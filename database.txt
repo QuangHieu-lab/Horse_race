@@ -1,0 +1,38 @@
+# Schema reference — Horse Racing
+
+> **Chuẩn đầy đủ:** [docs/DATABASE_EXPECT.md](docs/DATABASE_EXPECT.md)  
+> **Code:** `backend/src/models/`
+
+## Collections (17)
+
+| Model | File |
+|-------|------|
+| User | User.model.ts |
+| Horse | Horse.model.ts |
+| Track | Track.model.ts |
+| RaceMeeting | RaceMeeting.model.ts |
+| Tournament | Tournament.model.ts |
+| Race | Race.model.ts |
+| RaceRegistration | RaceRegistration.model.ts |
+| JockeyInvitation | JockeyInvitation.model.ts |
+| Result | Result.model.ts |
+| Prediction | Prediction.model.ts |
+| PredictionPool | PredictionPool.model.ts |
+| SpectatorProfile | SpectatorProfile.model.ts |
+| Product | Product.model.ts |
+| Redemption | Redemption.model.ts |
+| Notification | Notification.model.ts |
+| AuditLog | AuditLog.model.ts |
+| OrganizerLedger | OrganizerLedger.model.ts |
+
+## Quy tắc đã enforce
+
+Xem [docs/DATABASE_EXPECT.md](docs/DATABASE_EXPECT.md) mục 4.
+
+## Seed
+
+```bash
+cd backend && npm run db:seed
+```
+
+Mật khẩu: `Demo@123`

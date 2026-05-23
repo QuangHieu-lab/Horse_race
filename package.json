@@ -1,25 +1,14 @@
 {
-  "name": "horse_racing",
+  "name": "horse-racing-system",
   "version": "1.0.0",
-  "description": "",
-  "main": "dist/index.js",
-  "type": "module",
+  "private": true,
+  "description": "Horse racing tournament management — monorepo layout",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "express": "^5.2.1"
-  },
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.8.0",
-    "tsx": "^4.22.1",
-    "typescript": "^6.0.3"
-  }
+  "license": "ISC"
 }
