@@ -1,51 +1,15 @@
 import { Router } from 'express';
-import { asyncHandler } from '../middleware/error.middleware.js';
-import {
-  addParticipantToRace,
-  createRace,
-  getRaceById,
-  getRacesByTournament,
-  updateRaceStatus,
-} from '../services/race.service.js';
+import { RaceController } from '../controllers/race.controller.js';
 
 export const raceRouter = Router();
+const raceController = new RaceController();
 
-raceRouter.post(
-  '/',
-  asyncHandler(async (req, res) => {
-    const race = await createRace(req.body);
-    res.status(201).json({ race });
-  }),
-);
+raceRouter.post('/', raceController.create);
 
-raceRouter.get(
-  '/tournament/:tournamentId',
-  asyncHandler(async (req, res) => {
-    const races = await getRacesByTournament(String(req.params.tournamentId));
-    res.json({ races });
-  }),
-);
+raceRouter.get('/tournament/:tournamentId', raceController.getByTournament);
 
-raceRouter.get(
-  '/:id',
-  asyncHandler(async (req, res) => {
-    const race = await getRaceById(String(req.params.id));
-    res.json({ race });
-  }),
-);
+raceRouter.get('/:id', raceController.getById);
 
-raceRouter.post(
-  '/:id/participants',
-  asyncHandler(async (req, res) => {
-    const race = await addParticipantToRace(String(req.params.id), req.body);
-    res.json({ race });
-  }),
-);
+raceRouter.post('/:id/participants', raceController.addParticipant);
 
-raceRouter.patch(
-  '/:id/status',
-  asyncHandler(async (req, res) => {
-    const race = await updateRaceStatus(String(req.params.id), req.body.status);
-    res.json({ race });
-  }),
-);
+raceRouter.patch('/:id/status', raceController.updateStatus);
