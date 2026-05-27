@@ -1,48 +1,99 @@
-import {Tournament} from '../models/Tournament.model.js';
-import type {  ITournament } from '../models/Tournament.model.js';
-
-import { HttpError } from '../utils/http-error.js';
 import mongoose from 'mongoose';
+import { Race } from '../models/Race.model.js';
+import { Tournament, type ITournament } from '../models/Tournament.model.js';
+import { HttpError } from '../utils/http-error.js';
 
-export class TournamentService {
-  async createTournament(data: Partial<ITournament>, creatorId: string) {
-    // Ràng buộc logic: Ngày kết thúc phải sau ngày bắt đầu
-    if (data.startDate && data.endDate) {
-      if (new Date(data.endDate) <= new Date(data.startDate)) {
-        throw new HttpError(400, 'Ngày kết thúc giải đấu phải sau ngày bắt đầu.');
-      }
-    }
+export interface CreateTournamentInput {
+  name: string;
+  description?: string;
+  startDate: string | Date;
+  endDate: string | Date;
+  location: string;
+  regulationsUrl?: string;
+  prizePool?: number;
+  predictionConfig?: ITournament['predictionConfig'];
+}
 
-    const tournament = new Tournament({
-      ...data,
-      createdBy: new mongoose.Types.ObjectId(creatorId),
-    });
+export async function createTournament(
+  creatorId: string,
+  input: CreateTournamentInput,
+): Promise<ITournament & { _id: mongoose.Types.ObjectId }> {
+  const startDate = new Date(input.startDate);
+  const endDate = new Date(input.endDate);
 
-    return await tournament.save();
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    throw new HttpError(400, 'Ngày bắt đầu/kết thúc không hợp lệ');
+  }
+  if (endDate <= startDate) {
+    throw new HttpError(400, 'Ngày kết thúc phải sau ngày bắt đầu');
   }
 
-  async getAllTournaments(page = 1, limit = 10) {
-    const skip = (page - 1) * limit;
-    const items = await Tournament.find()
+  const tournament = await Tournament.create({
+    ...input,
+    startDate,
+    endDate,
+    createdBy: new mongoose.Types.ObjectId(creatorId),
+  });
+
+  return tournament.toObject();
+}
+
+export async function listTournaments(page = 1, limit = 10) {
+  const normalizedPage = Math.max(1, page);
+  const normalizedLimit = Math.min(50, Math.max(1, limit));
+  const skip = (normalizedPage - 1) * normalizedLimit;
+
+  const [items, total] = await Promise.all([
+    Tournament.find()
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit)
-      .populate('createdBy', 'fullName email'); // Lấy thêm thông tin người tạo
-    
-    const total = await Tournament.countDocuments();
-    return { items, total, page, pages: Math.ceil(total / limit) };
-  } 
-// Lấy chi tiết giải đấu
-  async getTournamentById(id: string) {
-    return await Tournament.findById(id).populate('createdBy', 'fullName email');
+      .limit(normalizedLimit)
+      .populate('createdBy', 'fullName email')
+      .lean(),
+    Tournament.countDocuments(),
+  ]);
+
+  return {
+    items,
+    total,
+    page: normalizedPage,
+    pages: Math.ceil(total / normalizedLimit) || 1,
+  };
+}
+
+export async function getTournamentById(id: string) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(400, 'ID giải đấu không hợp lệ');
   }
 
-  // Cập nhật trạng thái giải đấu
-  async updateTournamentStatus(id: string, status: string) {
-    return await Tournament.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true, runValidators: true }
-    );
+  const tournament = await Tournament.findById(id)
+    .populate('createdBy', 'fullName email')
+    .lean();
+
+  if (!tournament) {
+    throw new HttpError(404, 'Không tìm thấy giải đấu');
   }
+
+  const raceCount = await Race.countDocuments({ tournamentId: tournament._id });
+  return { ...tournament, raceCount };
+}
+
+export async function updateTournamentStatus(id: string, status: ITournament['status']) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(400, 'ID giải đấu không hợp lệ');
+  }
+
+  const tournament = await Tournament.findByIdAndUpdate(
+    id,
+    { status },
+    { new: true, runValidators: true },
+  )
+    .populate('createdBy', 'fullName email')
+    .lean();
+
+  if (!tournament) {
+    throw new HttpError(404, 'Không tìm thấy giải đấu để cập nhật');
+  }
+
+  return tournament;
 }

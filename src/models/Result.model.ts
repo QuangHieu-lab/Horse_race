@@ -147,6 +147,14 @@ ResultSchema.pre('save', async function (next) {
 
   if (this.isModified('publishedAt') && this.publishedAt) {
     if (!this.confirmedAt) return next(new Error('Result must be confirmed before publish'));
+    try {
+      const { scorePredictionsFromResult } = await import(
+        '../services/prediction-scoring.service.js'
+      );
+      await scorePredictionsFromResult(this);
+    } catch (err) {
+      return next(err instanceof Error ? err : new Error(String(err)));
+    }
   }
 
   const dq = disqualifiedHorseIdsFromViolations(this.violations);

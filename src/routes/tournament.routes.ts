@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { TournamentController } from '../controllers/tournament.controller.js';
 
-const router = Router();
-const controller = new TournamentController();
+export const tournamentRouter = Router();
+const tournamentController = new TournamentController();
 
-router.post('/', controller.create);
-router.get('/', controller.getAll);
-router.get('/:id', controller.getById);
-router.patch('/:id/status', controller.updateStatus);
-export default router;
+tournamentRouter.post('/', tournamentController.create);
+
+tournamentRouter.get('/', tournamentController.getAll);
+
+tournamentRouter.get('/:id', tournamentController.getById);
+
+tournamentRouter.patch('/:id/status', tournamentController.updateStatus);
