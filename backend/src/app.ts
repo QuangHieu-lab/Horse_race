@@ -1,29 +1,32 @@
-import express from 'express';
 import cors from 'cors';
-import { getDatabaseState } from './config/database.js';
+import express from 'express';
 import { env } from './config/env.js';
-import { errorHandler } from './middleware/error-handler.js';
-import { apiRouter } from './routes/index.js';
+import { authenticate } from './middleware/auth.middleware.js';
+import { errorHandler } from './middleware/error.middleware.js';
+import { requireRole } from './middleware/require-role.middleware.js';
+import { authRouter } from './routes/auth.routes.js';
+import { jockeyRouter } from './routes/jockey.routes.js';
+import { raceRouter } from './routes/race.routes.js';
+import { spectatorRouter } from './routes/spectator.routes.js';
+import { tournamentRouter } from './routes/tournament.routes.js';
 
-const app = express();
+export function createApp() {
+  const app = express();
 
-app.use(cors({ origin: env.corsOrigin, credentials: true }));
-app.use(express.json());
+  app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  app.use(express.json());
 
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'horse-racing-api',
-    database: getDatabaseState(),
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true });
   });
-});
 
-app.get('/', (_req, res) => {
-  res.send('Horse Racing API — docs: /api/v1');
-});
+  app.use('/api/auth', authRouter);
+  app.use('/api/jockey', authenticate, requireRole('jockey'), jockeyRouter);
+  app.use('/api/spectator', authenticate, requireRole('spectator'), spectatorRouter);
+  app.use('/api/tournaments', authenticate, requireRole('admin'), tournamentRouter);
+  app.use('/api/races', authenticate, requireRole('admin'), raceRouter);
 
-app.use('/api/v1', apiRouter);
+  app.use(errorHandler);
 
-app.use(errorHandler);
-
-export { app };
+  return app;
+}
