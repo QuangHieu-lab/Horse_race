@@ -10,9 +10,9 @@ spectatorRouter.get('/races', spectatorController.listRaces);
 
 spectatorRouter.get('/races/:id', spectatorController.getRaceById);
 
-spectatorRouter.get('/predictions', spectatorController.listPredictions);
+spectatorRouter.get('/predictions/:id', spectatorController.listPredictions);
 
-spectatorRouter.post('/predictions', spectatorController.createPrediction);
+spectatorRouter.post('/predictions/:id', spectatorController.createPrediction);
 
 spectatorRouter.get('/points', spectatorController.getPoints);
 
