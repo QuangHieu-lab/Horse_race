@@ -80,6 +80,29 @@ export interface SpectatorHorseDto {
   laneNumber: number;
 }
 
+export interface ViewingTicketInfoDto {
+  requiresTicket: boolean;
+  hasPass: boolean;
+  canPurchase: boolean;
+  pricePoints: number;
+  announceAt: string | null;
+  saleOpensAt: string | null;
+  saleExpiresAt: string | null;
+  announcementMessage?: string;
+  allowVipRedemption: boolean;
+}
+
+export interface RaceViewingPassDto {
+  id: string;
+  raceId: string;
+  raceName?: string;
+  scheduledAt?: string;
+  source: 'purchase' | 'vip_redemption';
+  pointsPaid: number;
+  purchasedAt: string;
+  status: 'active' | 'expired' | 'revoked';
+}
+
 export interface SpectatorRaceDto {
   id: string;
   name: string;
@@ -94,6 +117,8 @@ export interface SpectatorRaceDto {
   predictionOpenAt?: string | null;
   predictionCloseAt?: string | null;
   result?: RaceResultDto | null;
+  viewingTicket: ViewingTicketInfoDto;
+  streamUrl?: string;
 }
 
 export interface TournamentDto {
@@ -150,6 +175,8 @@ export interface ProductDto {
   pointsCost: number;
   stock: number;
   isInStock: boolean;
+  linkedRaceId?: string | null;
+  voucherKind?: 'race_viewing_pass' | null;
 }
 
 export interface RedemptionDto {

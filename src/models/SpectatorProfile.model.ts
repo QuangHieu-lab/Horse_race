@@ -1,11 +1,11 @@
 import mongoose, { Schema, type HydratedDocument, type Model } from 'mongoose';
-import type { PointsTxType } from '../types/shared.types.js';
+import type { PointsRefModel, PointsTxType } from '../types/shared.types.js';
 
 export interface IPointsTransaction {
   type: PointsTxType;
   points: number;
   balanceAfter: number;
-  refModel?: 'Prediction' | 'Redemption' | 'PredictionPool' | null;
+  refModel?: PointsRefModel | null;
   refId?: mongoose.Types.ObjectId | null;
   note?: string;
   createdAt: Date;
@@ -25,13 +25,14 @@ export interface ISpectatorProfileMethods {
   addPoints(
     points: number,
     type: PointsTxType,
-    refModel?: 'Prediction' | 'Redemption' | 'PredictionPool',
+    refModel?: PointsRefModel,
     refId?: mongoose.Types.ObjectId,
     note?: string,
   ): Promise<HydratedDocument<ISpectatorProfile, ISpectatorProfileMethods>>;
   spendPoints(
     points: number,
-    refModel?: 'Prediction' | 'Redemption' | 'PredictionPool',
+    type: PointsTxType,
+    refModel?: PointsRefModel,
     refId?: mongoose.Types.ObjectId,
     note?: string,
   ): Promise<HydratedDocument<ISpectatorProfile, ISpectatorProfileMethods>>;
@@ -42,6 +43,8 @@ type SpectatorProfileModel = Model<
   Record<string, never>,
   ISpectatorProfileMethods
 >;
+
+const POINTS_REF_MODELS = ['Prediction', 'Redemption', 'PredictionPool', 'RaceViewingPass'] as const;
 
 const PointsTransactionSchema = new Schema<IPointsTransaction>(
   {
@@ -55,6 +58,8 @@ const PointsTransactionSchema = new Schema<IPointsTransaction>(
         'spent_pool_entry',
         'earned_pool_share',
         'refunded_pool',
+        'spent_viewing_ticket',
+        'refunded_viewing_ticket',
       ],
       required: true,
     },
@@ -62,7 +67,7 @@ const PointsTransactionSchema = new Schema<IPointsTransaction>(
     balanceAfter: { type: Number, required: true, min: 0 },
     refModel: {
       type: String,
-      enum: ['Prediction', 'Redemption', 'PredictionPool'],
+      enum: POINTS_REF_MODELS,
       default: null,
     },
     refId: { type: Schema.Types.ObjectId, default: null },
@@ -90,7 +95,7 @@ const SpectatorProfileSchema = new Schema<
 SpectatorProfileSchema.methods.addPoints = async function (
   points: number,
   type: PointsTxType,
-  refModel?: 'Prediction' | 'Redemption' | 'PredictionPool',
+  refModel?: PointsRefModel,
   refId?: mongoose.Types.ObjectId,
   note?: string,
 ) {
@@ -110,7 +115,8 @@ SpectatorProfileSchema.methods.addPoints = async function (
 
 SpectatorProfileSchema.methods.spendPoints = async function (
   points: number,
-  refModel?: 'Prediction' | 'Redemption' | 'PredictionPool',
+  type: PointsTxType,
+  refModel?: PointsRefModel,
   refId?: mongoose.Types.ObjectId,
   note?: string,
 ) {
@@ -120,7 +126,7 @@ SpectatorProfileSchema.methods.spendPoints = async function (
   this.totalPointsSpent += points;
   this.currentBalance -= points;
   this.transactions.push({
-    type: 'spent_redemption',
+    type,
     points: -points,
     balanceAfter: this.currentBalance,
     refModel: refModel ?? null,

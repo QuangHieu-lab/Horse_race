@@ -57,7 +57,17 @@ export type PointsTxType =
   | 'refunded_redemption'
   | 'spent_pool_entry'
   | 'earned_pool_share'
-  | 'refunded_pool';
+  | 'refunded_pool'
+  | 'spent_viewing_ticket'
+  | 'refunded_viewing_ticket';
+
+export type ViewingPassSource = 'purchase' | 'vip_redemption';
+
+export type ViewingPassStatus = 'active' | 'expired' | 'revoked';
+
+export type ViewingReminderKind = 'sale_open' | 'daily_reminder' | 'purchased_reminder';
+
+export type ProductVoucherKind = 'race_viewing_pass' | null;
 
 export type ProductCategory =
   | 'merchandise'
@@ -85,7 +95,10 @@ export type NotificationType =
   | 'prediction_reward'
   | 'registration_approved'
   | 'participant_scratched'
-  | 'result_protest_filed';
+  | 'result_protest_filed'
+  | 'viewing_ticket_sale_open'
+  | 'viewing_ticket_daily_reminder'
+  | 'viewing_ticket_purchased';
 
 export type NotificationRefModel =
   | 'Race'
@@ -96,7 +109,10 @@ export type NotificationRefModel =
   | 'RaceRegistration'
   | 'PredictionPool'
   | 'RaceMeeting'
-  | 'Track';
+  | 'Track'
+  | 'RaceViewingPass';
+
+export type PointsRefModel = 'Prediction' | 'Redemption' | 'PredictionPool' | 'RaceViewingPass';
 
 export const PENALTY_APPLIED: readonly PenaltyApplied[] = [
   'warning',

@@ -21,6 +21,7 @@ import {
   Prediction,
   Product,
   Notification,
+  SpectatorProfile,
 } from '../models/index.js';
 
 const DEMO_PASSWORD = 'Demo@123';
@@ -33,6 +34,8 @@ const COLLECTIONS_TO_CLEAR = [
   'products',
   'predictions',
   'predictionpools',
+  'raceviewingpasses',
+  'viewingticketreminderlogs',
   'spectatorprofiles',
   'jockeyinvitations',
   'results',
@@ -138,6 +141,19 @@ async function seed(): Promise<void> {
   const jockey2 = users[3]!;
   const referee = users[4]!;
   const spectator = users[5]!;
+
+  console.log('Setting spectator points…');
+  await SpectatorProfile.findOneAndUpdate(
+    { userId: spectator._id },
+    {
+      $set: {
+        currentBalance: 2500,
+        totalPointsEarned: 2500,
+        totalPointsSpent: 0,
+      },
+    },
+    { upsert: true },
+  );
 
   console.log('Creating horses…');
   const horses = await Horse.create([
@@ -276,6 +292,7 @@ async function seed(): Promise<void> {
 
   // --- Scenario B: Spectator open prediction ---
   console.log('Scenario B — Spectator open prediction…');
+  const raceOpenScheduled = daysFromNow(3);
   const raceOpen = await Race.create({
     tournamentId: tournament._id,
     meetingId: meetingOpen._id,
@@ -283,17 +300,28 @@ async function seed(): Promise<void> {
     name: 'Chung kết — Vòng 1',
     round: 1,
     raceClass: 'Open',
-    scheduledAt: daysFromNow(3),
+    scheduledAt: raceOpenScheduled,
     distance: 1600,
     surface: 'turf',
     going: 'good',
     weather: 'Mát',
+    streamUrl: 'https://example.com/live/chung-ket-v1',
     predictionOpenAt: daysFromNow(-2),
     predictionCloseAt: daysFromNow(2),
     maxParticipants: 8,
     status: 'scheduled',
     refereeId: referee._id,
     participants: [],
+    viewingTicket: {
+      enabled: true,
+      pricePoints: 200,
+      announceAt: daysFromNow(-1),
+      saleOpensAt: daysFromNow(-1),
+      saleExpiresAt: raceOpenScheduled,
+      announcementMessage:
+        'Vé xem trực tiếp cuộc Chung kết — Vòng 1. Giá 200 điểm. Mua trước giờ đua để xem stream HD.',
+      allowVipRedemption: true,
+    },
   });
 
   await RaceRegistration.create([
@@ -454,11 +482,13 @@ async function seed(): Promise<void> {
 
   const product = await Product.create({
     name: 'Voucher xem giải VIP',
-    description: 'Đổi 500 điểm — demo redemption.',
+    description: 'Đổi 500 điểm — vé xem Chung kết Vòng 1 (sự kiện hiếm).',
     category: 'voucher',
     pointsCost: 500,
     stock: 10,
     isActive: true,
+    linkedRaceId: raceOpen._id,
+    voucherKind: 'race_viewing_pass',
     createdBy: admin._id,
   });
 

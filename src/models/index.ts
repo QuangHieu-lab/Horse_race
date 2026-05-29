@@ -11,7 +11,12 @@ export {
   type ITournament,
   type IPredictionConfig,
 } from './Tournament.model.js';
-export { Race, type IRace, type IParticipant } from './Race.model.js';
+export { Race, type IRace, type IParticipant, type IViewingTicket } from './Race.model.js';
+export { RaceViewingPass, type IRaceViewingPass } from './RaceViewingPass.model.js';
+export {
+  ViewingTicketReminderLog,
+  type IViewingTicketReminderLog,
+} from './ViewingTicketReminderLog.model.js';
 export { RaceRegistration, type IRaceRegistration } from './RaceRegistration.model.js';
 export {
   Result,

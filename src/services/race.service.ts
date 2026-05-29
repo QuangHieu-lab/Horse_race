@@ -6,6 +6,10 @@ import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceStatus } from '../types/shared.types.js';
 import { activeParticipants, nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
+import {
+  normalizeViewingTicket,
+  type ViewingTicketInput,
+} from '../utils/viewing-ticket.js';
 
 const RACE_STATUSES: RaceStatus[] = ['scheduled', 'ongoing', 'completed', 'cancelled'];
 
@@ -23,6 +27,8 @@ export interface CreateRaceInput {
   predictionCloseAt?: string | Date | null;
   maxParticipants: number;
   refereeId?: string;
+  streamUrl?: string;
+  viewingTicket?: ViewingTicketInput;
 }
 
 export interface AddParticipantInput {
@@ -48,6 +54,8 @@ export async function createRace(input: CreateRaceInput) {
     throw new HttpError(400, 'scheduledAt không hợp lệ');
   }
 
+  const viewingTicket = normalizeViewingTicket(scheduledAt, input.viewingTicket);
+
   const race = await Race.create({
     ...input,
     tournamentId: new mongoose.Types.ObjectId(input.tournamentId),
@@ -55,6 +63,7 @@ export async function createRace(input: CreateRaceInput) {
     predictionOpenAt: input.predictionOpenAt ? new Date(input.predictionOpenAt) : null,
     predictionCloseAt: input.predictionCloseAt ? new Date(input.predictionCloseAt) : null,
     refereeId: input.refereeId ? new mongoose.Types.ObjectId(input.refereeId) : null,
+    viewingTicket,
   });
 
   return race.toObject();

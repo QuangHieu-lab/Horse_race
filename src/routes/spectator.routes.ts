@@ -10,6 +10,10 @@ spectatorRouter.get('/races', spectatorController.listRaces);
 
 spectatorRouter.get('/races/:id', spectatorController.getRaceById);
 
+spectatorRouter.post('/races/:id/viewing-pass', spectatorController.purchaseViewingPass);
+
+spectatorRouter.get('/viewing-passes', spectatorController.listViewingPasses);
+
 spectatorRouter.get('/predictions/:id', spectatorController.listPredictions);
 
 spectatorRouter.post('/predictions/:id', spectatorController.createPrediction);

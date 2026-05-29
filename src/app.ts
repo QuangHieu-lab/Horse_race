@@ -10,6 +10,8 @@ import { raceRouter } from './routes/race.routes.js';
 import { spectatorRouter } from './routes/spectator.routes.js';
 import { tournamentRouter } from './routes/tournament.routes.js';
 import { horseOwnerRouter } from './routes/horse-owner.routes.js';
+import { adminJobsRouter } from './routes/admin-jobs.routes.js';
+
 export function createApp() {
   const app = express();
 
@@ -25,7 +27,8 @@ export function createApp() {
   app.use('/api/spectator', authenticate, requireRole('spectator'), spectatorRouter);
   app.use('/api/tournaments', authenticate, requireRole('admin'), tournamentRouter);
   app.use('/api/races', authenticate, requireRole('admin'), raceRouter);
-app.use('/api/horse-owner', authenticate, requireRole('horse_owner'), horseOwnerRouter);
+  app.use('/api/admin/jobs', authenticate, requireRole('admin'), adminJobsRouter);
+  app.use('/api/horse-owner', authenticate, requireRole('horse_owner'), horseOwnerRouter);
   app.use(errorHandler);
 
   return app;
