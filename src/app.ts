@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import { env } from './config/env.js';
+import { buildCorsOptions } from './config/cors.js';
 import { authenticate } from './middleware/auth.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { requireRole } from './middleware/require-role.middleware.js';
@@ -16,13 +16,10 @@ import { refereeRouter } from './routes/referee.routes.js';
 
 export function createApp() {
   const app = express();
+  const corsOptions = buildCorsOptions();
 
-  app.use(
-    cors({
-      origin: env.corsOrigins,
-      credentials: true,
-    }),
-  );
+  app.use(cors(corsOptions));
+  app.options(/.*/, cors(corsOptions));
   app.use(express.json());
 
   app.get('/api/health', (_req, res) => {
