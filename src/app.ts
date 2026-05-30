@@ -11,11 +11,18 @@ import { spectatorRouter } from './routes/spectator.routes.js';
 import { tournamentRouter } from './routes/tournament.routes.js';
 import { horseOwnerRouter } from './routes/horse-owner.routes.js';
 import { adminJobsRouter } from './routes/admin-jobs.routes.js';
+import { adminRouter } from './routes/admin.routes.js';
+import { refereeRouter } from './routes/referee.routes.js';
 
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  app.use(
+    cors({
+      origin: env.corsOrigins,
+      credentials: true,
+    }),
+  );
   app.use(express.json());
 
   app.get('/api/health', (_req, res) => {
@@ -28,6 +35,8 @@ export function createApp() {
   app.use('/api/tournaments', authenticate, requireRole('admin'), tournamentRouter);
   app.use('/api/races', authenticate, requireRole('admin'), raceRouter);
   app.use('/api/admin/jobs', authenticate, requireRole('admin'), adminJobsRouter);
+  app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
+  app.use('/api/referee', authenticate, requireRole('referee'), refereeRouter);
   app.use('/api/horse-owner', authenticate, requireRole('horse_owner'), horseOwnerRouter);
   app.use(errorHandler);
 

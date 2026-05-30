@@ -23,3 +23,5 @@ spectatorRouter.get('/points', spectatorController.getPoints);
 spectatorRouter.get('/products', spectatorController.listProducts);
 
 spectatorRouter.post('/redemptions', spectatorController.createRedemption);
+
+spectatorRouter.get('/notifications', spectatorController.listNotifications);

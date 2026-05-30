@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import * as jockeyService from '../services/jockey.service.js';
+import { listNotificationsForUser } from '../services/notification.service.js';
 import type { InvitationStatus } from '../types/shared.types.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -41,5 +42,10 @@ export class JockeyController {
   getRaceById = asyncHandler(async (req: Request, res: Response) => {
     const race = await jockeyService.getJockeyRace(req.user!.id, req.params.id as string);
     res.json({ race });
+  });
+
+  listNotifications = asyncHandler(async (req: Request, res: Response) => {
+    const notifications = await listNotificationsForUser(req.user!.id);
+    res.json({ notifications });
   });
 }
