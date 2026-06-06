@@ -18,6 +18,7 @@ const corsRaw = process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://localho
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  
   port: Number(process.env.PORT) || 3000,
   mongodbUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/horse_racing'),
   corsOrigins: parseCorsOrigins(corsRaw),
