@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { buildCorsOptions } from './config/cors.js';
+import { setupSwagger } from './config/swagger.js';
 import { authenticate } from './middleware/auth.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { requireRole } from './middleware/require-role.middleware.js';
@@ -25,6 +26,8 @@ export function createApp() {
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
+
+  setupSwagger(app);
 
   app.use('/api/auth', authRouter);
   app.use('/api/jockey', authenticate, requireRole('jockey'), jockeyRouter);
