@@ -207,3 +207,21 @@ export async function updateRaceStatus(raceId: string, status: IRace['status']) 
 
   return race.toObject();
 }
+export async function deleteRace(raceId: string) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  const race = await Race.findById(raceId);
+  if (!race) {
+    throw new HttpError(404, 'Không tìm thấy trận đua để xóa');
+  }
+
+  // Bảo vệ nghiệp vụ: Không xóa trận đang chạy hoặc đã kết thúc
+  if (race.status === 'ongoing' || race.status === 'completed') {
+    throw new HttpError(400, 'Không thể xóa trận đua đang diễn ra hoặc đã kết thúc.');
+  }
+
+  await Race.findByIdAndDelete(raceId);
+  return true;
+}

@@ -96,4 +96,35 @@ export async function updateTournamentStatus(id: string, status: ITournament['st
   }
 
   return tournament;
+  
+}
+export async function deleteTournament(id: string) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(400, 'ID giải đấu không hợp lệ');
+  }
+
+  const tournament = await Tournament.findById(id);
+  if (!tournament) {
+    throw new HttpError(404, 'Không tìm thấy giải đấu để xóa');
+  }
+
+  if (tournament.status !== 'draft' && tournament.status !== 'published') {
+    throw new HttpError(
+      400, 
+      `Không thể xóa giải đấu đang ở trạng thái "${tournament.status}".`
+    );
+  }
+
+  // 💡 LỚP BẢO VỆ MỚI: Kiểm tra xem có trận đua nào đang gắn với giải đấu này không
+  const existingRacesCount = await Race.countDocuments({ tournamentId: id });
+  
+  if (existingRacesCount > 0) {
+    throw new HttpError(
+      409, // 409 Conflict là mã HTTP chuẩn cho các lỗi dính líu đến dữ liệu quan hệ
+      `Không thể xóa! Giải đấu này đang có ${existingRacesCount} trận đua bên trong. Vui lòng xóa tất cả các trận đua trực thuộc trước khi xóa giải đấu.`
+    );
+  }
+
+  await Tournament.findByIdAndDelete(id);
+  return true;
 }

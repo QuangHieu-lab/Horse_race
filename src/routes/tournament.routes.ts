@@ -11,3 +11,5 @@ tournamentRouter.get('/', tournamentController.getAll);
 tournamentRouter.get('/:id', tournamentController.getById);
 
 tournamentRouter.patch('/:id/status', tournamentController.updateStatus);
+
+tournamentRouter.delete('/:id', tournamentController.delete);

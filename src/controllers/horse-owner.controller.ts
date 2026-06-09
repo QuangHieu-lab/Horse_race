@@ -99,4 +99,13 @@ export class HorseOwnerController {
       data: invitation 
     });
   });
+  deleteHorse = asyncHandler(async (req: Request, res: Response) => {
+    // Gọi xuống service để xóa ngựa, truyền vào ID chủ ngựa (để bảo mật) và ID của ngựa
+    await horseOwnerService.deleteHorse(req.user!.id, req.params.id as string);
+    
+    res.json({ 
+      success: true, 
+      message: 'Đã xóa hồ sơ ngựa thành công!' 
+    });
+  });
 }   
