@@ -6,6 +6,7 @@ import {
   getRaceById,
   getRacesByTournament,
   updateRaceStatus,
+  deleteRace,
 } from '../services/race.service.js';
 
 export class RaceController {
@@ -32,5 +33,9 @@ export class RaceController {
   updateStatus = asyncHandler(async (req: Request, res: Response) => {
     const race = await updateRaceStatus(String(req.params.id), req.body.status);
     res.json({ race });
+  });
+  delete = asyncHandler(async (req: Request, res: Response) => {
+    await deleteRace(String(req.params.id));
+    res.json({ success: true, message: 'Đã xóa trận đua thành công' });
   });
 }

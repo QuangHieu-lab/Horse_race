@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import {
   createTournament,
+  deleteTournament,
   getTournamentById,
   listTournaments,
   updateTournamentStatus,
@@ -31,5 +32,10 @@ export class TournamentController {
       req.body.status,
     );
     res.json({ tournament });
+  });
+  delete = asyncHandler(async (req: Request, res: Response) => {
+    await deleteTournament(String(req.params.id));
+    // Giữ format trả về ngắn gọn giống các hàm trên
+    res.json({ success: true, message: 'Đã xóa giải đấu thành công' }); 
   });
 }

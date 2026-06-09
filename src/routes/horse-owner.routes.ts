@@ -9,7 +9,7 @@ const controller = new HorseOwnerController();
 horseOwnerRouter.post('/horses', controller.createHorse);
 horseOwnerRouter.get('/horses', controller.listMyHorses);
 horseOwnerRouter.patch('/horses/:id', controller.updateHorseInfo);
-
+horseOwnerRouter.delete('/horses/:id', controller.deleteHorse);
 // --- API Đăng ký trận đua ---
 horseOwnerRouter.post('/registrations', controller.registerForRace);
 horseOwnerRouter.get('/registrations', controller.listMyRegistrations);

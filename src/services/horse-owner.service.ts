@@ -161,7 +161,30 @@ export class HorseOwnerService {
 
     return toHorseDto(horse);
   }
+async deleteHorse(ownerId: string, horseId: string) {
+    // Lớp bảo vệ 1: Kiểm tra xem ngựa có tồn tại và có đúng là của ông chủ này không
+    const horse = await Horse.findOne({ _id: horseId, ownerId: ownerId });
+    
+    if (!horse) {
+      throw new HttpError(404, 'Không tìm thấy chiến mã, hoặc bạn không có quyền thao tác trên chiến mã này!');
+    }
 
+    // Lớp bảo vệ 2: Kiểm tra xem ngựa có đang bị kẹt trong giải đua nào không
+    // (Tìm các đơn đăng ký của con ngựa này đang ở trạng thái chờ duyệt hoặc đã duyệt)
+    const activeRegistration = await RaceRegistration.findOne({
+      horseId: horseId,
+      status: { $in: ['pending', 'approved'] } 
+    });
+
+    if (activeRegistration) {
+      throw new HttpError(400, 'Không thể xóa! Chiến mã này đang có đơn đăng ký tham gia giải đấu. Vui lòng rút đơn đăng ký trước khi xóa.');
+    }
+
+    // Nếu qua được 2 ải trên thì tiến hành "hóa kiếp" cho ngựa
+    await Horse.findByIdAndDelete(horseId);
+
+    return true;
+  }
   // --- ĐĂNG KÝ GIẢI ĐẤU ---
 
   async registerForRace(ownerId: string, input: RegisterRaceInput): Promise<RegistrationDto> {
