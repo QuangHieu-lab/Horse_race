@@ -15,6 +15,16 @@ export interface IParticipant {
   confirmedAt?: Date | null;
 }
 
+export interface IViewingTicket {
+  enabled: boolean;
+  pricePoints: number;
+  announceAt?: Date | null;
+  saleOpensAt?: Date | null;
+  saleExpiresAt?: Date | null;
+  announcementMessage?: string;
+  allowVipRedemption: boolean;
+}
+
 export interface IRace {
   tournamentId: mongoose.Types.ObjectId;
   meetingId?: mongoose.Types.ObjectId | null;
@@ -36,9 +46,23 @@ export interface IRace {
   cancelReason?: string;
   cancelledAt?: Date | null;
   participants: IParticipant[];
+  viewingTicket: IViewingTicket;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ViewingTicketSchema = new Schema<IViewingTicket>(
+  {
+    enabled: { type: Boolean, default: false },
+    pricePoints: { type: Number, default: 0, min: 0 },
+    announceAt: { type: Date, default: null },
+    saleOpensAt: { type: Date, default: null },
+    saleExpiresAt: { type: Date, default: null },
+    announcementMessage: { type: String, trim: true },
+    allowVipRedemption: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
 
 const ParticipantSchema = new Schema<IParticipant>(
   {
@@ -81,6 +105,14 @@ const RaceSchema = new Schema<IRace>(
     cancelReason: { type: String, trim: true },
     cancelledAt: { type: Date, default: null },
     participants: { type: [ParticipantSchema], default: [] },
+    viewingTicket: {
+      type: ViewingTicketSchema,
+      default: () => ({
+        enabled: false,
+        pricePoints: 0,
+        allowVipRedemption: false,
+      }),
+    },
   },
   { timestamps: true },
 );

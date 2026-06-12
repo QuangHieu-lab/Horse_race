@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { createPrediction } from '../services/prediction.service.js';
 import * as spectatorService from '../services/spectator.service.js';
+import * as viewingTicketService from '../services/viewing-ticket.service.js';
+import { listNotificationsForUser } from '../services/notification.service.js';
 import { HttpError } from '../utils/http-error.js';
 
 export class SpectatorController {
@@ -61,5 +63,27 @@ export class SpectatorController {
       quantity ?? 1,
     );
     res.status(201).json(result);
+  });
+
+  purchaseViewingPass = asyncHandler(async (req: Request, res: Response) => {
+    const result = await viewingTicketService.purchaseViewingPass(
+      req.user!.id,
+      req.params.id as string,
+    );
+    res.status(201).json(result);
+  });
+
+  listViewingPasses = asyncHandler(async (req: Request, res: Response) => {
+    const filter = req.query.filter as 'upcoming' | undefined;
+    if (filter && filter !== 'upcoming') {
+      throw new HttpError(400, 'filter không hợp lệ');
+    }
+    const passes = await viewingTicketService.listViewingPasses(req.user!.id, filter);
+    res.json({ passes });
+  });
+
+  listNotifications = asyncHandler(async (req: Request, res: Response) => {
+    const notifications = await listNotificationsForUser(req.user!.id);
+    res.json({ notifications });
   });
 }

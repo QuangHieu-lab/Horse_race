@@ -18,6 +18,8 @@ import type {
 } from '../types/api.types.js';
 import type { RaceStatus } from '../types/shared.types.js';
 import { HttpError } from '../utils/http-error.js';
+import * as viewingTicketService from './viewing-ticket.service.js';
+import { grantViewingPassFromVip } from './viewing-ticket.service.js';
 
 function isPredictionWindowOpen(
   race: { predictionOpenAt?: Date | null; predictionCloseAt?: Date | null; status: RaceStatus },
@@ -46,6 +48,16 @@ async function buildSpectatorRaceDto(
     tournamentId: mongoose.Types.ObjectId;
     predictionOpenAt?: Date | null;
     predictionCloseAt?: Date | null;
+    streamUrl?: string;
+    viewingTicket?: {
+      enabled: boolean;
+      pricePoints: number;
+      announceAt?: Date | null;
+      saleOpensAt?: Date | null;
+      saleExpiresAt?: Date | null;
+      announcementMessage?: string;
+      allowVipRedemption?: boolean;
+    };
     participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber: number }>;
   },
   spectatorId?: mongoose.Types.ObjectId,
@@ -106,6 +118,35 @@ async function buildSpectatorRaceDto(
   const openAt = race.predictionOpenAt ?? tournament.predictionConfig.predictionOpenAt;
   const closeAt = race.predictionCloseAt ?? tournament.predictionConfig.predictionCloseAt;
 
+  const now = new Date();
+  const spectatorIdStr = spectatorId?.toString();
+  const hasPass = spectatorIdStr
+    ? await viewingTicketService.findActivePass(spectatorIdStr, race._id)
+    : false;
+  const vt = race.viewingTicket;
+  const raceLike = {
+    _id: race._id,
+    status: race.status,
+    streamUrl: race.streamUrl,
+    viewingTicket: {
+      enabled: vt?.enabled ?? false,
+      pricePoints: vt?.pricePoints ?? 0,
+      announceAt: vt?.announceAt ?? null,
+      saleOpensAt: vt?.saleOpensAt ?? null,
+      saleExpiresAt: vt?.saleExpiresAt ?? null,
+      announcementMessage: vt?.announcementMessage,
+      allowVipRedemption: vt?.allowVipRedemption ?? false,
+    },
+    scheduledAt: race.scheduledAt,
+    name: race.name,
+    tournamentId: race.tournamentId,
+  };
+  const ticketState = viewingTicketService.getViewingTicketState(raceLike, now, hasPass);
+  const hasAccess = spectatorIdStr
+    ? await viewingTicketService.hasViewingAccess(spectatorIdStr, raceLike)
+    : !ticketState.requiresTicket;
+  const streamUrl = viewingTicketService.resolveStreamUrl(raceLike, hasAccess);
+
   return {
     id: race._id.toString(),
     name: race.name,
@@ -124,6 +165,8 @@ async function buildSpectatorRaceDto(
     predictionOpenAt: openAt?.toISOString() ?? null,
     predictionCloseAt: closeAt?.toISOString() ?? null,
     result: resultDto,
+    viewingTicket: viewingTicketService.buildViewingTicketDto(ticketState),
+    streamUrl,
   };
 }
 
@@ -224,6 +267,8 @@ export async function listProducts(): Promise<ProductDto[]> {
     pointsCost: p.pointsCost,
     stock: p.stock,
     isInStock: p.stock === -1 || p.stock > 0,
+    linkedRaceId: p.linkedRaceId?.toString() ?? null,
+    voucherKind: p.voucherKind ?? null,
   }));
 }
 
@@ -247,6 +292,32 @@ export async function redeemProduct(
     throw new HttpError(409, 'Sản phẩm không đủ tồn kho');
   }
 
+  if (
+    product.voucherKind === 'race_viewing_pass' &&
+    product.linkedRaceId &&
+    quantity > 1
+  ) {
+    throw new HttpError(400, 'Voucher vé xem chỉ được đổi từng vé một');
+  }
+
+  if (product.voucherKind === 'race_viewing_pass' && product.linkedRaceId) {
+    const linkedRace = await Race.findById(product.linkedRaceId).lean();
+    if (!linkedRace) throw new HttpError(404, 'Cuộc đua gắn voucher không tồn tại');
+    if (!linkedRace.viewingTicket?.enabled) {
+      throw new HttpError(409, 'Cuộc đua này không bán vé xem');
+    }
+    if (!linkedRace.viewingTicket.allowVipRedemption) {
+      throw new HttpError(403, 'Cuộc đua này không hỗ trợ đổi voucher VIP');
+    }
+    const hasPass = await viewingTicketService.findActivePass(
+      spectatorId,
+      linkedRace._id,
+    );
+    if (hasPass) {
+      throw new HttpError(409, 'Bạn đã có vé xem cuộc đua này');
+    }
+  }
+
   const totalPoints = product.pointsCost * quantity;
   const profile = await SpectatorProfile.findOne({
     userId: new mongoose.Types.ObjectId(spectatorId),
@@ -264,7 +335,13 @@ export async function redeemProduct(
     status: 'pending',
   });
 
-  await profile.spendPoints(totalPoints, 'Redemption', redemption._id, `Đổi ${product.name}`);
+  await profile.spendPoints(
+    totalPoints,
+    'spent_redemption',
+    'Redemption',
+    redemption._id,
+    `Đổi ${product.name}`,
+  );
 
   if (product.stock !== -1) {
     product.stock -= quantity;
@@ -273,6 +350,14 @@ export async function redeemProduct(
   } else {
     product.totalRedeemed += quantity;
     await product.save();
+  }
+
+  let viewingPass = undefined;
+  if (product.voucherKind === 'race_viewing_pass' && product.linkedRaceId) {
+    viewingPass = await grantViewingPassFromVip(
+      spectatorId,
+      product.linkedRaceId.toString(),
+    );
   }
 
   return {
@@ -285,6 +370,7 @@ export async function redeemProduct(
       createdAt: redemption.createdAt.toISOString(),
     },
     points: await getOrCreateProfile(spectatorId),
+    ...(viewingPass ? { viewingPass } : {}),
   };
 }
 

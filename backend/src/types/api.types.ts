@@ -1,4 +1,6 @@
 import type {
+  HealthStatus,          
+  RegistrationStatus,
   InvitationStatus,
   PredictionStatus,
   RaceStatus,
@@ -26,10 +28,11 @@ export interface InvitationDto {
   race: {
     id: string;
     name: string;
-    scheduledAt: string;
+    scheduledAt?: string;
     status: RaceStatus;
   };
   owner: UserSummaryDto;
+  jockey?: UserSummaryDto | null; // Bổ sung thông tin người nhận lời mời
 }
 
 export interface JockeyRaceParticipantDto {
@@ -77,6 +80,29 @@ export interface SpectatorHorseDto {
   laneNumber: number;
 }
 
+export interface ViewingTicketInfoDto {
+  requiresTicket: boolean;
+  hasPass: boolean;
+  canPurchase: boolean;
+  pricePoints: number;
+  announceAt: string | null;
+  saleOpensAt: string | null;
+  saleExpiresAt: string | null;
+  announcementMessage?: string;
+  allowVipRedemption: boolean;
+}
+
+export interface RaceViewingPassDto {
+  id: string;
+  raceId: string;
+  raceName?: string;
+  scheduledAt?: string;
+  source: 'purchase' | 'vip_redemption';
+  pointsPaid: number;
+  purchasedAt: string;
+  status: 'active' | 'expired' | 'revoked';
+}
+
 export interface SpectatorRaceDto {
   id: string;
   name: string;
@@ -91,6 +117,8 @@ export interface SpectatorRaceDto {
   predictionOpenAt?: string | null;
   predictionCloseAt?: string | null;
   result?: RaceResultDto | null;
+  viewingTicket: ViewingTicketInfoDto;
+  streamUrl?: string;
 }
 
 export interface TournamentDto {
@@ -147,6 +175,8 @@ export interface ProductDto {
   pointsCost: number;
   stock: number;
   isInStock: boolean;
+  linkedRaceId?: string | null;
+  voucherKind?: 'race_viewing_pass' | null;
 }
 
 export interface RedemptionDto {
@@ -156,4 +186,38 @@ export interface RedemptionDto {
   totalPoints: number;
   status: RedemptionStatus;
   createdAt: string;
+}
+export interface HorseDto {
+  id: string;
+  registrationId?: string
+  name: string;
+  breed: string;
+  age: number;
+  weight?: number;
+  color?: string;
+  healthStatus: HealthStatus;
+  currentJockey?: UserSummaryDto | null;
+  createdAt?: string;
+}
+
+export interface RegistrationDto {
+  id: string;
+  status: RegistrationStatus;
+  horse: {
+    id: string;
+    name: string;
+    healthStatus: HealthStatus;
+  };
+  race: {
+    id: string;
+    name: string;
+    round: number;
+    status: RaceStatus;
+    scheduledAt?: string;
+  };
+  jockey?: UserSummaryDto | null;
+  processedBy?: UserSummaryDto | null; // Thông tin Admin đã duyệt
+  processedAt?: string | null;         // Thời gian duyệt
+  waiverAcceptedAt?: string | null;    // Thời gian ký miễn trừ
+  createdAt?: string;
 }

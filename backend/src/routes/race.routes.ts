@@ -13,3 +13,5 @@ raceRouter.get('/:id', raceController.getById);
 raceRouter.post('/:id/participants', raceController.addParticipant);
 
 raceRouter.patch('/:id/status', raceController.updateStatus);
+
+raceRouter.delete('/:id', raceController.delete);

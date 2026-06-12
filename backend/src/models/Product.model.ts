@@ -10,6 +10,8 @@ export interface IProduct {
   stock: number;
   totalRedeemed: number;
   isActive: boolean;
+  linkedRaceId?: mongoose.Types.ObjectId | null;
+  voucherKind?: 'race_viewing_pass' | null;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +31,12 @@ const ProductSchema = new Schema<IProduct>(
     stock: { type: Number, default: -1 },
     totalRedeemed: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true },
+    linkedRaceId: { type: Schema.Types.ObjectId, ref: 'Race', default: null },
+    voucherKind: {
+      type: String,
+      enum: ['race_viewing_pass', null],
+      default: null,
+    },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true },

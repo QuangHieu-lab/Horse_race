@@ -6,6 +6,10 @@ import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceStatus } from '../types/shared.types.js';
 import { activeParticipants, nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
+import {
+  normalizeViewingTicket,
+  type ViewingTicketInput,
+} from '../utils/viewing-ticket.js';
 
 const RACE_STATUSES: RaceStatus[] = ['scheduled', 'ongoing', 'completed', 'cancelled'];
 
@@ -23,6 +27,8 @@ export interface CreateRaceInput {
   predictionCloseAt?: string | Date | null;
   maxParticipants: number;
   refereeId?: string;
+  streamUrl?: string;
+  viewingTicket?: ViewingTicketInput;
 }
 
 export interface AddParticipantInput {
@@ -48,6 +54,8 @@ export async function createRace(input: CreateRaceInput) {
     throw new HttpError(400, 'scheduledAt không hợp lệ');
   }
 
+  const viewingTicket = normalizeViewingTicket(scheduledAt, input.viewingTicket);
+
   const race = await Race.create({
     ...input,
     tournamentId: new mongoose.Types.ObjectId(input.tournamentId),
@@ -55,6 +63,7 @@ export async function createRace(input: CreateRaceInput) {
     predictionOpenAt: input.predictionOpenAt ? new Date(input.predictionOpenAt) : null,
     predictionCloseAt: input.predictionCloseAt ? new Date(input.predictionCloseAt) : null,
     refereeId: input.refereeId ? new mongoose.Types.ObjectId(input.refereeId) : null,
+    viewingTicket,
   });
 
   return race.toObject();
@@ -197,4 +206,22 @@ export async function updateRaceStatus(raceId: string, status: IRace['status']) 
   }
 
   return race.toObject();
+}
+export async function deleteRace(raceId: string) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  const race = await Race.findById(raceId);
+  if (!race) {
+    throw new HttpError(404, 'Không tìm thấy trận đua để xóa');
+  }
+
+  // Bảo vệ nghiệp vụ: Không xóa trận đang chạy hoặc đã kết thúc
+  if (race.status === 'ongoing' || race.status === 'completed') {
+    throw new HttpError(400, 'Không thể xóa trận đua đang diễn ra hoặc đã kết thúc.');
+  }
+
+  await Race.findByIdAndDelete(raceId);
+  return true;
 }
