@@ -59,6 +59,106 @@ const swaggerDefinition = {
           fullName: { type: 'string' },
         },
       },
+      PredictedRankRequest: {
+        type: 'object',
+        required: ['rank', 'horseId'],
+        properties: {
+          rank: { type: 'integer', minimum: 1, example: 1 },
+          horseId: { type: 'string', example: '665f1e000000000000000001' },
+        },
+      },
+      CreatePredictionRequest: {
+        type: 'object',
+        required: ['raceId', 'predictedRanks'],
+        properties: {
+          raceId: { type: 'string', example: '665f1e000000000000000010' },
+          predictedRanks: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 3,
+            description: 'Top-rank predictions. MVP scoring focuses on top 3.',
+            items: { $ref: '#/components/schemas/PredictedRankRequest' },
+          },
+        },
+      },
+      PredictionDto: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          raceId: { type: 'string' },
+          raceName: { type: 'string' },
+          tournamentName: { type: 'string' },
+          status: {
+            type: 'string',
+            enum: ['pending', 'partial', 'correct', 'incorrect'],
+          },
+          contribution: {
+            type: 'number',
+            example: 50000,
+            description: 'Prediction ticket points paid into the bounty pool.',
+          },
+          predictionScore: {
+            type: 'number',
+            example: 65,
+            description: 'Bounty scoring weight: exact rank 1/2/3 = 50/40/30, wrong-position top 3 = 15.',
+          },
+          pointsEarned: { type: 'number', example: 100 },
+          bonusPoints: { type: 'number', example: 50 },
+          poolShare: {
+            type: 'number',
+            example: 225000,
+            description: 'Reward points received from SpectatorRewardPool.',
+          },
+          totalPoints: { type: 'number', example: 225150 },
+          evaluatedAt: { type: 'string', format: 'date-time', nullable: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          predictedRanks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                rank: { type: 'integer', example: 1 },
+                horseId: { type: 'string' },
+                horseName: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+      BountyPoolFormula: {
+        type: 'object',
+        description: 'Prediction bounty pool settlement formula used when admin publishes race results.',
+        properties: {
+          totalBountyPool: {
+            type: 'string',
+            example: 'ticketPrice * numberOfParticipants',
+          },
+          organizerFee: {
+            type: 'string',
+            example: 'totalBountyPool * 10%',
+          },
+          racingRewardPool: {
+            type: 'string',
+            example: 'totalBountyPool * 15%',
+          },
+          spectatorRewardPool: {
+            type: 'string',
+            example: 'totalBountyPool * 75%',
+          },
+          ownerReward: {
+            type: 'string',
+            example: 'racingRewardPool * 80%',
+          },
+          jockeyReward: {
+            type: 'string',
+            example: 'racingRewardPool * 20%',
+          },
+          userReward: {
+            type: 'string',
+            example: 'userPredictionScore / totalWinnerScore * spectatorRewardPool',
+          },
+        },
+      },
     },
   },
   tags: [
@@ -158,10 +258,27 @@ const swaggerDefinition = {
     '/api/admin/races/{id}/result/publish': {
       patch: {
         tags: ['Admin'],
-        summary: 'Publish a race result',
+        summary: 'Publish a race result and settle prediction bounty pool',
+        description:
+          'Publishes confirmed race results, scores pending predictions, charges the bounty formula, records organizer fee, notifies owner/jockey, and distributes spectator pool shares.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Published result' } },
+        responses: {
+          200: {
+            description: 'Result published and bounty pool settlement attempted',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    ok: { type: 'boolean', example: true },
+                  },
+                },
+              },
+            },
+          },
+          409: { description: 'Result is not confirmed yet or was already published' },
+        },
       },
     },
     '/api/admin/results/publish-queue': {
@@ -462,17 +579,91 @@ const swaggerDefinition = {
     '/api/spectator/predictions/{id}': {
       get: {
         tags: ['Spectator'],
-        summary: 'List predictions for a race',
+        summary: 'List my predictions',
+        description:
+          'Returns prediction history including bounty fields: contribution, predictionScore, poolShare, and totalPoints.',
         security: [{ bearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Prediction list' } },
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Compatibility path parameter. Current backend returns the authenticated spectator prediction list.',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Prediction list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    predictions: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/PredictionDto' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       post: {
         tags: ['Spectator'],
-        summary: 'Create a race prediction',
+        summary: 'Create a race prediction and buy a bounty ticket when enabled',
+        description:
+          'Creates one prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee points from the spectator profile, records contribution, and adds it to the flexible bounty pool.',
         security: [{ bearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 201: { description: 'Created prediction' } },
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Race id. The request body also accepts raceId for current controller compatibility.',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreatePredictionRequest' },
+              examples: {
+                top3Prediction: {
+                  value: {
+                    raceId: '665f1e000000000000000010',
+                    predictedRanks: [
+                      { rank: 1, horseId: '665f1e000000000000000001' },
+                      { rank: 2, horseId: '665f1e000000000000000002' },
+                      { rank: 3, horseId: '665f1e000000000000000003' },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Created prediction',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    prediction: { $ref: '#/components/schemas/PredictionDto' },
+                  },
+                },
+              },
+            },
+          },
+          409: {
+            description: 'Prediction window closed, duplicate prediction, pool closed, or insufficient points',
+          },
+        },
       },
     },
     '/api/spectator/points': {
