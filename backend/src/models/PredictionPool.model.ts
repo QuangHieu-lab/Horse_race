@@ -18,6 +18,16 @@ export interface IPredictionPool {
   spectatorRewardPool: number;
   ownerReward: number;
   jockeyReward: number;
+  racingRewards: Array<{
+    rank: number;
+    horseId: mongoose.Types.ObjectId;
+    ownerId: mongoose.Types.ObjectId;
+    jockeyId: mongoose.Types.ObjectId;
+    horseReward: number;
+    ownerReward: number;
+    jockeyReward: number;
+    isDeadHeat: boolean;
+  }>;
   jackpotAmount: number;
   contributorCount: number;
   totalWinnerScore: number;
@@ -25,6 +35,20 @@ export interface IPredictionPool {
   createdAt: Date;
   updatedAt: Date;
 }
+
+const RacingRewardSchema = new Schema(
+  {
+    rank: { type: Number, required: true, min: 1 },
+    horseId: { type: Schema.Types.ObjectId, ref: 'Horse', required: true },
+    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    jockeyId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    horseReward: { type: Number, required: true, min: 0 },
+    ownerReward: { type: Number, required: true, min: 0 },
+    jockeyReward: { type: Number, required: true, min: 0 },
+    isDeadHeat: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
 
 const PredictionPoolSchema = new Schema<IPredictionPool>(
   {
@@ -48,6 +72,7 @@ const PredictionPoolSchema = new Schema<IPredictionPool>(
     spectatorRewardPool: { type: Number, default: 0, min: 0 },
     ownerReward: { type: Number, default: 0, min: 0 },
     jockeyReward: { type: Number, default: 0, min: 0 },
+    racingRewards: { type: [RacingRewardSchema], default: [] },
     jackpotAmount: { type: Number, default: 0, min: 0 },
     contributorCount: { type: Number, default: 0, min: 0 },
     totalWinnerScore: { type: Number, default: 0, min: 0 },

@@ -151,12 +151,43 @@ const swaggerDefinition = {
           },
           jockeyReward: {
             type: 'string',
-            example: 'racingRewardPool * 20%',
+            example: 'horseReward * 20%',
+          },
+          rankRewardRates: {
+            type: 'string',
+            example: 'Top ranks split racingRewardPool as [50%, 25%, 15%, 7%, 3%]. Dead-heat horses in the same rank split that rank reward equally.',
           },
           userReward: {
             type: 'string',
             example: 'userPredictionScore / totalWinnerScore * spectatorRewardPool',
           },
+        },
+      },
+      PredictionConfigRequest: {
+        type: 'object',
+        properties: {
+          isEnabled: { type: 'boolean', example: true },
+          pointsPerCorrect: { type: 'number', example: 100 },
+          bonusPointsTop3: { type: 'number', example: 50 },
+          poolEnabled: { type: 'boolean', example: true },
+          entryFee: { type: 'number', example: 50000 },
+          organizerFeeRate: { type: 'number', example: 10 },
+          racingRewardRate: { type: 'number', example: 15 },
+          spectatorRewardRate: { type: 'number', example: 75 },
+          ownerShareRate: { type: 'number', example: 80 },
+          jockeyShareRate: { type: 'number', example: 20 },
+          rankRewardRates: {
+            type: 'array',
+            items: { type: 'number' },
+            example: [50, 25, 15, 7, 3],
+            description: 'Must sum to 100. Used to split RacingRewardPool by result rank.',
+          },
+          rolloverPolicy: {
+            type: 'string',
+            enum: ['refund', 'rollover_next_race', 'to_organizer'],
+            example: 'rollover_next_race',
+          },
+          minScoreToShare: { type: 'number', example: 1 },
         },
       },
     },
@@ -324,9 +355,35 @@ const swaggerDefinition = {
       patch: {
         tags: ['Tournaments'],
         summary: 'Update tournament status',
+        description: 'Publishing or starting a tournament requires at least one race to be set up.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Updated tournament' } },
+        responses: {
+          200: { description: 'Updated tournament' },
+          409: { description: 'Tournament cannot be published before at least one race exists' },
+        },
+      },
+    },
+    '/api/tournaments/{id}/prediction-config': {
+      patch: {
+        tags: ['Tournaments'],
+        summary: 'Update prediction bounty pool configuration',
+        description:
+          'Admin-only endpoint. Allows changing entry fee, 10/15/75 pool rates, owner/jockey split, and rank reward split while the tournament is draft or published.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/PredictionConfigRequest' },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Updated prediction configuration' },
+          409: { description: 'Tournament already started or invalid rate totals' },
+        },
       },
     },
     '/api/races': {

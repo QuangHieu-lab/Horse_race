@@ -222,6 +222,12 @@ async function seed(): Promise<void> {
       poolEnabled: true,
       entryFee: 50_000,
       feePercent: 10,
+      organizerFeeRate: 10,
+      racingRewardRate: 15,
+      spectatorRewardRate: 75,
+      ownerShareRate: 80,
+      jockeyShareRate: 20,
+      rankRewardRates: [50, 25, 15, 7, 3],
     },
     createdBy: admin._id,
   });

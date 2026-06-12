@@ -14,6 +14,26 @@ export interface CreateTournamentInput {
   predictionConfig?: ITournament['predictionConfig'];
 }
 
+function validatePredictionConfigRates(config: ITournament['predictionConfig']): void {
+  const poolRateTotal =
+    (config.organizerFeeRate ?? 10) +
+    (config.racingRewardRate ?? 15) +
+    (config.spectatorRewardRate ?? 75);
+  if (poolRateTotal !== 100) {
+    throw new HttpError(400, 'Tổng tỷ lệ organizer/racing/spectator phải bằng 100');
+  }
+  if ((config.ownerShareRate ?? 80) + (config.jockeyShareRate ?? 20) !== 100) {
+    throw new HttpError(400, 'Tổng tỷ lệ owner/jockey phải bằng 100');
+  }
+  const rankTotal = (config.rankRewardRates ?? [50, 25, 15, 7, 3]).reduce(
+    (sum, rate) => sum + rate,
+    0,
+  );
+  if (rankTotal !== 100) {
+    throw new HttpError(400, 'Tổng tỷ lệ chia theo thứ hạng phải bằng 100');
+  }
+}
+
 export async function createTournament(
   creatorId: string,
   input: CreateTournamentInput,
@@ -83,6 +103,13 @@ export async function updateTournamentStatus(id: string, status: ITournament['st
     throw new HttpError(400, 'ID giải đấu không hợp lệ');
   }
 
+  if (['published', 'ongoing'].includes(status)) {
+    const raceCount = await Race.countDocuments({ tournamentId: id });
+    if (raceCount === 0) {
+      throw new HttpError(409, 'Cần tạo ít nhất một cuộc đua trước khi công bố giải đấu');
+    }
+  }
+
   const tournament = await Tournament.findByIdAndUpdate(
     id,
     { status },
@@ -98,6 +125,33 @@ export async function updateTournamentStatus(id: string, status: ITournament['st
   return tournament;
   
 }
+
+export async function updatePredictionConfig(
+  id: string,
+  predictionConfig: Partial<ITournament['predictionConfig']>,
+) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(400, 'ID giải đấu không hợp lệ');
+  }
+
+  const tournament = await Tournament.findById(id);
+  if (!tournament) {
+    throw new HttpError(404, 'Không tìm thấy giải đấu để cập nhật');
+  }
+  if (!['draft', 'published'].includes(tournament.status)) {
+    throw new HttpError(409, 'Chỉ chỉnh cấu hình dự đoán khi giải đấu chưa bắt đầu');
+  }
+
+  tournament.predictionConfig = {
+    ...tournament.predictionConfig,
+    ...predictionConfig,
+  };
+  validatePredictionConfigRates(tournament.predictionConfig);
+  await tournament.save();
+
+  return tournament.toObject();
+}
+
 export async function deleteTournament(id: string) {
   if (!mongoose.isValidObjectId(id)) {
     throw new HttpError(400, 'ID giải đấu không hợp lệ');

@@ -6,6 +6,7 @@ import { PredictionPool } from '../models/PredictionPool.model.js';
 import { Race } from '../models/Race.model.js';
 import type { IResult } from '../models/Result.model.js';
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
+import { Tournament } from '../models/Tournament.model.js';
 import { HttpError } from '../utils/http-error.js';
 
 const DEFAULT_TICKET_PRICE = 50000;
@@ -55,6 +56,11 @@ export async function getOrCreatePredictionPool(race: {
   _id: mongoose.Types.ObjectId;
   tournamentId: mongoose.Types.ObjectId;
   ticketPrice?: number;
+  organizerFeeRate?: number;
+  racingRewardRate?: number;
+  spectatorRewardRate?: number;
+  ownerShareRate?: number;
+  jockeyShareRate?: number;
 }) {
   const pool = await PredictionPool.findOneAndUpdate(
     { raceId: race._id },
@@ -64,11 +70,11 @@ export async function getOrCreatePredictionPool(race: {
         tournamentId: race.tournamentId,
         status: 'open',
         ticketPrice: race.ticketPrice ?? DEFAULT_TICKET_PRICE,
-        organizerFeeRate: ORGANIZER_FEE_RATE,
-        racingRewardRate: RACING_REWARD_RATE,
-        spectatorRewardRate: SPECTATOR_REWARD_RATE,
-        ownerShareRate: OWNER_SHARE_RATE,
-        jockeyShareRate: JOCKEY_SHARE_RATE,
+        organizerFeeRate: race.organizerFeeRate ?? ORGANIZER_FEE_RATE,
+        racingRewardRate: race.racingRewardRate ?? RACING_REWARD_RATE,
+        spectatorRewardRate: race.spectatorRewardRate ?? SPECTATOR_REWARD_RATE,
+        ownerShareRate: race.ownerShareRate ?? OWNER_SHARE_RATE,
+        jockeyShareRate: race.jockeyShareRate ?? JOCKEY_SHARE_RATE,
       },
     },
     { new: true, upsert: true },
@@ -84,6 +90,11 @@ export async function chargePredictionTicket(
     tournamentId: mongoose.Types.ObjectId;
     name: string;
     ticketPrice?: number;
+    organizerFeeRate?: number;
+    racingRewardRate?: number;
+    spectatorRewardRate?: number;
+    ownerShareRate?: number;
+    jockeyShareRate?: number;
   },
 ): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId }> {
   const pool = await getOrCreatePredictionPool(race);
@@ -118,6 +129,8 @@ export async function settlePredictionPoolFromResult(
 ): Promise<void> {
   const race = await Race.findById(result.raceId).lean();
   if (!race) return;
+  const tournament = await Tournament.findById(result.tournamentId).lean();
+  const rankRewardRates = tournament?.predictionConfig.rankRewardRates ?? [50, 25, 15, 7, 3];
 
   const pool = await PredictionPool.findOne({ raceId: result.raceId });
   if (!pool || pool.status === 'settled') return;
@@ -137,8 +150,9 @@ export async function settlePredictionPoolFromResult(
   pool.organizerFee = pct(totalBountyPool, pool.organizerFeeRate);
   pool.racingRewardPool = pct(totalBountyPool, pool.racingRewardRate);
   pool.spectatorRewardPool = totalBountyPool - pool.organizerFee - pool.racingRewardPool;
-  pool.ownerReward = pct(pool.racingRewardPool, pool.ownerShareRate);
-  pool.jockeyReward = pool.racingRewardPool - pool.ownerReward;
+  pool.ownerReward = 0;
+  pool.jockeyReward = 0;
+  pool.racingRewards = [];
 
   const actualRankings = result.rankings.map((r) => ({
     rank: r.rank,
@@ -192,26 +206,54 @@ export async function settlePredictionPoolFromResult(
     }
   }
 
-  const winner = [...result.rankings].sort((a, b) => a.rank - b.rank)[0];
-  if (winner && pool.racingRewardPool > 0) {
-    await Notification.create([
-      {
-        userId: winner.ownerId,
-        type: 'prediction_reward',
-        title: 'Thưởng owner từ bounty pool',
-        message: `Owner nhận ${pool.ownerReward} điểm thưởng từ bounty pool cuộc đua ${race.name}.`,
-        refModel: 'PredictionPool',
-        refId: pool._id,
-      },
-      {
-        userId: winner.jockeyId,
-        type: 'prediction_reward',
-        title: 'Thưởng jockey từ bounty pool',
-        message: `Jockey nhận ${pool.jockeyReward} điểm thưởng từ bounty pool cuộc đua ${race.name}.`,
-        refModel: 'PredictionPool',
-        refId: pool._id,
-      },
-    ]);
+  const rankedGroups = new Map<number, typeof result.rankings>();
+  for (const ranking of result.rankings) {
+    if (ranking.rank > rankRewardRates.length) continue;
+    const group = rankedGroups.get(ranking.rank) ?? [];
+    group.push(ranking);
+    rankedGroups.set(ranking.rank, group);
+  }
+
+  for (const [rank, rankings] of [...rankedGroups.entries()].sort((a, b) => a[0] - b[0])) {
+    const rankReward = pct(pool.racingRewardPool, rankRewardRates[rank - 1] ?? 0);
+    const horseReward = Math.floor(rankReward / rankings.length);
+    const isDeadHeat = rankings.length > 1 || rankings.some((r) => r.isDeadHeat);
+
+    for (const ranking of rankings) {
+      const ownerReward = pct(horseReward, pool.ownerShareRate);
+      const jockeyReward = horseReward - ownerReward;
+      pool.ownerReward += ownerReward;
+      pool.jockeyReward += jockeyReward;
+      pool.racingRewards.push({
+        rank,
+        horseId: ranking.horseId,
+        ownerId: ranking.ownerId,
+        jockeyId: ranking.jockeyId,
+        horseReward,
+        ownerReward,
+        jockeyReward,
+        isDeadHeat,
+      });
+
+      await Notification.create([
+        {
+          userId: ranking.ownerId,
+          type: 'prediction_reward',
+          title: 'Thưởng owner từ bounty pool',
+          message: `Owner nhận ${ownerReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
+          refModel: 'PredictionPool',
+          refId: pool._id,
+        },
+        {
+          userId: ranking.jockeyId,
+          type: 'prediction_reward',
+          title: 'Thưởng jockey từ bounty pool',
+          message: `Jockey nhận ${jockeyReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
+          refModel: 'PredictionPool',
+          refId: pool._id,
+        },
+      ]);
+    }
   }
 
   if (pool.organizerFee > 0) {
@@ -221,7 +263,7 @@ export async function settlePredictionPoolFromResult(
       predictionPoolId: pool._id,
       feeAmount: pool.organizerFee,
       note: `Organizer fee 10% từ bounty pool cuộc đua ${race.name}`,
-      recordedBy: result.publishedBy ?? winner?.ownerId ?? predictions[0]!.spectatorId,
+      recordedBy: result.publishedBy ?? predictions[0]!.spectatorId,
     });
   }
 

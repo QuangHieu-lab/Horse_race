@@ -18,8 +18,15 @@ export function validateRankings(
   }
 
   const ranks = rankings.map((r) => r.rank).sort((a, b) => a - b);
-  for (let i = 0; i < ranks.length; i++) {
-    if (ranks[i] !== i + 1) return 'rankings must be contiguous starting at 1';
+  if (ranks[0] !== 1) return 'rankings must start at 1';
+  const rankCounts = new Map<number, number>();
+  for (const rank of ranks) {
+    rankCounts.set(rank, (rankCounts.get(rank) ?? 0) + 1);
+  }
+  let expectedNextRank = 1;
+  for (const [rank, count] of [...rankCounts.entries()].sort((a, b) => a[0] - b[0])) {
+    if (rank > expectedNextRank) return 'rankings contain an invalid rank gap';
+    expectedNextRank = rank + count;
   }
 
   const participantHorseIds = new Set(eligible.map((p) => p.horseId.toString()));

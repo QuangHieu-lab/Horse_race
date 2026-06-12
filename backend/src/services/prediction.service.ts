@@ -80,6 +80,11 @@ export async function createPrediction(
       tournamentId: race.tournamentId,
       name: race.name,
       ticketPrice: tournament.predictionConfig.entryFee || undefined,
+      organizerFeeRate: tournament.predictionConfig.organizerFeeRate,
+      racingRewardRate: tournament.predictionConfig.racingRewardRate,
+      spectatorRewardRate: tournament.predictionConfig.spectatorRewardRate,
+      ownerShareRate: tournament.predictionConfig.ownerShareRate,
+      jockeyShareRate: tournament.predictionConfig.jockeyShareRate,
     });
     contribution = charged.contribution;
   }
