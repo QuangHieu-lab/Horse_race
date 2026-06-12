@@ -1,0 +1,231 @@
+import mongoose from 'mongoose';
+import { Notification } from '../models/Notification.model.js';
+import { OrganizerLedger } from '../models/OrganizerLedger.model.js';
+import { Prediction } from '../models/Prediction.model.js';
+import { PredictionPool } from '../models/PredictionPool.model.js';
+import { Race } from '../models/Race.model.js';
+import type { IResult } from '../models/Result.model.js';
+import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
+import { HttpError } from '../utils/http-error.js';
+
+const DEFAULT_TICKET_PRICE = 50000;
+const ORGANIZER_FEE_RATE = 10;
+const RACING_REWARD_RATE = 15;
+const SPECTATOR_REWARD_RATE = 75;
+const OWNER_SHARE_RATE = 80;
+const JOCKEY_SHARE_RATE = 20;
+
+function pct(amount: number, rate: number): number {
+  return Math.floor((amount * rate) / 100);
+}
+
+function scorePrediction(
+  predictedRanks: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
+  actualRankings: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
+): number {
+  const actualByHorse = new Map(actualRankings.map((r) => [r.horseId.toString(), r.rank]));
+  const top3HorseIds = new Set(
+    actualRankings.filter((r) => r.rank <= 3).map((r) => r.horseId.toString()),
+  );
+
+  let score = 0;
+  for (const prediction of predictedRanks.filter((p) => p.rank <= 3)) {
+    const horseId = prediction.horseId.toString();
+    const actualRank = actualByHorse.get(horseId);
+
+    if (actualRank === prediction.rank) {
+      if (prediction.rank === 1) score += 50;
+      else if (prediction.rank === 2) score += 40;
+      else if (prediction.rank === 3) score += 30;
+    } else if (top3HorseIds.has(horseId)) {
+      score += 15;
+    }
+  }
+
+  return score;
+}
+
+async function getOrCreateProfile(userId: mongoose.Types.ObjectId) {
+  let profile = await SpectatorProfile.findOne({ userId });
+  if (!profile) profile = await SpectatorProfile.create({ userId });
+  return profile;
+}
+
+export async function getOrCreatePredictionPool(race: {
+  _id: mongoose.Types.ObjectId;
+  tournamentId: mongoose.Types.ObjectId;
+  ticketPrice?: number;
+}) {
+  const pool = await PredictionPool.findOneAndUpdate(
+    { raceId: race._id },
+    {
+      $setOnInsert: {
+        raceId: race._id,
+        tournamentId: race.tournamentId,
+        status: 'open',
+        ticketPrice: race.ticketPrice ?? DEFAULT_TICKET_PRICE,
+        organizerFeeRate: ORGANIZER_FEE_RATE,
+        racingRewardRate: RACING_REWARD_RATE,
+        spectatorRewardRate: SPECTATOR_REWARD_RATE,
+        ownerShareRate: OWNER_SHARE_RATE,
+        jockeyShareRate: JOCKEY_SHARE_RATE,
+      },
+    },
+    { new: true, upsert: true },
+  );
+
+  return pool;
+}
+
+export async function chargePredictionTicket(
+  spectatorId: string,
+  race: {
+    _id: mongoose.Types.ObjectId;
+    tournamentId: mongoose.Types.ObjectId;
+    name: string;
+    ticketPrice?: number;
+  },
+): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId }> {
+  const pool = await getOrCreatePredictionPool(race);
+  if (pool.status !== 'open') {
+    throw new HttpError(409, 'Bounty pool đã đóng');
+  }
+
+  const spectatorObjectId = new mongoose.Types.ObjectId(spectatorId);
+  const profile = await getOrCreateProfile(spectatorObjectId);
+  try {
+    await profile.spendPoints(
+      pool.ticketPrice,
+      'spent_pool_entry',
+      'PredictionPool',
+      pool._id,
+      `Mua vé dự đoán cuộc đua ${race.name}`,
+    );
+  } catch {
+    throw new HttpError(409, 'Không đủ điểm để mua vé dự đoán');
+  }
+
+  pool.totalTickets += 1;
+  pool.contributorCount += 1;
+  pool.totalBountyPool += pool.ticketPrice;
+  await pool.save();
+
+  return { contribution: pool.ticketPrice, poolId: pool._id };
+}
+
+export async function settlePredictionPoolFromResult(
+  result: Pick<IResult, 'raceId' | 'rankings' | 'tournamentId' | 'publishedBy'>,
+): Promise<void> {
+  const race = await Race.findById(result.raceId).lean();
+  if (!race) return;
+
+  const pool = await PredictionPool.findOne({ raceId: result.raceId });
+  if (!pool || pool.status === 'settled') return;
+
+  const predictions = await Prediction.find({ raceId: result.raceId });
+  if (predictions.length === 0) {
+    pool.status = 'settled';
+    pool.settledAt = new Date();
+    await pool.save();
+    return;
+  }
+
+  const totalBountyPool = predictions.reduce((sum, p) => sum + p.contribution, 0);
+  pool.totalTickets = predictions.length;
+  pool.contributorCount = predictions.length;
+  pool.totalBountyPool = totalBountyPool;
+  pool.organizerFee = pct(totalBountyPool, pool.organizerFeeRate);
+  pool.racingRewardPool = pct(totalBountyPool, pool.racingRewardRate);
+  pool.spectatorRewardPool = totalBountyPool - pool.organizerFee - pool.racingRewardPool;
+  pool.ownerReward = pct(pool.racingRewardPool, pool.ownerShareRate);
+  pool.jockeyReward = pool.racingRewardPool - pool.ownerReward;
+
+  const actualRankings = result.rankings.map((r) => ({
+    rank: r.rank,
+    horseId: r.horseId,
+  }));
+
+  const scores = new Map<string, number>();
+  for (const prediction of predictions) {
+    const score = scorePrediction(prediction.predictedRanks, actualRankings);
+    prediction.scoringWeight = score;
+    scores.set(prediction._id.toString(), score);
+  }
+
+  const totalWinnerScore = [...scores.values()].reduce((sum, score) => sum + score, 0);
+  pool.totalWinnerScore = totalWinnerScore;
+
+  if (totalWinnerScore === 0) {
+    pool.jackpotAmount = pool.spectatorRewardPool;
+    pool.spectatorRewardPool = 0;
+  }
+
+  for (const prediction of predictions) {
+    const score = scores.get(prediction._id.toString()) ?? 0;
+    const poolShare =
+      totalWinnerScore > 0
+        ? Math.floor((score / totalWinnerScore) * pool.spectatorRewardPool)
+        : 0;
+
+    prediction.poolShare = poolShare;
+    prediction.totalPoints = prediction.pointsEarned + prediction.bonusPoints + poolShare;
+    await prediction.save();
+
+    if (poolShare > 0) {
+      const profile = await getOrCreateProfile(prediction.spectatorId);
+      await profile.addPoints(
+        poolShare,
+        'earned_pool_share',
+        'PredictionPool',
+        pool._id,
+        `Chia thưởng bounty pool cuộc đua ${race.name}`,
+      );
+
+      await Notification.create({
+        userId: prediction.spectatorId,
+        type: 'prediction_reward',
+        title: 'Thưởng bounty pool',
+        message: `Bạn nhận ${poolShare} điểm từ bounty pool cuộc đua ${race.name}.`,
+        refModel: 'PredictionPool',
+        refId: pool._id,
+      });
+    }
+  }
+
+  const winner = [...result.rankings].sort((a, b) => a.rank - b.rank)[0];
+  if (winner && pool.racingRewardPool > 0) {
+    await Notification.create([
+      {
+        userId: winner.ownerId,
+        type: 'prediction_reward',
+        title: 'Thưởng owner từ bounty pool',
+        message: `Owner nhận ${pool.ownerReward} điểm thưởng từ bounty pool cuộc đua ${race.name}.`,
+        refModel: 'PredictionPool',
+        refId: pool._id,
+      },
+      {
+        userId: winner.jockeyId,
+        type: 'prediction_reward',
+        title: 'Thưởng jockey từ bounty pool',
+        message: `Jockey nhận ${pool.jockeyReward} điểm thưởng từ bounty pool cuộc đua ${race.name}.`,
+        refModel: 'PredictionPool',
+        refId: pool._id,
+      },
+    ]);
+  }
+
+  if (pool.organizerFee > 0) {
+    await OrganizerLedger.create({
+      tournamentId: result.tournamentId,
+      raceId: result.raceId,
+      predictionPoolId: pool._id,
+      feeAmount: pool.organizerFee,
+      note: `Organizer fee 10% từ bounty pool cuộc đua ${race.name}`,
+      recordedBy: result.publishedBy ?? winner?.ownerId ?? predictions[0]!.spectatorId,
+    });
+  }
+
+  pool.status = 'settled';
+  pool.settledAt = new Date();
+  await pool.save();
+}

@@ -4,6 +4,7 @@ import { Race } from '../models/Race.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import type { PredictionDto } from '../types/api.types.js';
 import { HttpError } from '../utils/http-error.js';
+import { chargePredictionTicket } from './prediction-pool.service.js';
 import { isPredictionWindowOpen } from './spectator.service.js';
 import { listPredictions } from './spectator.service.js';
 
@@ -72,6 +73,17 @@ export async function createPrediction(
     throw new HttpError(409, 'Bạn đã dự đoán cuộc đua này');
   }
 
+  let contribution = 0;
+  if (tournament.predictionConfig.poolEnabled) {
+    const charged = await chargePredictionTicket(spectatorId, {
+      _id: race._id,
+      tournamentId: race.tournamentId,
+      name: race.name,
+      ticketPrice: tournament.predictionConfig.entryFee || undefined,
+    });
+    contribution = charged.contribution;
+  }
+
   await Prediction.create({
     spectatorId: new mongoose.Types.ObjectId(spectatorId),
     raceId: race._id,
@@ -81,6 +93,7 @@ export async function createPrediction(
       horseId: new mongoose.Types.ObjectId(r.horseId),
     })),
     status: 'pending',
+    contribution,
   });
 
   const all = await listPredictions(spectatorId);

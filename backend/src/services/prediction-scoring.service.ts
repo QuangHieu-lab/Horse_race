@@ -6,6 +6,7 @@ import type { IResult } from '../models/Result.model.js';
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import type { PredictionStatus } from '../types/shared.types.js';
+import { settlePredictionPoolFromResult } from './prediction-pool.service.js';
 
 function evaluatePrediction(
   predictedRanks: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
@@ -48,7 +49,7 @@ export async function scorePredictionsForRace(raceId: mongoose.Types.ObjectId): 
 }
 
 export async function scorePredictionsFromResult(
-  result: Pick<IResult, 'raceId' | 'rankings'>,
+  result: Pick<IResult, 'raceId' | 'tournamentId' | 'rankings' | 'publishedBy'>,
 ): Promise<void> {
   const raceId = result.raceId;
   const race = await Race.findById(raceId).lean();
@@ -123,4 +124,6 @@ export async function scorePredictionsFromResult(
       });
     }
   }
+
+  await settlePredictionPoolFromResult(result);
 }

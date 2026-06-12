@@ -144,8 +144,11 @@ export interface PredictionDto {
   tournamentName: string;
   predictedRanks: PredictedRankDto[];
   status: PredictionStatus;
+  contribution: number;
+  predictionScore: number;
   pointsEarned: number;
   bonusPoints: number;
+  poolShare: number;
   totalPoints: number;
   evaluatedAt?: string | null;
   createdAt: string;

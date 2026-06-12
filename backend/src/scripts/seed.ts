@@ -19,6 +19,7 @@ import {
   Result,
   JockeyInvitation,
   Prediction,
+  PredictionPool,
   Product,
   Notification,
   SpectatorProfile,
@@ -147,8 +148,8 @@ async function seed(): Promise<void> {
     { userId: spectator._id },
     {
       $set: {
-        currentBalance: 2500,
-        totalPointsEarned: 2500,
+        currentBalance: 250000,
+        totalPointsEarned: 250000,
         totalPointsSpent: 0,
       },
     },
@@ -218,8 +219,8 @@ async function seed(): Promise<void> {
       predictionOpenAt: daysFromNow(-3),
       predictionCloseAt: daysFromNow(20),
       maxPredictionsPerRace: 1,
-      poolEnabled: false,
-      entryFee: 0,
+      poolEnabled: true,
+      entryFee: 50_000,
       feePercent: 10,
     },
     createdBy: admin._id,
@@ -475,9 +476,20 @@ async function seed(): Promise<void> {
       { rank: 2, horseId: horseB._id },
     ],
     status: 'pending',
+    contribution: 50_000,
     pointsEarned: 0,
     bonusPoints: 0,
     totalPoints: 0,
+  });
+
+  await PredictionPool.create({
+    raceId: raceCompleted._id,
+    tournamentId: tournament._id,
+    status: 'open',
+    ticketPrice: 50_000,
+    totalTickets: 1,
+    totalBountyPool: 50_000,
+    contributorCount: 1,
   });
 
   const product = await Product.create({
