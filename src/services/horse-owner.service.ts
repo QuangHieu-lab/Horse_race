@@ -3,6 +3,7 @@ import { Horse } from '../models/Horse.model.js';
 import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
 import { Notification } from '../models/Notification.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
+import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 // Giả định bạn đã khai báo các DTO này trong thư mục types
 import type { HorseDto, RegistrationDto, InvitationDto } from '../types/api.types.js';
@@ -212,6 +213,26 @@ export class HorseOwnerService {
     }).lean();
 
     if (!result) throw new HttpError(404, 'Không tìm thấy đơn đăng ký, hoặc đơn đã được duyệt');
+  }
+
+  // --- TÌM KIẾM JOCKEY ---
+
+  async searchJockeys(name: string): Promise<{ id: string; fullName: string; licenseNumber?: string }[]> {
+    if (!name.trim()) return [];
+    const jockeys = await User.find({
+      role: 'jockey',
+      isActive: true,
+      fullName: { $regex: name.trim(), $options: 'i' },
+    })
+      .select('_id fullName jockeyProfile.licenseNumber')
+      .limit(10)
+      .lean();
+
+    return jockeys.map((j) => ({
+      id: j._id.toString(),
+      fullName: j.fullName,
+      licenseNumber: (j as any).jockeyProfile?.licenseNumber,
+    }));
   }
 
   // --- THUÊ JOCKEY ---

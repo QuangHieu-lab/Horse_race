@@ -2,11 +2,13 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import { HorseOwnerService } from '../services/horse-owner.service.js';
 import { HttpError } from '../utils/http-error.js';
-import type { 
-  CreateHorseInput, 
-  RegisterRaceInput, 
-  InviteJockeyInput 
+import type {
+  CreateHorseInput,
+  RegisterRaceInput,
+  InviteJockeyInput
 } from '../services/horse-owner.service.js';
+import { listTournaments } from '../services/tournament.service.js';
+import { getRacesByTournament } from '../services/race.service.js';
 
 const horseOwnerService = new HorseOwnerService();
 
@@ -93,10 +95,40 @@ export class HorseOwnerController {
     }
 
     const invitation = await horseOwnerService.inviteJockey(req.user!.id, input);
-    res.status(201).json({ 
-      success: true, 
-      message: 'Đã gửi lời mời tới kỵ sĩ.', 
-      data: invitation 
+    res.status(201).json({
+      success: true,
+      message: 'Đã gửi lời mời tới kỵ sĩ.',
+      data: invitation
     });
+  });
+
+  // ==========================================================
+  // 4. TÌM KIẾM JOCKEY
+  // ==========================================================
+
+  searchJockeys = asyncHandler(async (req: Request, res: Response) => {
+    const name = String(req.query.name ?? '');
+    if (!name.trim()) {
+      res.json({ data: [] });
+      return;
+    }
+    const data = await horseOwnerService.searchJockeys(name);
+    res.json({ data });
+  });
+
+  // ==========================================================
+  // 5. DANH SÁCH GIẢI ĐẤU & TRẬN ĐUA (để đăng ký)
+  // ==========================================================
+
+  listTournaments = asyncHandler(async (req: Request, res: Response) => {
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 100);
+    const result = await listTournaments(page, limit);
+    res.json(result);
+  });
+
+  listRacesForTournament = asyncHandler(async (req: Request, res: Response) => {
+    const races = await getRacesByTournament(String(req.params.tournamentId));
+    res.json({ races });
   });
 }   
