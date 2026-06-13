@@ -1,44 +1,40 @@
-# Prediction Bounty Pool Design
+# Winner Prediction Bounty Pool Design
 
-Tai lieu nay mo ta co che Prediction Bounty Pool bang diem cho he thong Horse Race. Muc tieu la game hoa viec du doan ket qua dua, khong dung tien that va tranh thiet ke theo kieu ca cuoc.
+Tai lieu nay mo ta co che bounty pool MVP cho Horse Race. Ban hien tai chi lam mot viec don gian: spectator chon ngua ve nhat.
 
-## 1. Y Tuong Chinh
-
-Moi cuoc dua co mot bounty pool bang diem. Spectator tham gia bang cach gui du doan top 3 va chon muc rui ro bang so nguyen duong (`riskMultiplier`).
-
-He thong khong dung cac tu `bet`, `wager`, `odds`, `cashout`. Nen dung:
+He thong dung diem noi bo, khong dung tien that. Trong UI va API nen dung cac tu:
 
 - `Prediction`
+- `Winner Prediction`
 - `Risk Multiplier`
 - `Entry Points`
-- `Bounty Pool`
-- `Prediction Score`
+- `Win Pool`
+- `Prize Pool`
 - `Reward Points`
 
-## 2. Cau Hinh Chinh
+Tranh dung cac tu: `bet`, `wager`, `odds`, `cashout`.
+
+## 1. Luong Chinh
+
+```text
+1. Spectator chon 1 con ngua ve nhat.
+2. Spectator chon riskMultiplier, vi du 1x, 2x, 3x, 6x.
+3. Backend tinh EntryPoints.
+4. Backend tru EntryPoints cua spectator khi gui du doan.
+5. Race ket thuc va admin/referee publish result.
+6. Backend tach nguoi doan dung va nguoi doan sai.
+7. Diem cua nguoi doan dung duoc hoan lai.
+8. Diem cua nguoi doan sai gom thanh WinPool.
+9. WinPool chia 10% cho organizer, 15% cho horse, 75% thanh PrizePool.
+10. PrizePool chia cho nguoi doan dung theo ty le EntryPoints cua tung nguoi.
+```
+
+## 2. Entry Points
 
 ```text
 EntryFee = diem co so de tham gia du doan
-RiskMultiplier = muc rui ro do spectator chon, chi nhan so nguyen
-MinRiskMultiplier = muc thap nhat duoc nhap
-MaxRiskMultiplier = muc cao nhat duoc nhap
-QuickRiskMultipliers = cac nut goi y nhanh, vi du [1, 2, 3, 6]
-```
+RiskMultiplier = muc rui ro, chi nhan so nguyen duong
 
-Frontend co the hien nut nhanh 1x, 2x, 3x, 6x. User van duoc nhap tu ban phim, mien la gia tri la so nguyen va nam trong min/max.
-
-Vi du cau hinh MVP:
-
-```text
-EntryFee = 50,000 diem
-MinRiskMultiplier = 1
-MaxRiskMultiplier = 10
-QuickRiskMultipliers = [1, 2, 3, 6]
-```
-
-## 3. Cong Thuc Diem Tham Gia
-
-```text
 EntryPoints = EntryFee * RiskMultiplier
 ```
 
@@ -52,210 +48,226 @@ User B chon 2x => EntryPoints = 100,000
 User C chon 6x => EntryPoints = 300,000
 ```
 
-Neu user sai, phan EntryPoints da dua vao pool se mat. Neu user dung/co diem, EntryPoints lam trong so khi chia phan thuong spectator.
+`riskMultiplier` chi duoc la so nguyen. Hop le: `1`, `2`, `3`, `6`, `10`. Khong hop le: `1.5`, `1.75`, `2.5`.
 
-## 4. Tong Bounty Pool
+## 3. Xac Dinh Dung Sai
 
-Tong pool la tong EntryPoints cua tat ca prediction trong race.
+MVP chi xet ngua ve nhat.
 
 ```text
-TotalBountyPool = sum(EntryPoints cua tat ca spectator)
+Neu predictedHorseId == actualRank1HorseId:
+  prediction dung
+
+Nguoc lai:
+  prediction sai
+```
+
+Khong cham top 2, top 3, sai vi tri, hay prediction score phuc tap trong MVP nay.
+
+## 4. Win Pool
+
+Nguoi doan dung duoc giu lai/hoan lai EntryPoints cua minh.
+
+Diem cua nguoi doan sai bi gom vao `WinPool`.
+
+```text
+WinPool = sum(EntryPoints cua tat ca prediction sai)
 ```
 
 Vi du:
 
 ```text
-User A EntryPoints = 50,000
-User B EntryPoints = 100,000
-User C EntryPoints = 300,000
+User A dung, EntryPoints = 50,000
+User B sai, EntryPoints = 100,000
+User C sai, EntryPoints = 300,000
 
-TotalBountyPool = 450,000
+WinPool = 100,000 + 300,000 = 400,000
 ```
 
-## 5. Ti Le Chia Pool
+## 5. Chia Win Pool
 
-De xuat cau hinh MVP:
+Ti le MVP:
 
 ```text
 OrganizerFeeRate = 10%
 RacingRewardRate = 15%
-SpectatorRewardRate = 75%
+PrizePoolRate = 75%
 ```
 
 Cong thuc:
 
 ```text
-OrganizerFee = TotalBountyPool * OrganizerFeeRate
-RacingRewardPool = TotalBountyPool * RacingRewardRate
-SpectatorRewardPool = TotalBountyPool * SpectatorRewardRate
+OrganizerFee = WinPool * 10%
+RacingRewardPool = WinPool * 15%
+PrizePool = WinPool * 75%
 ```
 
 Vi du:
 
 ```text
-TotalBountyPool = 1,000,000
+WinPool = 400,000
 
-OrganizerFee = 1,000,000 * 10% = 100,000
-RacingRewardPool = 1,000,000 * 15% = 150,000
-SpectatorRewardPool = 1,000,000 * 75% = 750,000
+OrganizerFee = 400,000 * 10% = 40,000
+RacingRewardPool = 400,000 * 15% = 60,000
+PrizePool = 400,000 * 75% = 300,000
 ```
 
-## 6. Chia RacingRewardPool Cho Owner Va Jockey
+## 6. Chia Cho Horse Owner Va Jockey
 
-RacingRewardPool chia cho cac ngua co thu hang theo `RankRewardRates`.
+`RacingRewardPool` chi trao cho ngua ve nhat trong MVP.
 
-MVP de xuat:
+Neu co nhieu ngua cung rank 1, cac ngua rank 1 chia deu `RacingRewardPool`.
 
-```text
-RankRewardRates = [50%, 25%, 15%, 7%, 3%]
-```
-
-Nghia la:
-
-```text
-Rank 1 nhan 50% RacingRewardPool
-Rank 2 nhan 25% RacingRewardPool
-Rank 3 nhan 15% RacingRewardPool
-Rank 4 nhan 7% RacingRewardPool
-Rank 5 nhan 3% RacingRewardPool
-```
-
-Neu co 2 ngua cung hang, cac ngua cung hang chia deu phan thuong cua hang do.
-
-Moi phan thuong cua ngua lai chia tiep cho owner va jockey:
+Trong tung ngua, owner va jockey chia nhu cu:
 
 ```text
 OwnerShareRate = 80%
 JockeyShareRate = 20%
 
-OwnerReward = HorseRankReward * OwnerShareRate
-JockeyReward = HorseRankReward * JockeyShareRate
+OwnerReward = HorseReward * 80%
+JockeyReward = HorseReward * 20%
 ```
 
 Vi du:
 
 ```text
-RacingRewardPool = 150,000
-Rank 1 Reward = 150,000 * 50% = 75,000
+RacingRewardPool = 60,000
 
-OwnerReward = 75,000 * 80% = 60,000
-JockeyReward = 75,000 * 20% = 15,000
+OwnerReward = 60,000 * 80% = 48,000
+JockeyReward = 60,000 * 20% = 12,000
 ```
 
-## 7. Cham Prediction Score
+## 7. Chia Prize Pool Cho Nguoi Doan Dung
 
-Spectator du doan top 3. Cong thuc cham diem MVP:
+Nguoi doan dung nhan:
 
 ```text
-Dung hang 1 chinh xac: +50
-Dung hang 2 chinh xac: +40
-Dung hang 3 chinh xac: +30
-Ngua nam trong top 3 nhung sai vi tri: +15
-Sai hoan toan: +0
+TotalReturned = EntryPoints + PrizeReward
 ```
+
+Trong do:
+
+```text
+TotalCorrectEntryPoints = sum(EntryPoints cua tat ca prediction dung)
+
+PrizeReward =
+  PrizePool * (UserEntryPoints / TotalCorrectEntryPoints)
+```
+
+Day la diem quan trong: user bo nhieu EntryPoints hon thi nhan ti le PrizePool lon hon, nhung chi khi doan dung.
 
 Vi du:
 
 ```text
-Du doan:
-1. Horse A
-2. Horse B
-3. Horse C
+PrizePool = 300,000
 
-Ket qua:
-1. Horse A
-2. Horse C
-3. Horse D
+User A dung, EntryPoints = 50,000
+User D dung, EntryPoints = 100,000
 
-Horse A dung hang 1: +50
-Horse C nam trong top 3 nhung sai vi tri: +15
-Horse B khong nam trong top 3: +0
-
-PredictionScore = 65
+TotalCorrectEntryPoints = 150,000
 ```
 
-## 8. Chia SpectatorRewardPool
-
-Chi prediction co `PredictionScore > 0` moi duoc chia `SpectatorRewardPool`.
-
-Voi co che linh hoat, phan thuong phu thuoc vao ca do chinh xac va muc rui ro:
+Chia prize:
 
 ```text
-PredictionWeight = EntryPoints * PredictionScore
-TotalPredictionWeight = sum(PredictionWeight cua cac prediction co PredictionScore > 0)
-
-UserReward = PredictionWeight / TotalPredictionWeight * SpectatorRewardPool
+User A PrizeReward = 300,000 * (50,000 / 150,000) = 100,000
+User D PrizeReward = 300,000 * (100,000 / 150,000) = 200,000
 ```
 
-Vi du:
+Tong diem user nhan lai:
 
 ```text
-SpectatorRewardPool = 750,000
+User A TotalReturned = 50,000 + 100,000 = 150,000
+User D TotalReturned = 100,000 + 200,000 = 300,000
+```
+
+## 8. Vi Du Day Du
+
+Gia su:
+
+```text
 EntryFee = 50,000
 
-User A: Risk 1x, EntryPoints 50,000, Score 100
-User B: Risk 2x, EntryPoints 100,000, Score 100
-User C: Risk 1x, EntryPoints 50,000, Score 50
+User A chon Horse 1, risk 1x, EntryPoints = 50,000
+User B chon Horse 2, risk 2x, EntryPoints = 100,000
+User C chon Horse 3, risk 6x, EntryPoints = 300,000
+User D chon Horse 1, risk 2x, EntryPoints = 100,000
+
+Ket qua: Horse 1 ve nhat
 ```
 
-Tinh trong so:
+Nguoi dung:
 
 ```text
-User A Weight = 50,000 * 100 = 5,000,000
-User B Weight = 100,000 * 100 = 10,000,000
-User C Weight = 50,000 * 50 = 2,500,000
-
-TotalPredictionWeight = 17,500,000
+User A dung
+User D dung
+User B sai
+User C sai
 ```
 
-Chia thuong:
+WinPool:
 
 ```text
-User A Reward = 5,000,000 / 17,500,000 * 750,000 = 214,285
-User B Reward = 10,000,000 / 17,500,000 * 750,000 = 428,571
-User C Reward = 2,500,000 / 17,500,000 * 750,000 = 107,142
+WinPool = User B 100,000 + User C 300,000 = 400,000
 ```
 
-Ket luan: neu hai user cung doan dung nhu nhau, user chon 2x se co trong so gap doi user chon 1x. Neu doan sai, user khong duoc chia SpectatorRewardPool.
-
-## 9. Truong Hop Khong Ai Co Diem
-
-Neu khong prediction nao co `PredictionScore > 0`:
+Chia WinPool:
 
 ```text
-TotalPredictionWeight = 0
+OrganizerFee = 400,000 * 10% = 40,000
+RacingRewardPool = 400,000 * 15% = 60,000
+PrizePool = 400,000 * 75% = 300,000
 ```
 
-He thong khong chia `SpectatorRewardPool`. Chinh sach hien tai co the:
+Chia horse:
 
 ```text
-RolloverPolicy = refund | rollover_next_race | to_organizer
+OwnerReward = 60,000 * 80% = 48,000
+JockeyReward = 60,000 * 20% = 12,000
 ```
 
-Huong nen dung cho game:
+Chia spectator dung:
 
 ```text
-rollover_next_race
+TotalCorrectEntryPoints = User A 50,000 + User D 100,000 = 150,000
+
+User A PrizeReward = 300,000 * (50,000 / 150,000) = 100,000
+User D PrizeReward = 300,000 * (100,000 / 150,000) = 200,000
 ```
 
-Phan spectator pool se thanh jackpot cho race sau.
-
-## 10. Flow Thuc Te
+Tong tra ve:
 
 ```text
-1. Admin cau hinh predictionConfig cho tournament.
-2. Spectator mo race va gui predictedRanks + riskMultiplier.
-3. Backend validate riskMultiplier la so nguyen trong min/max.
-4. Backend tinh EntryPoints = EntryFee * RiskMultiplier.
-5. Backend tru EntryPoints tu spectator profile.
-6. Backend cong EntryPoints vao PredictionPool.
-7. Referee/admin publish result.
-8. Backend cham PredictionScore.
-9. Backend tinh PredictionWeight = EntryPoints * PredictionScore.
-10. Backend chia pool cho organizer, owner/jockey, spectator.
-11. Backend ghi point transaction va notification.
+User A TotalReturned = 50,000 + 100,000 = 150,000
+User D TotalReturned = 100,000 + 200,000 = 300,000
 ```
 
-## 11. Tom Tat Mot Cau
+## 9. Truong Hop Dac Biet
 
-Prediction Bounty Pool la hu thuong diem linh hoat: spectator du doan top 3 va chon risk multiplier bang so nguyen, he thong tinh EntryPoints = EntryFee * RiskMultiplier, tong EntryPoints tao pool, pool chia 10% cho he thong, 15% cho owner/jockey, 75% cho nguoi du doan co diem theo cong thuc EntryPoints * PredictionScore.
+Neu khong ai doan dung:
+
+```text
+TotalCorrectEntryPoints = 0
+```
+
+He thong khong co ai de chia `PrizePool`. MVP hien tai de `PrizePool` vao `jackpotAmount` trong pool de co the xu ly sau.
+
+Neu khong ai doan sai:
+
+```text
+WinPool = 0
+```
+
+Thi:
+
+```text
+OrganizerFee = 0
+RacingRewardPool = 0
+PrizePool = 0
+```
+
+Nguoi doan dung chi duoc hoan lai EntryPoints cua minh.
+
+## 10. Tom Tat Mot Cau
+
+MVP bounty pool chi cho spectator chon ngua ve nhat: nguoi doan dung duoc hoan EntryPoints, diem cua nguoi doan sai tao thanh WinPool, WinPool chia 10% organizer, 15% horse owner/jockey, 75% PrizePool chia lai cho nguoi doan dung theo ty le EntryPoints dung.

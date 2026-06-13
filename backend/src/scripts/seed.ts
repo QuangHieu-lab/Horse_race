@@ -502,6 +502,7 @@ async function seed(): Promise<void> {
     quickRiskMultipliers: [1, 2, 3, 6],
     totalTickets: 1,
     totalBountyPool: 50_000,
+    winPool: 0,
     contributorCount: 1,
   });
 

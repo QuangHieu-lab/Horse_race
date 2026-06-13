@@ -26,6 +26,9 @@ export async function createPrediction(
   if (!predictedRanks?.length) {
     throw new HttpError(400, 'Dự đoán phải có ít nhất một thứ hạng');
   }
+  if (predictedRanks.length !== 1 || predictedRanks[0]?.rank !== 1) {
+    throw new HttpError(400, 'MVP hiện tại chỉ hỗ trợ dự đoán ngựa về nhất');
+  }
 
   const rankNums = predictedRanks.map((r) => r.rank);
   const horseIds = predictedRanks.map((r) => r.horseId);
