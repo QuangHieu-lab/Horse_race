@@ -409,6 +409,7 @@ export async function listPredictions(spectatorId: string): Promise<PredictionDt
         horseName: horseMap.get(r.horseId.toString()),
       })),
       status: p.status,
+      riskMultiplier: p.riskMultiplier,
       contribution: p.contribution,
       predictionScore: p.scoringWeight,
       pointsEarned: p.pointsEarned,

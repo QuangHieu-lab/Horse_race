@@ -144,6 +144,7 @@ export interface PredictionDto {
   tournamentName: string;
   predictedRanks: PredictedRankDto[];
   status: PredictionStatus;
+  riskMultiplier: number;
   contribution: number;
   predictionScore: number;
   pointsEarned: number;

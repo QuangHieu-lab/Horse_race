@@ -56,6 +56,9 @@ export async function getOrCreatePredictionPool(race: {
   _id: mongoose.Types.ObjectId;
   tournamentId: mongoose.Types.ObjectId;
   ticketPrice?: number;
+  minRiskMultiplier?: number;
+  maxRiskMultiplier?: number;
+  quickRiskMultipliers?: number[];
   organizerFeeRate?: number;
   racingRewardRate?: number;
   spectatorRewardRate?: number;
@@ -70,6 +73,9 @@ export async function getOrCreatePredictionPool(race: {
         tournamentId: race.tournamentId,
         status: 'open',
         ticketPrice: race.ticketPrice ?? DEFAULT_TICKET_PRICE,
+        minRiskMultiplier: race.minRiskMultiplier ?? 1,
+        maxRiskMultiplier: race.maxRiskMultiplier ?? 10,
+        quickRiskMultipliers: race.quickRiskMultipliers ?? [1, 2, 3, 6],
         organizerFeeRate: race.organizerFeeRate ?? ORGANIZER_FEE_RATE,
         racingRewardRate: race.racingRewardRate ?? RACING_REWARD_RATE,
         spectatorRewardRate: race.spectatorRewardRate ?? SPECTATOR_REWARD_RATE,
@@ -90,38 +96,53 @@ export async function chargePredictionTicket(
     tournamentId: mongoose.Types.ObjectId;
     name: string;
     ticketPrice?: number;
+    riskMultiplier?: number;
+    minRiskMultiplier?: number;
+    maxRiskMultiplier?: number;
+    quickRiskMultipliers?: number[];
     organizerFeeRate?: number;
     racingRewardRate?: number;
     spectatorRewardRate?: number;
     ownerShareRate?: number;
     jockeyShareRate?: number;
   },
-): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId }> {
+): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId; riskMultiplier: number }> {
   const pool = await getOrCreatePredictionPool(race);
   if (pool.status !== 'open') {
     throw new HttpError(409, 'Bounty pool đã đóng');
   }
+  const riskMultiplier = race.riskMultiplier ?? 1;
+  if (!Number.isInteger(riskMultiplier)) {
+    throw new HttpError(400, 'Mức rủi ro phải là số nguyên');
+  }
+  if (riskMultiplier < pool.minRiskMultiplier || riskMultiplier > pool.maxRiskMultiplier) {
+    throw new HttpError(
+      400,
+      `Mức rủi ro phải nằm trong khoảng ${pool.minRiskMultiplier}x đến ${pool.maxRiskMultiplier}x`,
+    );
+  }
+  const contribution = pool.ticketPrice * riskMultiplier;
 
   const spectatorObjectId = new mongoose.Types.ObjectId(spectatorId);
   const profile = await getOrCreateProfile(spectatorObjectId);
   try {
     await profile.spendPoints(
-      pool.ticketPrice,
+      contribution,
       'spent_pool_entry',
       'PredictionPool',
       pool._id,
-      `Mua vé dự đoán cuộc đua ${race.name}`,
+      `Tham gia dự đoán ${riskMultiplier}x cuộc đua ${race.name}`,
     );
   } catch {
-    throw new HttpError(409, 'Không đủ điểm để mua vé dự đoán');
+    throw new HttpError(409, 'Không đủ điểm để tham gia dự đoán');
   }
 
   pool.totalTickets += 1;
   pool.contributorCount += 1;
-  pool.totalBountyPool += pool.ticketPrice;
+  pool.totalBountyPool += contribution;
   await pool.save();
 
-  return { contribution: pool.ticketPrice, poolId: pool._id };
+  return { contribution, poolId: pool._id, riskMultiplier };
 }
 
 export async function settlePredictionPoolFromResult(
@@ -159,14 +180,20 @@ export async function settlePredictionPoolFromResult(
     horseId: r.horseId,
   }));
 
-  const scores = new Map<string, number>();
+  const weightedScores = new Map<string, { score: number; weight: number }>();
   for (const prediction of predictions) {
     const score = scorePrediction(prediction.predictedRanks, actualRankings);
     prediction.scoringWeight = score;
-    scores.set(prediction._id.toString(), score);
+    weightedScores.set(prediction._id.toString(), {
+      score,
+      weight: prediction.contribution * score,
+    });
   }
 
-  const totalWinnerScore = [...scores.values()].reduce((sum, score) => sum + score, 0);
+  const totalWinnerScore = [...weightedScores.values()].reduce(
+    (sum, weighted) => sum + weighted.weight,
+    0,
+  );
   pool.totalWinnerScore = totalWinnerScore;
 
   if (totalWinnerScore === 0) {
@@ -175,10 +202,10 @@ export async function settlePredictionPoolFromResult(
   }
 
   for (const prediction of predictions) {
-    const score = scores.get(prediction._id.toString()) ?? 0;
+    const weighted = weightedScores.get(prediction._id.toString()) ?? { score: 0, weight: 0 };
     const poolShare =
       totalWinnerScore > 0
-        ? Math.floor((score / totalWinnerScore) * pool.spectatorRewardPool)
+        ? Math.floor((weighted.weight / totalWinnerScore) * pool.spectatorRewardPool)
         : 0;
 
     prediction.poolShare = poolShare;

@@ -11,13 +11,14 @@ import { listPredictions } from './spectator.service.js';
 export interface CreatePredictionInput {
   raceId: string;
   predictedRanks: Array<{ rank: number; horseId: string }>;
+  riskMultiplier?: number;
 }
 
 export async function createPrediction(
   spectatorId: string,
   input: CreatePredictionInput,
 ): Promise<PredictionDto> {
-  const { raceId, predictedRanks } = input;
+  const { raceId, predictedRanks, riskMultiplier } = input;
 
   if (!mongoose.isValidObjectId(raceId)) {
     throw new HttpError(400, 'ID cuộc đua không hợp lệ');
@@ -74,12 +75,17 @@ export async function createPrediction(
   }
 
   let contribution = 0;
+  let finalRiskMultiplier = 1;
   if (tournament.predictionConfig.poolEnabled) {
     const charged = await chargePredictionTicket(spectatorId, {
       _id: race._id,
       tournamentId: race.tournamentId,
       name: race.name,
       ticketPrice: tournament.predictionConfig.entryFee || undefined,
+      riskMultiplier,
+      minRiskMultiplier: tournament.predictionConfig.minRiskMultiplier,
+      maxRiskMultiplier: tournament.predictionConfig.maxRiskMultiplier,
+      quickRiskMultipliers: tournament.predictionConfig.quickRiskMultipliers,
       organizerFeeRate: tournament.predictionConfig.organizerFeeRate,
       racingRewardRate: tournament.predictionConfig.racingRewardRate,
       spectatorRewardRate: tournament.predictionConfig.spectatorRewardRate,
@@ -87,6 +93,7 @@ export async function createPrediction(
       jockeyShareRate: tournament.predictionConfig.jockeyShareRate,
     });
     contribution = charged.contribution;
+    finalRiskMultiplier = charged.riskMultiplier;
   }
 
   await Prediction.create({
@@ -98,6 +105,7 @@ export async function createPrediction(
       horseId: new mongoose.Types.ObjectId(r.horseId),
     })),
     status: 'pending',
+    riskMultiplier: finalRiskMultiplier,
     contribution,
   });
 

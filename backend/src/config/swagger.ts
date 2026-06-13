@@ -79,6 +79,13 @@ const swaggerDefinition = {
             description: 'Top-rank predictions. MVP scoring focuses on top 3.',
             items: { $ref: '#/components/schemas/PredictedRankRequest' },
           },
+          riskMultiplier: {
+            type: 'integer',
+            minimum: 1,
+            example: 2,
+            description:
+              'Custom prediction risk multiplier. Must be a whole number within the tournament predictionConfig min/max range.',
+          },
         },
       },
       PredictionDto: {
@@ -94,8 +101,13 @@ const swaggerDefinition = {
           },
           contribution: {
             type: 'number',
-            example: 50000,
-            description: 'Prediction ticket points paid into the bounty pool.',
+            example: 100000,
+            description: 'Prediction entry points paid into the bounty pool: entryFee * riskMultiplier.',
+          },
+          riskMultiplier: {
+            type: 'integer',
+            example: 2,
+            description: 'Whole-number risk multiplier used for this prediction.',
           },
           predictionScore: {
             type: 'number',
@@ -131,7 +143,7 @@ const swaggerDefinition = {
         properties: {
           totalBountyPool: {
             type: 'string',
-            example: 'ticketPrice * numberOfParticipants',
+            example: 'sum(entryFee * riskMultiplier) across all predictions',
           },
           organizerFee: {
             type: 'string',
@@ -159,7 +171,8 @@ const swaggerDefinition = {
           },
           userReward: {
             type: 'string',
-            example: 'userPredictionScore / totalWinnerScore * spectatorRewardPool',
+            example:
+              '(predictionEntryPoints * predictionScore) / totalPredictionWeight * spectatorRewardPool',
           },
         },
       },
@@ -171,6 +184,15 @@ const swaggerDefinition = {
           bonusPointsTop3: { type: 'number', example: 50 },
           poolEnabled: { type: 'boolean', example: true },
           entryFee: { type: 'number', example: 50000 },
+          minRiskMultiplier: { type: 'integer', minimum: 1, example: 1 },
+          maxRiskMultiplier: { type: 'integer', minimum: 1, example: 10 },
+          quickRiskMultipliers: {
+            type: 'array',
+            items: { type: 'integer', minimum: 1 },
+            example: [1, 2, 3, 6],
+            description:
+              'Suggested quick-pick multipliers for frontend buttons. Users can still enter any whole number within min/max.',
+          },
           organizerFeeRate: { type: 'number', example: 10 },
           racingRewardRate: { type: 'number', example: 15 },
           spectatorRewardRate: { type: 'number', example: 75 },
@@ -670,9 +692,9 @@ const swaggerDefinition = {
       },
       post: {
         tags: ['Spectator'],
-        summary: 'Create a race prediction and buy a bounty ticket when enabled',
+        summary: 'Create a race prediction with optional risk multiplier',
         description:
-          'Creates one prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee points from the spectator profile, records contribution, and adds it to the flexible bounty pool.',
+          'Creates one prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee * riskMultiplier points from the spectator profile, records contribution, and adds it to the flexible bounty pool.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -697,6 +719,7 @@ const swaggerDefinition = {
                       { rank: 2, horseId: '665f1e000000000000000002' },
                       { rank: 3, horseId: '665f1e000000000000000003' },
                     ],
+                    riskMultiplier: 2,
                   },
                 },
               },

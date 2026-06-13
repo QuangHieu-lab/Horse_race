@@ -12,6 +12,7 @@ export interface IPrediction {
   tournamentId: mongoose.Types.ObjectId;
   predictedRanks: IPredictedRank[];
   status: PredictionStatus;
+  riskMultiplier: number;
   contribution: number;
   poolShare: number;
   scoringWeight: number;
@@ -56,6 +57,7 @@ const PredictionSchema = new Schema<IPrediction>(
       enum: ['pending', 'partial', 'correct', 'incorrect'],
       default: 'pending',
     },
+    riskMultiplier: { type: Number, default: 1, min: 1 },
     contribution: { type: Number, default: 0, min: 0 },
     poolShare: { type: Number, default: 0, min: 0 },
     scoringWeight: { type: Number, default: 0, min: 0 },
