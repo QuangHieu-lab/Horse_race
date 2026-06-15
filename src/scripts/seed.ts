@@ -22,6 +22,7 @@ import {
   Product,
   Notification,
   SpectatorProfile,
+  ViolationRule, 
 } from '../models/index.js';
 
 const DEMO_PASSWORD = 'Demo@123';
@@ -46,6 +47,7 @@ const COLLECTIONS_TO_CLEAR = [
   'tracks',
   'horses',
   'users',
+  'violationrules', // 🚀 Clear luôn bảng luật cũ nếu có
 ];
 
 function daysFromNow(days: number): Date {
@@ -194,6 +196,48 @@ async function seed(): Promise<void> {
   const horseA = horses[0]!;
   const horseB = horses[1]!;
   const horseC = horses[2]!;
+
+  // 🚀 TẠO MASTER DATA LUẬT VI PHẠM (VIOLATION RULES)
+  console.log('Creating Violation Rules…');
+  const rules = await ViolationRule.create([
+    {
+      code: 'ERR-001',
+      name: 'Xuất phát sớm (False Start)',
+      description: 'Ngựa hoặc kỵ sĩ vượt rào trước hiệu lệnh bắt đầu.',
+      category: 'race_conduct',
+      severity: 'high',
+      penaltyApplied: 'disqualify',
+      fineAmount: 500000,
+      banDurationDays: 0,
+      isActive: true,
+      createdBy: admin._id,
+    },
+    {
+      code: 'ERR-002',
+      name: 'Chèn ép làn đối thủ (Obstruction)',
+      description: 'Kỵ sĩ điều khiển ngựa tạt đầu, chèn ép sai luật gây nguy hiểm.',
+      category: 'race_conduct',
+      severity: 'high',
+      penaltyApplied: 'disqualification',
+      fineAmount: 1000000,
+      banDurationDays: 7,
+      isActive: true,
+      createdBy: admin._id,
+    },
+    {
+      code: 'ERR-003',
+      name: 'Sử dụng roi quá mức',
+      description: 'Kỵ sĩ quất roi vượt quá số lần quy định ở đoạn nước rút.',
+      category: 'equipment',
+      severity: 'medium',
+      penaltyApplied: 'fine',
+      fineAmount: 200000,
+      banDurationDays: 0,
+      isActive: true,
+      createdBy: admin._id,
+    }
+  ]);
+  const ruleFalseStart = rules[0]!;
 
   console.log('Creating track & tournament…');
   const track = await Track.create({
@@ -345,20 +389,8 @@ async function seed(): Promise<void> {
     },
   ]);
 
-  await acceptInvitation(
-    owner._id,
-    jockey1._id,
-    horseA._id,
-    raceOpen._id,
-    'Mời bạn điều khiển Sóng Gió tại chung kết.',
-  );
-  await acceptInvitation(
-    owner._id,
-    jockey2._id,
-    horseB._id,
-    raceOpen._id,
-    'Mời bạn điều khiển Bóng Mây tại chung kết.',
-  );
+  await acceptInvitation(owner._id, jockey1._id, horseA._id, raceOpen._id, 'Mời bạn điều khiển Sóng Gió tại chung kết.');
+  await acceptInvitation(owner._id, jockey2._id, horseB._id, raceOpen._id, 'Mời bạn điều khiển Bóng Mây tại chung kết.');
 
   // --- Scenario C: Scoring after publish ---
   console.log('Scenario C — Result awaiting publish…');
@@ -403,25 +435,16 @@ async function seed(): Promise<void> {
     },
   ]);
 
-  await acceptInvitation(
-    owner._id,
-    jockey1._id,
-    horseA._id,
-    raceCompleted._id,
-    'Mời bạn điều khiển Sóng Gió tại vòng loại.',
-  );
-  await acceptInvitation(
-    owner._id,
-    jockey2._id,
-    horseB._id,
-    raceCompleted._id,
-    'Mời bạn điều khiển Bóng Mây tại vòng loại.',
-  );
+  await acceptInvitation(owner._id, jockey1._id, horseA._id, raceCompleted._id, 'Mời bạn điều khiển Sóng Gió tại vòng loại.');
+  await acceptInvitation(owner._id, jockey2._id, horseB._id, raceCompleted._id, 'Mời bạn điều khiển Bóng Mây tại vòng loại.');
 
-  const raceCompletedDoc = await Race.findById(raceCompleted._id);
+ const raceCompletedDoc = await Race.findById(raceCompleted._id);
   if (!raceCompletedDoc) throw new Error('Seed failed: race completed not found');
 
   const now = new Date();
+  
+  // 🚀 BƯỚC 1: Xác nhận y tế và điểm danh cho cả 2 ngựa
+  // Mục đích: Đảm bảo có đủ 2 con ngựa hợp lệ (active = 2) để trận đua có thể BẮT ĐẦU.
   raceCompletedDoc.participants = raceCompletedDoc.participants.map((p) => ({
     ...p,
     confirmedAt: now,
@@ -429,11 +452,27 @@ async function seed(): Promise<void> {
     carriedWeight: p.horseId.toString() === horseA._id.toString() ? 56 : 57,
   }));
   raceCompletedDoc.status = 'ongoing';
-  await raceCompletedDoc.save();
+  await raceCompletedDoc.save(); // ✅ Lưu thành công, trận đua chính thức bắt đầu!
+
+  // 🚀 BƯỚC 2: Trong lúc đua, Ngựa B phạm lỗi (False Start) nên bị tước quyền, sau đó chốt trận.
+  raceCompletedDoc.participants = raceCompletedDoc.participants.map((p) => {
+    const isHorseB = p.horseId.toString() === horseB._id.toString();
+    if (isHorseB) {
+      return {
+        ...p,
+        isDisqualified: true,
+        disqualifiedReason: ruleFalseStart.name,
+        disqualifiedAt: now,
+        scratchedAt: now, // Chính thức văng khỏi đường chạy
+      };
+    }
+    return p;
+  });
   raceCompletedDoc.status = 'completed';
   raceCompletedDoc.scheduledAt = daysFromNow(-1);
-  await raceCompletedDoc.save();
+  await raceCompletedDoc.save(); // ✅ Lưu thành công, chốt sổ trận đua!
 
+  // 🚀 CẬP NHẬT SCENARIO C: Ghi biên bản vi phạm theo cấu trúc mới
   const result = await Result.create({
     raceId: raceCompleted._id,
     tournamentId: tournament._id,
@@ -450,10 +489,13 @@ async function seed(): Promise<void> {
     ],
     violations: [
       {
+        ruleId: ruleFalseStart._id,
         horseId: horseB._id,
-        type: 'false_start',
-        description: 'Xuất phát sớm — loại khỏi bảng xếp hạng.',
-        penaltyApplied: 'disqualify',
+        jockeyId: jockey2._id, // Có thể phạt cả Ngựa và Kỵ sĩ
+        type: ruleFalseStart.category,
+        description: `Bắt nhầm nhịp xuất phát - ${ruleFalseStart.description}`,
+        penaltyApplied: ruleFalseStart.penaltyApplied,
+        bannedUntil: null,
         recordedAt: now,
       },
     ],
@@ -513,12 +555,13 @@ async function seed(): Promise<void> {
   ]);
 
   console.log('\n=== Seed completed (3 scenarios) ===\n');
+  console.log('Master Data — Đã nạp 3 luật vi phạm (Violation Rules)');
   console.log('A — Jockey:   pending invite for jockey2@demo.local on', raceUpcoming.name);
   console.log('B — Spectator: open prediction on', raceOpen.name, '(no prediction yet)');
   console.log('C — Scoring:  result confirmed, awaiting publish on', raceCompletedDoc.name);
   console.log('Prediction pending:', predictionPending._id);
   console.log('\nDemo accounts (password: Demo@123):');
-  console.log('  jockey1@demo.local, jockey2@demo.local, spectator@demo.local');
+  console.log('  jockey1@demo.local, jockey2@demo.local, spectator@demo.local, admin@demo.local');
   console.log('Product:', product.name, `— ${product.pointsCost} points\n`);
 }
 

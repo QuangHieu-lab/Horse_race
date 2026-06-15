@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { HttpError } from '../utils/http-error.js';
+import { ViolationRule } from '../models/ViolationRule.model.js';
 import { activeParticipants } from '../utils/race-participants.js';
 
 export interface RefereeRaceDto {
@@ -137,4 +138,108 @@ export async function buildResultFromRace(raceId: string, refereeId: string) {
     finishTime: 120 + idx * 2,
     prize: 1000 - idx * 100,
   }));
+
+  
+}
+export async function applyRacePenalty(
+  refereeId: string,
+  raceId: string,
+  payload: { ruleId: string; horseId?: string; jockeyId?: string; notes?: string; }
+): Promise<void> {
+  const race = await Race.findById(raceId);
+  if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
+  if (race.refereeId?.toString() !== refereeId) throw new HttpError(403, 'Không có quyền truy cập');
+  if (race.status !== 'ongoing') throw new HttpError(400, 'Chỉ áp dụng khi trận đua đang diễn ra');
+
+  const rule = await ViolationRule.findById(payload.ruleId);
+  if (!rule || !rule.isActive) throw new HttpError(404, 'Luật vi phạm không hợp lệ');
+
+  const participant = race.participants.find((p) => 
+    (payload.horseId && p.horseId.toString() === payload.horseId) || 
+    (payload.jockeyId && p.jockeyId.toString() === payload.jockeyId)
+  );
+  if (!participant) throw new HttpError(404, 'Không tìm thấy đối tượng trong trận');
+
+  // Xử lý loại trực tiếp
+  const isDQ = ['disqualify', 'disqualification'].includes(rule.penaltyApplied);
+  if (isDQ) {
+    (participant as any).isDisqualified = true;
+    (participant as any).disqualifiedReason = rule.name;
+    (participant as any).disqualifiedAt = new Date();
+    participant.scratchedAt = new Date();
+    await race.save();
+  }
+
+  // Ghi biên bản vào Result
+  let resultDoc = await Result.findOne({ raceId: race._id });
+  if (!resultDoc) {
+    resultDoc = new Result({ raceId: race._id, tournamentId: race.tournamentId, rankings: [], violations: [], protests: [] });
+  }
+
+  let bannedUntil: Date | null = null;
+  if (rule.penaltyApplied === 'time_ban' && rule.banDurationDays > 0) {
+    bannedUntil = new Date();
+    bannedUntil.setDate(bannedUntil.getDate() + rule.banDurationDays);
+  }
+
+  resultDoc.violations.push({
+    ruleId: rule._id,
+    horseId: payload.horseId ? new mongoose.Types.ObjectId(payload.horseId) : null,
+    jockeyId: payload.jockeyId ? new mongoose.Types.ObjectId(payload.jockeyId) : null,
+    type: rule.category,
+    description: payload.notes ? `${rule.name} - Ghi chú: ${payload.notes}` : rule.description,
+    penaltyApplied: rule.penaltyApplied,
+    bannedUntil,
+    recordedAt: new Date(),
+  });
+
+  await resultDoc.save();
+
+  
+}
+
+export async function revokeRacePenalty(
+  refereeId: string,
+  raceId: string,
+  violationId: string
+): Promise<void> {
+  const race = await Race.findById(raceId);
+  if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
+  if (race.refereeId?.toString() !== refereeId) {
+    throw new HttpError(403, 'Bạn không phải trọng tài phụ trách trận đua này');
+  }
+  if (race.status === 'completed') {
+    throw new HttpError(400, 'Không thể hoàn tác án phạt khi trận đua đã kết thúc');
+  }
+
+  const resultDoc = await Result.findOne({ raceId: race._id });
+  if (!resultDoc) throw new HttpError(404, 'Chưa có biên bản kết quả nào được ghi nhận');
+
+  // Tìm lỗi vi phạm cần xóa
+  const violationIndex = resultDoc.violations.findIndex(v => v._id?.toString() === violationId);
+  if (violationIndex === -1) throw new HttpError(404, 'Không tìm thấy biên bản vi phạm này');
+
+  const violation = resultDoc.violations[violationIndex];
+
+  // Nếu lỗi đó là lỗi "Tước quyền", phải khôi phục lại trạng thái cho Ngựa trên đường đua
+  const isDQ = ['disqualify', 'disqualification'].includes(violation!.penaltyApplied || '');
+  if (isDQ) {
+    const participant = race.participants.find(p => 
+      (violation!.horseId && p.horseId.toString() === violation!.horseId.toString()) ||
+      (violation!.jockeyId && p.jockeyId.toString() === violation!.jockeyId.toString())
+    );
+
+    if (participant) {
+      // Khôi phục trạng thái (Xóa cờ tước quyền)
+      participant.isDisqualified = false;
+      participant.disqualifiedReason = undefined;
+      participant.disqualifiedAt = null;
+      participant.scratchedAt = null; // Cho phép chạy tiếp
+      await race.save();
+    }
+  }
+
+  // Xóa vi phạm khỏi danh sách của Result
+  resultDoc.violations.splice(violationIndex, 1);
+  await resultDoc.save();
 }

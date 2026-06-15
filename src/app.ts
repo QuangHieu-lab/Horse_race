@@ -16,6 +16,7 @@ import { adminRouter } from './routes/admin.routes.js';
 import { refereeRouter } from './routes/referee.routes.js';
 import { adminRaceMeetingRouter } from './routes/admin-racemeeting.routes.js';
 import { adminTrackRouter } from './routes/admin-track.routes.js';
+import { adminViolationRuleRouter } from './routes/admin-violation-rule.routes.js';
 export function createApp() {
   const app = express();
   const corsOptions = buildCorsOptions();
@@ -39,8 +40,10 @@ export function createApp() {
   app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
   app.use('/api/admin/race-meetings', authenticate, requireRole('admin'),adminRaceMeetingRouter);
   app.use('/api/admin/tracks', authenticate, requireRole('admin'), adminTrackRouter);
+    app.use('/api/admin/violation-rules',authenticate, requireRole('admin'),adminViolationRuleRouter)
   app.use('/api/referee', authenticate, requireRole('referee'), refereeRouter);
   app.use('/api/horse-owner', authenticate, requireRole('horse_owner'), horseOwnerRouter);
+;
   app.use('/api/admin/tracks', adminTrackRouter);
   app.use(errorHandler);
 

@@ -13,6 +13,9 @@ export interface IParticipant {
   vetApprovedAt?: Date | null;
   scratchedAt?: Date | null;
   confirmedAt?: Date | null;
+  isDisqualified?: boolean;
+  disqualifiedReason?: string;
+  disqualifiedAt?: Date | null;
 }
 
 export interface IViewingTicket {
@@ -72,6 +75,9 @@ const ParticipantSchema = new Schema<IParticipant>(
     laneNumber: { type: Number, required: true, min: 1 },
     clothNumber: { type: Number, min: 1 },
     carriedWeight: { type: Number, min: 40, max: 80 },
+    isDisqualified: { type: Boolean, default: false },
+    disqualifiedReason: { type: String },
+    disqualifiedAt: { type: Date, default: null },  
     vetApprovedAt: { type: Date, default: null },
     scratchedAt: { type: Date, default: null },
     confirmedAt: { type: Date, default: null },
