@@ -59,26 +59,26 @@ export class RefereeController {
     const result = await resultService.getResultByRaceId(req.params.id as string);
     res.json({ result });
   });
-  penalize = asyncHandler(async (req: Request, res: Response) => {
-    const { ruleId, horseId, jockeyId, notes } = req.body as {
+penalize = asyncHandler(async (req: Request, res: Response) => {
+    // 🚀 Bổ sung thêm 'target' vào body
+    const { ruleId, horseId, jockeyId, target, notes } = req.body as {
       ruleId?: string;
       horseId?: string;
       jockeyId?: string;
+      target?: 'horse' | 'jockey' | 'both';
       notes?: string;
     };
 
-    if (!ruleId) {
-      throw new HttpError(400, 'Vui lòng cung cấp mã luật vi phạm (ruleId)');
-    }
-
-    if (!horseId && !jockeyId) {
-      throw new HttpError(400, 'Phải chỉ định ít nhất Ngựa (horseId) hoặc Kỵ sĩ (jockeyId) vi phạm');
+    if (!ruleId) throw new HttpError(400, 'Vui lòng cung cấp mã luật vi phạm (ruleId)');
+    if (!horseId && !jockeyId) throw new HttpError(400, 'Phải chỉ định ít nhất Ngựa hoặc Kỵ sĩ');
+    if (!target || !['horse', 'jockey', 'both'].includes(target)) {
+      throw new HttpError(400, 'Vui lòng chỉ định đối tượng chịu án phạt (target: horse, jockey, both)');
     }
 
     await refereeService.applyRacePenalty(
       req.user!.id,
       req.params.id as string,
-      { ruleId, horseId, jockeyId, notes }
+      { ruleId, horseId, jockeyId, target, notes } // Truyền target xuống Service
     );
 
     res.json({ 

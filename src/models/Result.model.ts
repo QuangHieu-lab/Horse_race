@@ -23,6 +23,7 @@ export interface IViolation {
   ruleId?: mongoose.Types.ObjectId; // Trỏ về bảng Master Data ViolationRule
   horseId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt kỵ sĩ
   jockeyId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt ngựa
+  target: 'horse' | 'jockey' | 'both';
   type: string;
   description: string;
   penaltyApplied?: PenaltyApplied | null;
@@ -79,6 +80,7 @@ const ViolationSchema = new Schema<IViolation>(
     penaltyApplied: { type: String, enum: PENALTY_APPLIED, default: null },
     bannedUntil: { type: Date, default: null },
     recordedAt: { type: Date, default: () => new Date() },
+    target: { type: String, enum: ['horse', 'jockey', 'both'], required: true },
   },
   { _id: true }, // Mở _id để dễ dàng khiếu nại (Protest) một lỗi cụ thể
 );

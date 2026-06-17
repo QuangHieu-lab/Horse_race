@@ -207,7 +207,6 @@ async function seed(): Promise<void> {
       category: 'race_conduct',
       severity: 'high',
       penaltyApplied: 'disqualify',
-      fineAmount: 500000,
       banDurationDays: 0,
       isActive: true,
       createdBy: admin._id,
@@ -219,7 +218,6 @@ async function seed(): Promise<void> {
       category: 'race_conduct',
       severity: 'high',
       penaltyApplied: 'disqualification',
-      fineAmount: 1000000,
       banDurationDays: 7,
       isActive: true,
       createdBy: admin._id,
@@ -230,9 +228,8 @@ async function seed(): Promise<void> {
       description: 'Kỵ sĩ quất roi vượt quá số lần quy định ở đoạn nước rút.',
       category: 'equipment',
       severity: 'medium',
-      penaltyApplied: 'fine',
-      fineAmount: 200000,
-      banDurationDays: 0,
+      penaltyApplied: 'disqualification',
+      banDurationDays: 1,
       isActive: true,
       createdBy: admin._id,
     }
@@ -491,7 +488,11 @@ async function seed(): Promise<void> {
       {
         ruleId: ruleFalseStart._id,
         horseId: horseB._id,
-        jockeyId: jockey2._id, // Có thể phạt cả Ngựa và Kỵ sĩ
+        jockeyId: jockey2._id, 
+        
+        // 🚀 THÊM TRƯỜNG NÀY ĐỂ VƯỢT QUA LỖI VALIDATION
+        target: 'both', 
+        
         type: ruleFalseStart.category,
         description: `Bắt nhầm nhịp xuất phát - ${ruleFalseStart.description}`,
         penaltyApplied: ruleFalseStart.penaltyApplied,

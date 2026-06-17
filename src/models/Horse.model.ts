@@ -17,6 +17,12 @@ export interface IHorse {
   currentJockeyId?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
+  penaltyStatus: {
+    isBanned: boolean;
+    bannedUntil: Date | null;
+    currentViolationId: mongoose.Types.ObjectId | null; // Trỏ về biên bản lỗi trong Result
+    reason: string | null;
+  };
 }
 
 const HorseSchema = new Schema<IHorse>(
@@ -31,15 +37,20 @@ const HorseSchema = new Schema<IHorse>(
     age: { type: Number, required: true, min: 1, max: 30 },
     color: { type: String, trim: true },
     weight: { type: Number, min: 350, max: 600 },
+    penaltyStatus: {
+    isBanned: { type: Boolean, default: false },
+    bannedUntil: { type: Date, default: null },
+    currentViolationId: { type: Schema.Types.ObjectId, ref: 'Result', default: null },
+    reason: { type: String, default: null }
+  },
     healthStatus: {
-      type: String,
-      enum: ['fit', 'injured', 'retired'],
-      default: 'fit',
-    },
-    imageUrl: { type: String },
+      type: String, enum: ['fit', 'injured', 'retired'], default: 'fit', },
+     imageUrl: { type: String },
     currentJockeyId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
+  
   { timestamps: true },
+  
 );
 
 HorseSchema.index({ ownerId: 1 });

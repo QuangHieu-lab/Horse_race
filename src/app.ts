@@ -40,11 +40,10 @@ export function createApp() {
   app.use('/api/admin', authenticate, requireRole('admin'), adminRouter);
   app.use('/api/admin/race-meetings', authenticate, requireRole('admin'),adminRaceMeetingRouter);
   app.use('/api/admin/tracks', authenticate, requireRole('admin'), adminTrackRouter);
-    app.use('/api/admin/violation-rules',authenticate, requireRole('admin'),adminViolationRuleRouter)
+  app.use('/api/admin/violation-rules',authenticate, requireRole('admin'),adminViolationRuleRouter)
   app.use('/api/referee', authenticate, requireRole('referee'), refereeRouter);
   app.use('/api/horse-owner', authenticate, requireRole('horse_owner'), horseOwnerRouter);
 ;
-  app.use('/api/admin/tracks', adminTrackRouter);
   app.use(errorHandler);
 
   return app;

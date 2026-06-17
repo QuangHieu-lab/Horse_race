@@ -1,18 +1,18 @@
-import mongoose, { Schema } from 'mongoose';
-import type { ViolationCategory, ViolationSeverity, PenaltyApplied } from '../types/shared.types.js';
+import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IViolationRule {
+export interface IViolationRule extends Document {
   code: string;
   name: string;
   description: string;
-  category: ViolationCategory;
-  severity: ViolationSeverity;
-  penaltyApplied: PenaltyApplied;
+  category: 'race_conduct' | 'medical' | 'equipment' | 'administrative';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  
+  // 🚀 CHỈ GIỮ LẠI CÁC HÌNH THỨC CẤM THI ĐẤU VÀ XỬ LÝ TẠI TRẬN (Đã xóa 'fine')
+  penaltyApplied: 'warning' | 'demote' | 'disqualify' | 'disqualification' | 'restart' | 'time_ban' | 'permanent_ban';
+  
   banDurationDays: number;
   isActive: boolean;
-  createdBy?: mongoose.Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
+  createdBy?: mongoose.Types.ObjectId | null;
 }
 
 const ViolationRuleSchema = new Schema<IViolationRule>(
@@ -32,7 +32,16 @@ const ViolationRuleSchema = new Schema<IViolationRule>(
     },
     penaltyApplied: {
       type: String,
-      enum: ['warning', 'fine', 'disqualify','disqualification', 'time_ban', 'permanent_ban'],
+      // 🚀 CẬP NHẬT ENUM TẠI ĐÂY ĐỂ MONGOOSE CHẶN ĐỨNG MỌI CỐ GẮNG TRUYỀN 'fine'
+      enum: [
+        'warning', 
+        'demote', 
+        'disqualify', 
+        'disqualification', 
+        'restart', 
+        'time_ban', 
+        'permanent_ban'
+      ],
       required: true,
     },
     banDurationDays: { type: Number, min: 0, default: 0 },
@@ -42,8 +51,10 @@ const ViolationRuleSchema = new Schema<IViolationRule>(
   { timestamps: true },
 );
 
-
-ViolationRuleSchema.index({ category: 1, isActive: 1 });
-ViolationRuleSchema.index({ penaltyType: 1 });
+// Mongoose tự động xử lý index cho các trường có unique: true (như trường code)
+// Index hỗ trợ truy vấn tốc độ cao cho Admin
+ViolationRuleSchema.index({ penaltyApplied: 1 });
+ViolationRuleSchema.index({ category: 1 });
+ViolationRuleSchema.index({ isActive: 1 });
 
 export const ViolationRule = mongoose.model<IViolationRule>('ViolationRule', ViolationRuleSchema);

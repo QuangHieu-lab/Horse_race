@@ -46,7 +46,6 @@ export type PenaltyApplied =
   | 'disqualify'       // Tước quyền (Dùng cho Result)
   | 'disqualification' // Tước quyền (Dùng cho ViolationRule)
   | 'restart'          // Đua lại
-  | 'fine'             // Phạt tiền
   | 'time_ban'         // Cấm thi đấu có thời hạn
   | 'permanent_ban';   // Cấm thi đấu vĩnh viễn
 
@@ -140,7 +139,6 @@ export const PENALTY_APPLIED: readonly PenaltyApplied[] = [
   'disqualify',
   'disqualification',
   'restart',
-  'fine',
   'time_ban',
   'permanent_ban'
 ] as const;
