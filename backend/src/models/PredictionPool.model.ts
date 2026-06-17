@@ -6,8 +6,12 @@ export interface IPredictionPool {
   tournamentId: mongoose.Types.ObjectId;
   status: PredictionPoolStatus;
   ticketPrice: number;
+  minRiskMultiplier: number;
+  maxRiskMultiplier: number;
+  quickRiskMultipliers: number[];
   totalTickets: number;
   totalBountyPool: number;
+  winPool: number;
   organizerFeeRate: number;
   racingRewardRate: number;
   spectatorRewardRate: number;
@@ -60,8 +64,12 @@ const PredictionPoolSchema = new Schema<IPredictionPool>(
       default: 'open',
     },
     ticketPrice: { type: Number, default: 50000, min: 0 },
+    minRiskMultiplier: { type: Number, default: 1, min: 1 },
+    maxRiskMultiplier: { type: Number, default: 10, min: 1 },
+    quickRiskMultipliers: { type: [Number], default: () => [1, 2, 3, 6] },
     totalTickets: { type: Number, default: 0, min: 0 },
     totalBountyPool: { type: Number, default: 0, min: 0 },
+    winPool: { type: Number, default: 0, min: 0 },
     organizerFeeRate: { type: Number, default: 10, min: 0, max: 100 },
     racingRewardRate: { type: Number, default: 15, min: 0, max: 100 },
     spectatorRewardRate: { type: Number, default: 75, min: 0, max: 100 },

@@ -75,9 +75,16 @@ const swaggerDefinition = {
           predictedRanks: {
             type: 'array',
             minItems: 1,
-            maxItems: 3,
-            description: 'Top-rank predictions. MVP scoring focuses on top 3.',
+            maxItems: 1,
+            description: 'MVP prediction accepts one horse only: rank 1 winner prediction.',
             items: { $ref: '#/components/schemas/PredictedRankRequest' },
+          },
+          riskMultiplier: {
+            type: 'integer',
+            minimum: 1,
+            example: 2,
+            description:
+              'Custom prediction risk multiplier. Must be a whole number within the tournament predictionConfig min/max range.',
           },
         },
       },
@@ -94,22 +101,35 @@ const swaggerDefinition = {
           },
           contribution: {
             type: 'number',
-            example: 50000,
-            description: 'Prediction ticket points paid into the bounty pool.',
+            example: 100000,
+            description: 'Prediction entry points paid into the bounty pool: entryFee * riskMultiplier.',
+          },
+          riskMultiplier: {
+            type: 'integer',
+            example: 2,
+            description: 'Whole-number risk multiplier used for this prediction.',
           },
           predictionScore: {
             type: 'number',
-            example: 65,
-            description: 'Bounty scoring weight: exact rank 1/2/3 = 50/40/30, wrong-position top 3 = 15.',
+            example: 1,
+            description: 'Winner-only scoring weight: 1 when rank 1 prediction is correct, otherwise 0.',
           },
-          pointsEarned: { type: 'number', example: 100 },
-          bonusPoints: { type: 'number', example: 50 },
+          pointsEarned: {
+            type: 'number',
+            example: 100000,
+            description: 'Returned entry points for a correct winner prediction.',
+          },
+          bonusPoints: { type: 'number', example: 0 },
           poolShare: {
             type: 'number',
             example: 225000,
-            description: 'Reward points received from SpectatorRewardPool.',
+            description: 'Prize points received from PrizePool, excluding returned entry points.',
           },
-          totalPoints: { type: 'number', example: 225150 },
+          totalPoints: {
+            type: 'number',
+            example: 325000,
+            description: 'Total returned to the spectator: pointsEarned + poolShare.',
+          },
           evaluatedAt: { type: 'string', format: 'date-time', nullable: true },
           createdAt: { type: 'string', format: 'date-time' },
           predictedRanks: {
@@ -131,19 +151,23 @@ const swaggerDefinition = {
         properties: {
           totalBountyPool: {
             type: 'string',
-            example: 'ticketPrice * numberOfParticipants',
+            example: 'sum(entryFee * riskMultiplier) across all predictions',
+          },
+          winPool: {
+            type: 'string',
+            example: 'sum(entryFee * riskMultiplier) from incorrect winner predictions',
           },
           organizerFee: {
             type: 'string',
-            example: 'totalBountyPool * 10%',
+            example: 'winPool * 10%',
           },
           racingRewardPool: {
             type: 'string',
-            example: 'totalBountyPool * 15%',
+            example: 'winPool * 15%',
           },
           spectatorRewardPool: {
             type: 'string',
-            example: 'totalBountyPool * 75%',
+            example: 'winPool * 75%',
           },
           ownerReward: {
             type: 'string',
@@ -155,11 +179,11 @@ const swaggerDefinition = {
           },
           rankRewardRates: {
             type: 'string',
-            example: 'Top ranks split racingRewardPool as [50%, 25%, 15%, 7%, 3%]. Dead-heat horses in the same rank split that rank reward equally.',
+            example: 'MVP pays RacingRewardPool to rank 1 horse only. Dead-heat rank 1 horses split it equally.',
           },
           userReward: {
             type: 'string',
-            example: 'userPredictionScore / totalWinnerScore * spectatorRewardPool',
+            example: 'entryPoints + prizePool * (entryPoints / totalCorrectEntryPoints)',
           },
         },
       },
@@ -171,6 +195,15 @@ const swaggerDefinition = {
           bonusPointsTop3: { type: 'number', example: 50 },
           poolEnabled: { type: 'boolean', example: true },
           entryFee: { type: 'number', example: 50000 },
+          minRiskMultiplier: { type: 'integer', minimum: 1, example: 1 },
+          maxRiskMultiplier: { type: 'integer', minimum: 1, example: 10 },
+          quickRiskMultipliers: {
+            type: 'array',
+            items: { type: 'integer', minimum: 1 },
+            example: [1, 2, 3, 6],
+            description:
+              'Suggested quick-pick multipliers for frontend buttons. Users can still enter any whole number within min/max.',
+          },
           organizerFeeRate: { type: 'number', example: 10 },
           racingRewardRate: { type: 'number', example: 15 },
           spectatorRewardRate: { type: 'number', example: 75 },
@@ -670,9 +703,9 @@ const swaggerDefinition = {
       },
       post: {
         tags: ['Spectator'],
-        summary: 'Create a race prediction and buy a bounty ticket when enabled',
+        summary: 'Create a race prediction with optional risk multiplier',
         description:
-          'Creates one prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee points from the spectator profile, records contribution, and adds it to the flexible bounty pool.',
+          'Creates one winner prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee * riskMultiplier points from the spectator profile and records it as entry points.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -689,14 +722,11 @@ const swaggerDefinition = {
             'application/json': {
               schema: { $ref: '#/components/schemas/CreatePredictionRequest' },
               examples: {
-                top3Prediction: {
+                winnerPrediction: {
                   value: {
                     raceId: '665f1e000000000000000010',
-                    predictedRanks: [
-                      { rank: 1, horseId: '665f1e000000000000000001' },
-                      { rank: 2, horseId: '665f1e000000000000000002' },
-                      { rank: 3, horseId: '665f1e000000000000000003' },
-                    ],
+                    predictedRanks: [{ rank: 1, horseId: '665f1e000000000000000001' }],
+                    riskMultiplier: 2,
                   },
                 },
               },

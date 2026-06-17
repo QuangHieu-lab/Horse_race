@@ -20,30 +20,15 @@ function pct(amount: number, rate: number): number {
   return Math.floor((amount * rate) / 100);
 }
 
-function scorePrediction(
+function isWinningPrediction(
   predictedRanks: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
   actualRankings: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
-): number {
-  const actualByHorse = new Map(actualRankings.map((r) => [r.horseId.toString(), r.rank]));
-  const top3HorseIds = new Set(
-    actualRankings.filter((r) => r.rank <= 3).map((r) => r.horseId.toString()),
+): boolean {
+  const predictedWinner = predictedRanks.find((p) => p.rank === 1);
+  if (!predictedWinner) return false;
+  return actualRankings.some(
+    (ranking) => ranking.rank === 1 && ranking.horseId.toString() === predictedWinner.horseId.toString(),
   );
-
-  let score = 0;
-  for (const prediction of predictedRanks.filter((p) => p.rank <= 3)) {
-    const horseId = prediction.horseId.toString();
-    const actualRank = actualByHorse.get(horseId);
-
-    if (actualRank === prediction.rank) {
-      if (prediction.rank === 1) score += 50;
-      else if (prediction.rank === 2) score += 40;
-      else if (prediction.rank === 3) score += 30;
-    } else if (top3HorseIds.has(horseId)) {
-      score += 15;
-    }
-  }
-
-  return score;
 }
 
 async function getOrCreateProfile(userId: mongoose.Types.ObjectId) {
@@ -56,6 +41,9 @@ export async function getOrCreatePredictionPool(race: {
   _id: mongoose.Types.ObjectId;
   tournamentId: mongoose.Types.ObjectId;
   ticketPrice?: number;
+  minRiskMultiplier?: number;
+  maxRiskMultiplier?: number;
+  quickRiskMultipliers?: number[];
   organizerFeeRate?: number;
   racingRewardRate?: number;
   spectatorRewardRate?: number;
@@ -70,6 +58,9 @@ export async function getOrCreatePredictionPool(race: {
         tournamentId: race.tournamentId,
         status: 'open',
         ticketPrice: race.ticketPrice ?? DEFAULT_TICKET_PRICE,
+        minRiskMultiplier: race.minRiskMultiplier ?? 1,
+        maxRiskMultiplier: race.maxRiskMultiplier ?? 10,
+        quickRiskMultipliers: race.quickRiskMultipliers ?? [1, 2, 3, 6],
         organizerFeeRate: race.organizerFeeRate ?? ORGANIZER_FEE_RATE,
         racingRewardRate: race.racingRewardRate ?? RACING_REWARD_RATE,
         spectatorRewardRate: race.spectatorRewardRate ?? SPECTATOR_REWARD_RATE,
@@ -90,38 +81,53 @@ export async function chargePredictionTicket(
     tournamentId: mongoose.Types.ObjectId;
     name: string;
     ticketPrice?: number;
+    riskMultiplier?: number;
+    minRiskMultiplier?: number;
+    maxRiskMultiplier?: number;
+    quickRiskMultipliers?: number[];
     organizerFeeRate?: number;
     racingRewardRate?: number;
     spectatorRewardRate?: number;
     ownerShareRate?: number;
     jockeyShareRate?: number;
   },
-): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId }> {
+): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId; riskMultiplier: number }> {
   const pool = await getOrCreatePredictionPool(race);
   if (pool.status !== 'open') {
     throw new HttpError(409, 'Bounty pool đã đóng');
   }
+  const riskMultiplier = race.riskMultiplier ?? 1;
+  if (!Number.isInteger(riskMultiplier)) {
+    throw new HttpError(400, 'Mức rủi ro phải là số nguyên');
+  }
+  if (riskMultiplier < pool.minRiskMultiplier || riskMultiplier > pool.maxRiskMultiplier) {
+    throw new HttpError(
+      400,
+      `Mức rủi ro phải nằm trong khoảng ${pool.minRiskMultiplier}x đến ${pool.maxRiskMultiplier}x`,
+    );
+  }
+  const contribution = pool.ticketPrice * riskMultiplier;
 
   const spectatorObjectId = new mongoose.Types.ObjectId(spectatorId);
   const profile = await getOrCreateProfile(spectatorObjectId);
   try {
     await profile.spendPoints(
-      pool.ticketPrice,
+      contribution,
       'spent_pool_entry',
       'PredictionPool',
       pool._id,
-      `Mua vé dự đoán cuộc đua ${race.name}`,
+      `Tham gia dự đoán ${riskMultiplier}x cuộc đua ${race.name}`,
     );
   } catch {
-    throw new HttpError(409, 'Không đủ điểm để mua vé dự đoán');
+    throw new HttpError(409, 'Không đủ điểm để tham gia dự đoán');
   }
 
   pool.totalTickets += 1;
   pool.contributorCount += 1;
-  pool.totalBountyPool += pool.ticketPrice;
+  pool.totalBountyPool += contribution;
   await pool.save();
 
-  return { contribution: pool.ticketPrice, poolId: pool._id };
+  return { contribution, poolId: pool._id, riskMultiplier };
 }
 
 export async function settlePredictionPoolFromResult(
@@ -130,7 +136,6 @@ export async function settlePredictionPoolFromResult(
   const race = await Race.findById(result.raceId).lean();
   if (!race) return;
   const tournament = await Tournament.findById(result.tournamentId).lean();
-  const rankRewardRates = tournament?.predictionConfig.rankRewardRates ?? [50, 25, 15, 7, 3];
 
   const pool = await PredictionPool.findOne({ raceId: result.raceId });
   if (!pool || pool.status === 'settled') return;
@@ -143,83 +148,80 @@ export async function settlePredictionPoolFromResult(
     return;
   }
 
-  const totalBountyPool = predictions.reduce((sum, p) => sum + p.contribution, 0);
-  pool.totalTickets = predictions.length;
-  pool.contributorCount = predictions.length;
-  pool.totalBountyPool = totalBountyPool;
-  pool.organizerFee = pct(totalBountyPool, pool.organizerFeeRate);
-  pool.racingRewardPool = pct(totalBountyPool, pool.racingRewardRate);
-  pool.spectatorRewardPool = totalBountyPool - pool.organizerFee - pool.racingRewardPool;
-  pool.ownerReward = 0;
-  pool.jockeyReward = 0;
-  pool.racingRewards = [];
-
   const actualRankings = result.rankings.map((r) => ({
     rank: r.rank,
     horseId: r.horseId,
   }));
+  const winners = predictions.filter((prediction) =>
+    isWinningPrediction(prediction.predictedRanks, actualRankings),
+  );
+  const losers = predictions.filter(
+    (prediction) => !isWinningPrediction(prediction.predictedRanks, actualRankings),
+  );
+  const totalBountyPool = predictions.reduce((sum, p) => sum + p.contribution, 0);
+  const winPool = losers.reduce((sum, p) => sum + p.contribution, 0);
+  const totalWinningContribution = winners.reduce((sum, p) => sum + p.contribution, 0);
+  pool.totalTickets = predictions.length;
+  pool.contributorCount = predictions.length;
+  pool.totalBountyPool = totalBountyPool;
+  pool.winPool = winPool;
+  pool.organizerFee = pct(winPool, pool.organizerFeeRate);
+  pool.racingRewardPool = pct(winPool, pool.racingRewardRate);
+  pool.spectatorRewardPool = winPool - pool.organizerFee - pool.racingRewardPool;
+  pool.ownerReward = 0;
+  pool.jockeyReward = 0;
+  pool.racingRewards = [];
+  pool.totalWinnerScore = totalWinningContribution;
 
-  const scores = new Map<string, number>();
-  for (const prediction of predictions) {
-    const score = scorePrediction(prediction.predictedRanks, actualRankings);
-    prediction.scoringWeight = score;
-    scores.set(prediction._id.toString(), score);
-  }
-
-  const totalWinnerScore = [...scores.values()].reduce((sum, score) => sum + score, 0);
-  pool.totalWinnerScore = totalWinnerScore;
-
-  if (totalWinnerScore === 0) {
+  if (totalWinningContribution === 0) {
     pool.jackpotAmount = pool.spectatorRewardPool;
     pool.spectatorRewardPool = 0;
   }
 
   for (const prediction of predictions) {
-    const score = scores.get(prediction._id.toString()) ?? 0;
-    const poolShare =
-      totalWinnerScore > 0
-        ? Math.floor((score / totalWinnerScore) * pool.spectatorRewardPool)
+    const isWinner = winners.some((winner) => winner._id.equals(prediction._id));
+    const prizeShare =
+      isWinner && totalWinningContribution > 0
+        ? Math.floor((prediction.contribution / totalWinningContribution) * pool.spectatorRewardPool)
         : 0;
+    const refund = isWinner ? prediction.contribution : 0;
+    const totalReturned = refund + prizeShare;
 
-    prediction.poolShare = poolShare;
-    prediction.totalPoints = prediction.pointsEarned + prediction.bonusPoints + poolShare;
+    prediction.scoringWeight = isWinner ? 1 : 0;
+    prediction.pointsEarned = refund;
+    prediction.bonusPoints = 0;
+    prediction.poolShare = prizeShare;
+    prediction.totalPoints = totalReturned;
     await prediction.save();
 
-    if (poolShare > 0) {
+    if (totalReturned > 0) {
       const profile = await getOrCreateProfile(prediction.spectatorId);
       await profile.addPoints(
-        poolShare,
+        totalReturned,
         'earned_pool_share',
         'PredictionPool',
         pool._id,
-        `Chia thưởng bounty pool cuộc đua ${race.name}`,
+        `Hoàn điểm dự đoán đúng và chia thưởng bounty pool cuộc đua ${race.name}`,
       );
 
       await Notification.create({
         userId: prediction.spectatorId,
         type: 'prediction_reward',
         title: 'Thưởng bounty pool',
-        message: `Bạn nhận ${poolShare} điểm từ bounty pool cuộc đua ${race.name}.`,
+        message: `Bạn nhận ${totalReturned} điểm từ dự đoán đúng cuộc đua ${race.name}.`,
         refModel: 'PredictionPool',
         refId: pool._id,
       });
     }
   }
 
-  const rankedGroups = new Map<number, typeof result.rankings>();
-  for (const ranking of result.rankings) {
-    if (ranking.rank > rankRewardRates.length) continue;
-    const group = rankedGroups.get(ranking.rank) ?? [];
-    group.push(ranking);
-    rankedGroups.set(ranking.rank, group);
-  }
+  const winningRankings = result.rankings.filter((ranking) => ranking.rank === 1);
+  if (winningRankings.length > 0) {
+    const horseReward = Math.floor(pool.racingRewardPool / winningRankings.length);
+    const isDeadHeat = winningRankings.length > 1 || winningRankings.some((r) => r.isDeadHeat);
 
-  for (const [rank, rankings] of [...rankedGroups.entries()].sort((a, b) => a[0] - b[0])) {
-    const rankReward = pct(pool.racingRewardPool, rankRewardRates[rank - 1] ?? 0);
-    const horseReward = Math.floor(rankReward / rankings.length);
-    const isDeadHeat = rankings.length > 1 || rankings.some((r) => r.isDeadHeat);
-
-    for (const ranking of rankings) {
+    for (const ranking of winningRankings) {
+      const rank = 1;
       const ownerReward = pct(horseReward, pool.ownerShareRate);
       const jockeyReward = horseReward - ownerReward;
       pool.ownerReward += ownerReward;
@@ -240,7 +242,7 @@ export async function settlePredictionPoolFromResult(
           userId: ranking.ownerId,
           type: 'prediction_reward',
           title: 'Thưởng owner từ bounty pool',
-          message: `Owner nhận ${ownerReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
+          message: `Owner nhận ${ownerReward} điểm thưởng ngựa về nhất từ bounty pool cuộc đua ${race.name}.`,
           refModel: 'PredictionPool',
           refId: pool._id,
         },
@@ -248,7 +250,7 @@ export async function settlePredictionPoolFromResult(
           userId: ranking.jockeyId,
           type: 'prediction_reward',
           title: 'Thưởng jockey từ bounty pool',
-          message: `Jockey nhận ${jockeyReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
+          message: `Jockey nhận ${jockeyReward} điểm thưởng ngựa về nhất từ bounty pool cuộc đua ${race.name}.`,
           refModel: 'PredictionPool',
           refId: pool._id,
         },

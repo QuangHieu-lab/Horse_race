@@ -33,14 +33,19 @@ export class SpectatorController {
   });
 
   createPrediction = asyncHandler(async (req: Request, res: Response) => {
-    const { raceId, predictedRanks } = req.body as {
+    const { raceId, predictedRanks, riskMultiplier } = req.body as {
       raceId?: string;
       predictedRanks?: Array<{ rank: number; horseId: string }>;
+      riskMultiplier?: number;
     };
     if (!raceId || !predictedRanks) {
       throw new HttpError(400, 'raceId và predictedRanks là bắt buộc');
     }
-    const prediction = await createPrediction(req.user!.id, { raceId, predictedRanks });
+    const prediction = await createPrediction(req.user!.id, {
+      raceId,
+      predictedRanks,
+      riskMultiplier,
+    });
     res.status(201).json({ prediction });
   });
 
