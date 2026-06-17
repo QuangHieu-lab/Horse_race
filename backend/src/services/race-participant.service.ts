@@ -5,6 +5,7 @@ import { Race } from '../models/Race.model.js';
 import type { IParticipant } from '../models/Race.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { User } from '../models/User.model.js';
+import { HttpError } from '../utils/http-error.js';
 import { nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
 
 export async function assertUserRole(
@@ -13,18 +14,19 @@ export async function assertUserRole(
 ): Promise<void> {
   const user = await User.findById(userId).select('role isActive').lean();
   if (!user?.isActive || user.role !== role) {
-    throw new Error(`User ${userId} must be an active ${role}`);
+    throw new HttpError(409, `Người dùng ${userId} phải là ${role} đang hoạt động`);
   }
 }
 
 /**
- * Thêm participant sau khi jockey accept — cần RaceRegistration đã approved.
+ * Thêm horse + jockey vào Race.participants sau khi jockey ACCEPT lời mời.
+ * Yêu cầu đơn đăng ký đã được admin DUYỆT trước đó.
  */
 export async function addParticipantFromInvitation(
   invitation: IJockeyInvitation,
 ): Promise<IParticipant[]> {
   if (invitation.status !== 'accepted') {
-    throw new Error('Invitation must be accepted before adding participant');
+    throw new HttpError(409, 'Lời mời phải được chấp nhận trước khi xếp vào đường đua');
   }
 
   const registration = await RaceRegistration.findOne({
@@ -34,31 +36,31 @@ export async function addParticipantFromInvitation(
     status: 'approved',
   });
   if (!registration) {
-    throw new Error('Approved race registration required before adding participant');
+    throw new HttpError(409, 'Ngựa chưa được ban tổ chức duyệt cho cuộc đua này');
   }
 
   const horse = await Horse.findById(invitation.horseId);
   if (!horse || horse.healthStatus !== 'fit') {
-    throw new Error('Horse must exist and be fit to race');
+    throw new HttpError(409, 'Ngựa phải tồn tại và đủ sức khỏe để đua');
   }
 
   await assertUserRole(invitation.jockeyId, 'jockey');
 
   const race = await Race.findById(invitation.raceId);
-  if (!race) throw new Error('Race not found');
-  if (race.status === 'cancelled') throw new Error('Cannot add participant to cancelled race');
+  if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
+  if (race.status === 'cancelled') throw new HttpError(409, 'Không thể xếp vào cuộc đua đã hủy');
   if (race.participants.length >= race.maxParticipants) {
-    throw new Error('Race is full');
+    throw new HttpError(409, 'Cuộc đua đã đủ số lượng tham gia');
   }
 
   const horseKey = invitation.horseId.toString();
   const jockeyKey = invitation.jockeyId.toString();
 
   if (race.participants.some((p) => p.horseId.toString() === horseKey)) {
-    throw new Error('Horse is already in this race');
+    throw new HttpError(409, 'Ngựa đã có trong cuộc đua này');
   }
   if (race.participants.some((p) => p.jockeyId.toString() === jockeyKey)) {
-    throw new Error('Jockey is already assigned in this race');
+    throw new HttpError(409, 'Nài ngựa đã được xếp trong cuộc đua này');
   }
 
   const lane = nextLaneNumber(race.participants);
@@ -75,7 +77,7 @@ export async function addParticipantFromInvitation(
 
   const next = [...race.participants, participant];
   const err = validateParticipants(next, race.maxParticipants);
-  if (err) throw new Error(err);
+  if (err) throw new HttpError(409, err);
 
   race.participants = next;
   await race.save();
@@ -93,6 +95,7 @@ export async function addParticipantFromInvitation(
 
 /**
  * Gọi từ hook JockeyInvitation khi chuyển sang accepted.
+ * Kiểm tra ràng buộc + xếp ngựa/nài vào đường đua (đơn đã được duyệt trước đó).
  */
 export async function onInvitationAccepted(
   invitation: IJockeyInvitation,
@@ -104,7 +107,10 @@ export async function onInvitationAccepted(
     _id: { $ne: invitation._id },
   });
   if (otherAccepted > 0) {
-    throw new Error('Jockey already accepted another invitation for this race');
+    throw new HttpError(
+      409,
+      'Bạn đã chấp nhận một lời mời khác cho cuộc đua này rồi.',
+    );
   }
 
   await addParticipantFromInvitation(invitation);
