@@ -37,10 +37,29 @@ export type PredictionPoolStatus = 'open' | 'locked' | 'settled';
 
 export type PoolRolloverPolicy = 'refund' | 'rollover_next_race' | 'to_organizer';
 
-export type PenaltyApplied = 'warning' | 'demote' | 'disqualify' | 'restart';
 
 export type ProtestStatus = 'pending' | 'upheld' | 'dismissed';
 
+export type PenaltyApplied = 
+  | 'warning' 
+  | 'demote'           // Hạ bậc
+  | 'disqualify'       // Tước quyền (Dùng cho Result)
+  | 'disqualification' // Tước quyền (Dùng cho ViolationRule)
+  | 'restart'          // Đua lại
+  | 'time_ban'         // Cấm thi đấu có thời hạn
+  | 'permanent_ban';   // Cấm thi đấu vĩnh viễn
+
+export type ViolationSeverity = 
+  | 'low' 
+  | 'medium' 
+  | 'high' 
+  | 'critical';
+
+export type ViolationCategory = 
+  | 'race_conduct' 
+  | 'medical' 
+  | 'equipment' 
+  | 'administrative';
 export type AuditAction =
   | 'registration_approved'
   | 'registration_rejected'
@@ -118,8 +137,12 @@ export const PENALTY_APPLIED: readonly PenaltyApplied[] = [
   'warning',
   'demote',
   'disqualify',
+  'disqualification',
   'restart',
+  'time_ban',
+  'permanent_ban'
 ] as const;
+
 
 export const USER_ROLES: readonly UserRole[] = [
   'horse_owner',
@@ -149,4 +172,19 @@ export const POOL_ROLLOVER_POLICIES: readonly PoolRolloverPolicy[] = [
   'refund',
   'rollover_next_race',
   'to_organizer',
+] as const;
+
+
+export const VIOLATION_CATEGORIES: readonly ViolationCategory[] = [
+  'race_conduct',
+  'medical',
+  'equipment',
+  'administrative'
+] as const;
+
+export const VIOLATION_SEVERITIES: readonly ViolationSeverity[] = [
+  'low',
+  'medium',
+  'high',
+  'critical'
 ] as const;
