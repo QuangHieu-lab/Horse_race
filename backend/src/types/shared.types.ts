@@ -70,6 +70,7 @@ export type AuditAction =
   | 'participant_scratched';
 
 export type PointsTxType =
+  | 'topup'
   | 'earned_prediction'
   | 'earned_bonus'
   | 'spent_redemption'
@@ -103,6 +104,7 @@ export type RedemptionStatus =
   | 'refunded';
 
 export type NotificationType =
+  | 'points_topup'
   | 'invitation_received'
   | 'invitation_accepted'
   | 'invitation_declined'

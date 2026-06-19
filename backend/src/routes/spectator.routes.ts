@@ -20,6 +20,10 @@ spectatorRouter.post('/predictions/:id', spectatorController.createPrediction);
 
 spectatorRouter.get('/points', spectatorController.getPoints);
 
+spectatorRouter.post('/top-ups', spectatorController.createTopUp);
+
+spectatorRouter.get('/top-ups', spectatorController.listTopUps);
+
 spectatorRouter.get('/products', spectatorController.listProducts);
 
 spectatorRouter.post('/redemptions', spectatorController.createRedemption);

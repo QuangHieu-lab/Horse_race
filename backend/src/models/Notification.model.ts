@@ -19,6 +19,7 @@ const NotificationSchema = new Schema<INotification>(
     type: {
       type: String,
       enum: [
+        'points_topup',
         'invitation_received',
         'invitation_accepted',
         'invitation_declined',

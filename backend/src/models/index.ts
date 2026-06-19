@@ -40,3 +40,9 @@ export { Notification, type INotification } from './Notification.model.js';
 export { AuditLog, type IAuditLog } from './AuditLog.model.js';
 export { OrganizerLedger, type IOrganizerLedger } from './OrganizerLedger.model.js';
 export { ViolationRule, type IViolationRule } from './ViolationRule.model.js';
+export {
+  PaymentTransaction,
+  type IPaymentTransaction,
+  type PaymentProvider,
+  type PaymentStatus,
+} from './PaymentTransaction.model.js';

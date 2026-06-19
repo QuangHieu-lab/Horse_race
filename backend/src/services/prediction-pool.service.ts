@@ -9,7 +9,8 @@ import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import { HttpError } from '../utils/http-error.js';
 
-const DEFAULT_TICKET_PRICE = 50000;
+const MIN_ENTRY_POINTS = 100;
+const DEFAULT_TICKET_PRICE = MIN_ENTRY_POINTS;
 const ORGANIZER_FEE_RATE = 10;
 const RACING_REWARD_RATE = 15;
 const SPECTATOR_REWARD_RATE = 75;
@@ -105,6 +106,9 @@ export async function chargePredictionTicket(
       400,
       `Mức rủi ro phải nằm trong khoảng ${pool.minRiskMultiplier}x đến ${pool.maxRiskMultiplier}x`,
     );
+  }
+  if (pool.ticketPrice < MIN_ENTRY_POINTS) {
+    throw new HttpError(400, `Entry points tối thiểu là ${MIN_ENTRY_POINTS}`);
   }
   const contribution = pool.ticketPrice * riskMultiplier;
 

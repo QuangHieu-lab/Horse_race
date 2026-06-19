@@ -171,6 +171,19 @@ export interface SpectatorPointsDto {
   transactions: PointsTransactionDto[];
 }
 
+export interface PaymentTransactionDto {
+  id: string;
+  provider: string;
+  amountVnd: number;
+  points: number;
+  exchangeRateVndPerPoint: number;
+  status: string;
+  providerTransactionId?: string | null;
+  paidAt?: string | null;
+  expiredAt?: string | null;
+  createdAt: string;
+}
+
 export interface ProductDto {
   id: string;
   name: string;

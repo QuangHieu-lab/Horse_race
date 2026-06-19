@@ -51,6 +51,7 @@ const PointsTransactionSchema = new Schema<IPointsTransaction>(
     type: {
       type: String,
       enum: [
+        'topup',
         'earned_prediction',
         'earned_bonus',
         'spent_redemption',
