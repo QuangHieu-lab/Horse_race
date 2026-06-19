@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { Horse } from '../models/Horse.model.js';
+import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
 import { Race, type IParticipant, type IRace } from '../models/Race.model.js';
+import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
@@ -221,6 +223,12 @@ export async function deleteRace(raceId: string) {
   if (race.status === 'ongoing' || race.status === 'completed') {
     throw new HttpError(400, 'Không thể xóa trận đua đang diễn ra hoặc đã kết thúc.');
   }
+
+  // Dọn dữ liệu liên quan để không để lại đơn/lời mời mồ côi
+  await Promise.all([
+    RaceRegistration.deleteMany({ raceId: race._id }),
+    JockeyInvitation.deleteMany({ raceId: race._id }),
+  ]);
 
   await Race.findByIdAndDelete(raceId);
   return true;

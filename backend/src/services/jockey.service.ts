@@ -117,7 +117,14 @@ export async function respondToInvitation(
   } else {
     invitation.status = 'accepted';
     invitation.respondedAt = new Date();
-    await invitation.save();
+    try {
+      // Hook sẽ xếp ngựa/nài vào đường đua (đơn đã được duyệt) và gán jockeyId.
+      await invitation.save();
+    } catch (err) {
+      // Lỗi nghiệp vụ từ hook (vd: chưa duyệt ngựa, đã nhận lời mời khác…) → thông báo rõ ràng.
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(409, err instanceof Error ? err.message : 'Không thể chấp nhận lời mời');
+    }
 
     const horse = await Horse.findById(invitation.horseId).select('name').lean();
     const race = await Race.findById(invitation.raceId).select('name').lean();

@@ -6,6 +6,7 @@ import type { IResult } from '../models/Result.model.js';
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import type { PredictionStatus } from '../types/shared.types.js';
+import { settlePredictionPoolFromResult } from './prediction-pool.service.js';
 
 function evaluatePrediction(
   predictedRanks: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
@@ -40,6 +41,18 @@ function resolveStatus(correctCount: number, totalPredicted: number): Prediction
   return 'partial';
 }
 
+function predictsWinner(
+  predictedRanks: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
+  actualRankings: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
+): boolean {
+  const predictedWinner = predictedRanks.find((prediction) => prediction.rank === 1);
+  if (!predictedWinner) return false;
+  return actualRankings.some(
+    (ranking) =>
+      ranking.rank === 1 && ranking.horseId.toString() === predictedWinner.horseId.toString(),
+  );
+}
+
 export async function scorePredictionsForRace(raceId: mongoose.Types.ObjectId): Promise<void> {
   const { Result } = await import('../models/Result.model.js');
   const result = await Result.findOne({ raceId, publishedAt: { $ne: null } }).lean();
@@ -48,7 +61,7 @@ export async function scorePredictionsForRace(raceId: mongoose.Types.ObjectId): 
 }
 
 export async function scorePredictionsFromResult(
-  result: Pick<IResult, 'raceId' | 'rankings'>,
+  result: Pick<IResult, 'raceId' | 'tournamentId' | 'rankings' | 'publishedBy'>,
 ): Promise<void> {
   const raceId = result.raceId;
   const race = await Race.findById(raceId).lean();
@@ -67,6 +80,23 @@ export async function scorePredictionsFromResult(
     rank: r.rank,
     horseId: r.horseId,
   }));
+
+  if (tournament.predictionConfig.poolEnabled) {
+    for (const prediction of predictions) {
+      const isWinner = predictsWinner(prediction.predictedRanks, actualRankings);
+      prediction.status = isWinner ? 'correct' : 'incorrect';
+      prediction.scoringWeight = isWinner ? 1 : 0;
+      prediction.pointsEarned = 0;
+      prediction.bonusPoints = 0;
+      prediction.poolShare = 0;
+      prediction.totalPoints = 0;
+      prediction.evaluatedAt = new Date();
+      await prediction.save();
+    }
+
+    await settlePredictionPoolFromResult(result);
+    return;
+  }
 
   for (const prediction of predictions) {
     const { correctCount, totalPredicted, top3Bonus } = evaluatePrediction(
@@ -123,4 +153,6 @@ export async function scorePredictionsFromResult(
       });
     }
   }
+
+  await settlePredictionPoolFromResult(result);
 }

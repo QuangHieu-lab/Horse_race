@@ -11,7 +11,16 @@ export interface IPredictionConfig {
   maxPredictionsPerRace: number;
   poolEnabled: boolean;
   entryFee: number;
+  minRiskMultiplier: number;
+  maxRiskMultiplier: number;
+  quickRiskMultipliers: number[];
   feePercent: number;
+  organizerFeeRate: number;
+  racingRewardRate: number;
+  spectatorRewardRate: number;
+  ownerShareRate: number;
+  jockeyShareRate: number;
+  rankRewardRates: number[];
   rolloverPolicy: PoolRolloverPolicy;
   minScoreToShare: number;
 }
@@ -41,7 +50,34 @@ const PredictionConfigSchema = new Schema<IPredictionConfig>(
     maxPredictionsPerRace: { type: Number, default: 1, min: 1, max: 5 },
     poolEnabled: { type: Boolean, default: false },
     entryFee: { type: Number, default: 0, min: 0 },
+    minRiskMultiplier: { type: Number, default: 1, min: 1 },
+    maxRiskMultiplier: { type: Number, default: 10, min: 1 },
+    quickRiskMultipliers: {
+      type: [Number],
+      default: () => [1, 2, 3, 6],
+      validate: {
+        validator(multipliers: number[]) {
+          return multipliers.every((multiplier) => Number.isInteger(multiplier) && multiplier >= 1);
+        },
+        message: 'quickRiskMultipliers must contain positive integers',
+      },
+    },
     feePercent: { type: Number, default: 10, min: 0, max: 30 },
+    organizerFeeRate: { type: Number, default: 10, min: 0, max: 100 },
+    racingRewardRate: { type: Number, default: 15, min: 0, max: 100 },
+    spectatorRewardRate: { type: Number, default: 75, min: 0, max: 100 },
+    ownerShareRate: { type: Number, default: 80, min: 0, max: 100 },
+    jockeyShareRate: { type: Number, default: 20, min: 0, max: 100 },
+    rankRewardRates: {
+      type: [Number],
+      default: () => [50, 25, 15, 7, 3],
+      validate: {
+        validator(rates: number[]) {
+          return rates.length > 0 && rates.every((rate) => rate >= 0);
+        },
+        message: 'rankRewardRates must contain non-negative numbers',
+      },
+    },
     rolloverPolicy: {
       type: String,
       enum: POOL_ROLLOVER_POLICIES,
@@ -77,6 +113,29 @@ TournamentSchema.pre('save', function (next) {
     return next(new Error('endDate must be after startDate'));
   }
   const cfg = this.predictionConfig;
+  if (cfg.minRiskMultiplier > cfg.maxRiskMultiplier) {
+    return next(new Error('minRiskMultiplier must be less than or equal to maxRiskMultiplier'));
+  }
+  if (
+    cfg.quickRiskMultipliers.some(
+      (multiplier) =>
+        multiplier < cfg.minRiskMultiplier || multiplier > cfg.maxRiskMultiplier,
+    )
+  ) {
+    return next(new Error('quickRiskMultipliers must be inside min/max risk bounds'));
+  }
+  const poolRateTotal =
+    cfg.organizerFeeRate + cfg.racingRewardRate + cfg.spectatorRewardRate;
+  if (poolRateTotal !== 100) {
+    return next(new Error('Prediction pool rates must sum to 100'));
+  }
+  if (cfg.ownerShareRate + cfg.jockeyShareRate !== 100) {
+    return next(new Error('Owner and jockey share rates must sum to 100'));
+  }
+  const rankTotal = cfg.rankRewardRates.reduce((sum, rate) => sum + rate, 0);
+  if (rankTotal !== 100) {
+    return next(new Error('Rank reward rates must sum to 100'));
+  }
   if (cfg.predictionOpenAt && cfg.predictionCloseAt) {
     if (cfg.predictionCloseAt <= cfg.predictionOpenAt) {
       return next(new Error('predictionCloseAt must be after predictionOpenAt'));

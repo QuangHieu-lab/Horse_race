@@ -5,6 +5,7 @@ import {
   deleteTournament,
   getTournamentById,
   listTournaments,
+  updatePredictionConfig,
   updateTournamentStatus,
 } from '../services/tournament.service.js';
 
@@ -33,6 +34,12 @@ export class TournamentController {
     );
     res.json({ tournament });
   });
+
+  updatePredictionConfig = asyncHandler(async (req: Request, res: Response) => {
+    const tournament = await updatePredictionConfig(String(req.params.id), req.body);
+    res.json({ tournament });
+  });
+
   delete = asyncHandler(async (req: Request, res: Response) => {
     await deleteTournament(String(req.params.id));
     // Giữ format trả về ngắn gọn giống các hàm trên

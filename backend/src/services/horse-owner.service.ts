@@ -3,6 +3,7 @@ import { Horse } from '../models/Horse.model.js';
 import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
 import { Notification } from '../models/Notification.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
+import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 // Giả định bạn đã khai báo các DTO này trong thư mục types
 import type { HorseDto, RegistrationDto, InvitationDto } from '../types/api.types.js';
@@ -180,7 +181,13 @@ async deleteHorse(ownerId: string, horseId: string) {
       throw new HttpError(400, 'Không thể xóa! Chiến mã này đang có đơn đăng ký tham gia giải đấu. Vui lòng rút đơn đăng ký trước khi xóa.');
     }
 
-    // Nếu qua được 2 ải trên thì tiến hành "hóa kiếp" cho ngựa
+    // Dọn các đơn đăng ký (đã bị từ chối) và lời mời liên quan để không để lại dữ liệu mồ côi
+    await Promise.all([
+      RaceRegistration.deleteMany({ horseId: horse._id }),
+      JockeyInvitation.deleteMany({ horseId: horse._id }),
+    ]);
+
+    // Nếu qua được các ải trên thì tiến hành "hóa kiếp" cho ngựa
     await Horse.findByIdAndDelete(horseId);
 
     return true;
@@ -193,14 +200,32 @@ async deleteHorse(ownerId: string, horseId: string) {
       throw new HttpError(400, 'ID không hợp lệ');
     }
 
-    // Unique index sẽ lo việc chặn trùng lặp, nên ta gọi create luôn
-    const registration = await RaceRegistration.create({
+    // Chặn đăng ký trùng sớm để báo lỗi rõ ràng (unique index vẫn là chốt chặn cuối)
+    const existing = await RaceRegistration.findOne({
       raceId: new mongoose.Types.ObjectId(raceId),
       horseId: new mongoose.Types.ObjectId(horseId),
-      ownerId: new mongoose.Types.ObjectId(ownerId),
-      status: 'pending',
-      waiverAcceptedAt: new Date(),
-    });
+    }).lean();
+    if (existing) {
+      throw new HttpError(409, 'Ngựa này đã được đăng ký cho cuộc đua này rồi.');
+    }
+
+    let registration;
+    try {
+      registration = await RaceRegistration.create({
+        raceId: new mongoose.Types.ObjectId(raceId),
+        horseId: new mongoose.Types.ObjectId(horseId),
+        ownerId: new mongoose.Types.ObjectId(ownerId),
+        status: 'pending',
+        waiverAcceptedAt: new Date(),
+      });
+    } catch (err: unknown) {
+      // Trùng do race-condition (unique index { raceId, horseId })
+      if (typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000) {
+        throw new HttpError(409, 'Ngựa này đã được đăng ký cho cuộc đua này rồi.');
+      }
+      // Lỗi nghiệp vụ từ pre-save hook (ngựa không đủ sức khỏe, không thuộc chủ, cuộc đua đã hủy…)
+      throw new HttpError(400, err instanceof Error ? err.message : 'Đăng ký không hợp lệ');
+    }
 
     // Populate thủ công để DTO mapper có đủ dữ liệu
     const populatedReg = await RaceRegistration.findById(registration._id)
@@ -223,7 +248,10 @@ async deleteHorse(ownerId: string, horseId: string) {
       .sort({ createdAt: -1 })
       .lean();
 
-    return registrations.map(toRegistrationDto);
+    // Bỏ qua đơn mồ côi (ngựa hoặc cuộc đua đã bị xóa) để tránh lỗi khi map DTO
+    return registrations
+      .filter((r) => r.raceId && r.horseId)
+      .map(toRegistrationDto);
   }
   async cancelRegistration(ownerId: string, registrationId: string): Promise<void> {
     if (!mongoose.isValidObjectId(registrationId)) throw new HttpError(400, 'ID đơn đăng ký không hợp lệ');
@@ -237,12 +265,32 @@ async deleteHorse(ownerId: string, horseId: string) {
     if (!result) throw new HttpError(404, 'Không tìm thấy đơn đăng ký, hoặc đơn đã được duyệt');
   }
 
+  // --- TÌM KIẾM JOCKEY ---
+
+  async searchJockeys(name: string): Promise<{ id: string; fullName: string; licenseNumber?: string }[]> {
+    if (!name.trim()) return [];
+    const jockeys = await User.find({
+      role: 'jockey',
+      isActive: true,
+      fullName: { $regex: name.trim(), $options: 'i' },
+    })
+      .select('_id fullName jockeyProfile.licenseNumber')
+      .limit(10)
+      .lean();
+
+    return jockeys.map((j) => ({
+      id: j._id.toString(),
+      fullName: j.fullName,
+      licenseNumber: (j as any).jockeyProfile?.licenseNumber,
+    }));
+  }
+
   // --- THUÊ JOCKEY ---
 
   async inviteJockey(ownerId: string, input: InviteJockeyInput): Promise<InvitationDto> {
     const { raceId, horseId, jockeyId, message } = input;
 
-    // 1. Validation Logic
+    // 1. Validation Logic — chỉ mời Nài ngựa khi ngựa ĐÃ được ban tổ chức duyệt
     const registration = await RaceRegistration.findOne({
       raceId: new mongoose.Types.ObjectId(raceId),
       horseId: new mongoose.Types.ObjectId(horseId),

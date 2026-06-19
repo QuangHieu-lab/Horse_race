@@ -8,7 +8,13 @@ import { HttpError } from '../utils/http-error.js';
 function toRegistrationDto(reg: {
   _id: mongoose.Types.ObjectId;
   status: RegistrationStatus;
-  horseId: { _id: mongoose.Types.ObjectId; name: string; healthStatus: string };
+  horseId: {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+    healthStatus: string;
+    breed?: string;
+    age?: number;
+  };
   raceId: {
     _id: mongoose.Types.ObjectId;
     name: string;
@@ -16,11 +22,12 @@ function toRegistrationDto(reg: {
     status: string;
     scheduledAt?: Date;
   };
-  ownerId?: { _id: mongoose.Types.ObjectId; fullName: string };
+  ownerId?: { _id: mongoose.Types.ObjectId; fullName: string } | null;
   jockeyId?: { _id: mongoose.Types.ObjectId; fullName: string } | null;
   processedBy?: { _id: mongoose.Types.ObjectId; fullName: string } | null;
   processedAt?: Date | null;
   waiverAcceptedAt?: Date | null;
+  adminNote?: string | null;
   createdAt: Date;
 }): RegistrationDto {
   return {
@@ -30,6 +37,8 @@ function toRegistrationDto(reg: {
       id: reg.horseId._id.toString(),
       name: reg.horseId.name,
       healthStatus: reg.horseId.healthStatus as RegistrationDto['horse']['healthStatus'],
+      breed: reg.horseId.breed,
+      age: reg.horseId.age,
     },
     race: {
       id: reg.raceId._id.toString(),
@@ -38,6 +47,9 @@ function toRegistrationDto(reg: {
       status: reg.raceId.status as RegistrationDto['race']['status'],
       scheduledAt: reg.raceId.scheduledAt?.toISOString(),
     },
+    owner: reg.ownerId
+      ? { id: reg.ownerId._id.toString(), fullName: reg.ownerId.fullName }
+      : null,
     jockey: reg.jockeyId
       ? { id: reg.jockeyId._id.toString(), fullName: reg.jockeyId.fullName }
       : null,
@@ -46,6 +58,7 @@ function toRegistrationDto(reg: {
       : null,
     processedAt: reg.processedAt?.toISOString() ?? null,
     waiverAcceptedAt: reg.waiverAcceptedAt?.toISOString() ?? null,
+    adminNote: reg.adminNote ?? null,
     createdAt: reg.createdAt.toISOString(),
   };
 }
@@ -58,13 +71,17 @@ export async function listRegistrations(
 
   const items = await RaceRegistration.find(filter)
     .populate('raceId', 'name round status scheduledAt')
-    .populate('horseId', 'name healthStatus')
+    .populate('horseId', 'name healthStatus breed age')
+    .populate('ownerId', 'fullName')
     .populate('jockeyId', 'fullName')
     .populate('processedBy', 'fullName')
     .sort({ createdAt: -1 })
     .lean();
 
-  return items.map((r) => toRegistrationDto(r as unknown as Parameters<typeof toRegistrationDto>[0]));
+  // Bỏ qua đơn mồ côi (ngựa hoặc cuộc đua đã bị xóa)
+  return items
+    .filter((r) => r.raceId && r.horseId)
+    .map((r) => toRegistrationDto(r as unknown as Parameters<typeof toRegistrationDto>[0]));
 }
 
 export async function updateRegistrationStatus(
@@ -103,7 +120,8 @@ export async function updateRegistrationStatus(
 
   const populated = await RaceRegistration.findById(reg._id)
     .populate('raceId', 'name round status scheduledAt')
-    .populate('horseId', 'name healthStatus')
+    .populate('horseId', 'name healthStatus breed age')
+    .populate('ownerId', 'fullName')
     .populate('jockeyId', 'fullName')
     .populate('processedBy', 'fullName')
     .lean();

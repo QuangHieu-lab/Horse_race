@@ -19,6 +19,7 @@ import {
   Result,
   JockeyInvitation,
   Prediction,
+  PredictionPool,
   Product,
   Notification,
   SpectatorProfile,
@@ -149,8 +150,8 @@ async function seed(): Promise<void> {
     { userId: spectator._id },
     {
       $set: {
-        currentBalance: 2500,
-        totalPointsEarned: 2500,
+        currentBalance: 250000,
+        totalPointsEarned: 250000,
         totalPointsSpent: 0,
       },
     },
@@ -259,9 +260,18 @@ async function seed(): Promise<void> {
       predictionOpenAt: daysFromNow(-3),
       predictionCloseAt: daysFromNow(20),
       maxPredictionsPerRace: 1,
-      poolEnabled: false,
-      entryFee: 0,
+      poolEnabled: true,
+      entryFee: 50_000,
+      minRiskMultiplier: 1,
+      maxRiskMultiplier: 10,
+      quickRiskMultipliers: [1, 2, 3, 6],
       feePercent: 10,
+      organizerFeeRate: 10,
+      racingRewardRate: 15,
+      spectatorRewardRate: 75,
+      ownerShareRate: 80,
+      jockeyShareRate: 20,
+      rankRewardRates: [50, 25, 15, 7, 3],
     },
     createdBy: admin._id,
   });
@@ -518,9 +528,25 @@ async function seed(): Promise<void> {
       { rank: 2, horseId: horseB._id },
     ],
     status: 'pending',
+    riskMultiplier: 1,
+    contribution: 50_000,
     pointsEarned: 0,
     bonusPoints: 0,
     totalPoints: 0,
+  });
+
+  await PredictionPool.create({
+    raceId: raceCompleted._id,
+    tournamentId: tournament._id,
+    status: 'open',
+    ticketPrice: 50_000,
+    minRiskMultiplier: 1,
+    maxRiskMultiplier: 10,
+    quickRiskMultipliers: [1, 2, 3, 6],
+    totalTickets: 1,
+    totalBountyPool: 50_000,
+    winPool: 0,
+    contributorCount: 1,
   });
 
   const product = await Product.create({

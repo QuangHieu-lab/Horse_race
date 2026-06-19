@@ -144,8 +144,12 @@ export interface PredictionDto {
   tournamentName: string;
   predictedRanks: PredictedRankDto[];
   status: PredictionStatus;
+  riskMultiplier: number;
+  contribution: number;
+  predictionScore: number;
   pointsEarned: number;
   bonusPoints: number;
+  poolShare: number;
   totalPoints: number;
   evaluatedAt?: string | null;
   createdAt: string;
@@ -207,6 +211,8 @@ export interface RegistrationDto {
     id: string;
     name: string;
     healthStatus: HealthStatus;
+    breed?: string;
+    age?: number;
   };
   race: {
     id: string;
@@ -215,9 +221,11 @@ export interface RegistrationDto {
     status: RaceStatus;
     scheduledAt?: string;
   };
+  owner?: UserSummaryDto | null;        // Chủ ngựa đã nộp đơn
   jockey?: UserSummaryDto | null;
   processedBy?: UserSummaryDto | null; // Thông tin Admin đã duyệt
   processedAt?: string | null;         // Thời gian duyệt
   waiverAcceptedAt?: string | null;    // Thời gian ký miễn trừ
+  adminNote?: string | null;           // Ghi chú của Admin khi xử lý
   createdAt?: string;
 }

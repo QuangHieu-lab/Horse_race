@@ -59,6 +59,170 @@ const swaggerDefinition = {
           fullName: { type: 'string' },
         },
       },
+      PredictedRankRequest: {
+        type: 'object',
+        required: ['rank', 'horseId'],
+        properties: {
+          rank: { type: 'integer', minimum: 1, example: 1 },
+          horseId: { type: 'string', example: '665f1e000000000000000001' },
+        },
+      },
+      CreatePredictionRequest: {
+        type: 'object',
+        required: ['raceId', 'predictedRanks'],
+        properties: {
+          raceId: { type: 'string', example: '665f1e000000000000000010' },
+          predictedRanks: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 1,
+            description: 'MVP prediction accepts one horse only: rank 1 winner prediction.',
+            items: { $ref: '#/components/schemas/PredictedRankRequest' },
+          },
+          riskMultiplier: {
+            type: 'integer',
+            minimum: 1,
+            example: 2,
+            description:
+              'Custom prediction risk multiplier. Must be a whole number within the tournament predictionConfig min/max range.',
+          },
+        },
+      },
+      PredictionDto: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          raceId: { type: 'string' },
+          raceName: { type: 'string' },
+          tournamentName: { type: 'string' },
+          status: {
+            type: 'string',
+            enum: ['pending', 'partial', 'correct', 'incorrect'],
+          },
+          contribution: {
+            type: 'number',
+            example: 100000,
+            description: 'Prediction entry points paid into the bounty pool: entryFee * riskMultiplier.',
+          },
+          riskMultiplier: {
+            type: 'integer',
+            example: 2,
+            description: 'Whole-number risk multiplier used for this prediction.',
+          },
+          predictionScore: {
+            type: 'number',
+            example: 1,
+            description: 'Winner-only scoring weight: 1 when rank 1 prediction is correct, otherwise 0.',
+          },
+          pointsEarned: {
+            type: 'number',
+            example: 100000,
+            description: 'Returned entry points for a correct winner prediction.',
+          },
+          bonusPoints: { type: 'number', example: 0 },
+          poolShare: {
+            type: 'number',
+            example: 225000,
+            description: 'Prize points received from PrizePool, excluding returned entry points.',
+          },
+          totalPoints: {
+            type: 'number',
+            example: 325000,
+            description: 'Total returned to the spectator: pointsEarned + poolShare.',
+          },
+          evaluatedAt: { type: 'string', format: 'date-time', nullable: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          predictedRanks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                rank: { type: 'integer', example: 1 },
+                horseId: { type: 'string' },
+                horseName: { type: 'string' },
+              },
+            },
+          },
+        },
+      },
+      BountyPoolFormula: {
+        type: 'object',
+        description: 'Prediction bounty pool settlement formula used when admin publishes race results.',
+        properties: {
+          totalBountyPool: {
+            type: 'string',
+            example: 'sum(entryFee * riskMultiplier) across all predictions',
+          },
+          winPool: {
+            type: 'string',
+            example: 'sum(entryFee * riskMultiplier) from incorrect winner predictions',
+          },
+          organizerFee: {
+            type: 'string',
+            example: 'winPool * 10%',
+          },
+          racingRewardPool: {
+            type: 'string',
+            example: 'winPool * 15%',
+          },
+          spectatorRewardPool: {
+            type: 'string',
+            example: 'winPool * 75%',
+          },
+          ownerReward: {
+            type: 'string',
+            example: 'racingRewardPool * 80%',
+          },
+          jockeyReward: {
+            type: 'string',
+            example: 'horseReward * 20%',
+          },
+          rankRewardRates: {
+            type: 'string',
+            example: 'MVP pays RacingRewardPool to rank 1 horse only. Dead-heat rank 1 horses split it equally.',
+          },
+          userReward: {
+            type: 'string',
+            example: 'entryPoints + prizePool * (entryPoints / totalCorrectEntryPoints)',
+          },
+        },
+      },
+      PredictionConfigRequest: {
+        type: 'object',
+        properties: {
+          isEnabled: { type: 'boolean', example: true },
+          pointsPerCorrect: { type: 'number', example: 100 },
+          bonusPointsTop3: { type: 'number', example: 50 },
+          poolEnabled: { type: 'boolean', example: true },
+          entryFee: { type: 'number', example: 50000 },
+          minRiskMultiplier: { type: 'integer', minimum: 1, example: 1 },
+          maxRiskMultiplier: { type: 'integer', minimum: 1, example: 10 },
+          quickRiskMultipliers: {
+            type: 'array',
+            items: { type: 'integer', minimum: 1 },
+            example: [1, 2, 3, 6],
+            description:
+              'Suggested quick-pick multipliers for frontend buttons. Users can still enter any whole number within min/max.',
+          },
+          organizerFeeRate: { type: 'number', example: 10 },
+          racingRewardRate: { type: 'number', example: 15 },
+          spectatorRewardRate: { type: 'number', example: 75 },
+          ownerShareRate: { type: 'number', example: 80 },
+          jockeyShareRate: { type: 'number', example: 20 },
+          rankRewardRates: {
+            type: 'array',
+            items: { type: 'number' },
+            example: [50, 25, 15, 7, 3],
+            description: 'Must sum to 100. Used to split RacingRewardPool by result rank.',
+          },
+          rolloverPolicy: {
+            type: 'string',
+            enum: ['refund', 'rollover_next_race', 'to_organizer'],
+            example: 'rollover_next_race',
+          },
+          minScoreToShare: { type: 'number', example: 1 },
+        },
+      },
     },
   },
   tags: [
@@ -158,10 +322,27 @@ const swaggerDefinition = {
     '/api/admin/races/{id}/result/publish': {
       patch: {
         tags: ['Admin'],
-        summary: 'Publish a race result',
+        summary: 'Publish a race result and settle prediction bounty pool',
+        description:
+          'Publishes confirmed race results, scores pending predictions, charges the bounty formula, records organizer fee, notifies owner/jockey, and distributes spectator pool shares.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Published result' } },
+        responses: {
+          200: {
+            description: 'Result published and bounty pool settlement attempted',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    ok: { type: 'boolean', example: true },
+                  },
+                },
+              },
+            },
+          },
+          409: { description: 'Result is not confirmed yet or was already published' },
+        },
       },
     },
     '/api/admin/results/publish-queue': {
@@ -207,9 +388,35 @@ const swaggerDefinition = {
       patch: {
         tags: ['Tournaments'],
         summary: 'Update tournament status',
+        description: 'Publishing or starting a tournament requires at least one race to be set up.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Updated tournament' } },
+        responses: {
+          200: { description: 'Updated tournament' },
+          409: { description: 'Tournament cannot be published before at least one race exists' },
+        },
+      },
+    },
+    '/api/tournaments/{id}/prediction-config': {
+      patch: {
+        tags: ['Tournaments'],
+        summary: 'Update prediction bounty pool configuration',
+        description:
+          'Admin-only endpoint. Allows changing entry fee, 10/15/75 pool rates, owner/jockey split, and rank reward split while the tournament is draft or published.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/PredictionConfigRequest' },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Updated prediction configuration' },
+          409: { description: 'Tournament already started or invalid rate totals' },
+        },
       },
     },
     '/api/races': {
@@ -462,17 +669,88 @@ const swaggerDefinition = {
     '/api/spectator/predictions/{id}': {
       get: {
         tags: ['Spectator'],
-        summary: 'List predictions for a race',
+        summary: 'List my predictions',
+        description:
+          'Returns prediction history including bounty fields: contribution, predictionScore, poolShare, and totalPoints.',
         security: [{ bearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Prediction list' } },
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Compatibility path parameter. Current backend returns the authenticated spectator prediction list.',
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Prediction list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    predictions: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/PredictionDto' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       post: {
         tags: ['Spectator'],
-        summary: 'Create a race prediction',
+        summary: 'Create a race prediction with optional risk multiplier',
+        description:
+          'Creates one winner prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee * riskMultiplier points from the spectator profile and records it as entry points.',
         security: [{ bearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 201: { description: 'Created prediction' } },
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            schema: { type: 'string' },
+            description: 'Race id. The request body also accepts raceId for current controller compatibility.',
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/CreatePredictionRequest' },
+              examples: {
+                winnerPrediction: {
+                  value: {
+                    raceId: '665f1e000000000000000010',
+                    predictedRanks: [{ rank: 1, horseId: '665f1e000000000000000001' }],
+                    riskMultiplier: 2,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Created prediction',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    prediction: { $ref: '#/components/schemas/PredictionDto' },
+                  },
+                },
+              },
+            },
+          },
+          409: {
+            description: 'Prediction window closed, duplicate prediction, pool closed, or insufficient points',
+          },
+        },
       },
     },
     '/api/spectator/points': {
