@@ -223,6 +223,56 @@ const swaggerDefinition = {
           minScoreToShare: { type: 'number', example: 1 },
         },
       },
+      // === NEW: THÊM SCHEMAS CHO LUẬT VÀ PHẠT ===
+      CreateViolationRuleRequest: {
+        type: 'object',
+        required: ['code', 'description', 'category', 'severity', 'penaltyApplied'],
+        properties: {
+          code: { type: 'string', example: 'RC-001' },
+          description: { type: 'string', example: 'Chèn ép đối thủ ở khúc cua' },
+          category: { 
+            type: 'string', 
+            enum: ['race_conduct', 'medical', 'equipment', 'administrative'],
+            example: 'race_conduct'
+          },
+          severity: { 
+            type: 'string', 
+            enum: ['low', 'medium', 'high', 'critical'],
+            example: 'high'
+          },
+          penaltyApplied: { type: 'string', example: 'Tước quyền thi đấu 2 chặng' },
+        },
+      },
+      ViolationRuleDto: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          code: { type: 'string' },
+          description: { type: 'string' },
+          category: { type: 'string' },
+          severity: { type: 'string' },
+          penaltyApplied: { type: 'string' },
+          isActive: { type: 'boolean', example: true },
+          createdBy: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      ApplyPenaltyRequest: {
+        type: 'object',
+        required: ['ruleId', 'targetId', 'targetType', 'raceId'],
+        properties: {
+          ruleId: { type: 'string', description: 'ID của luật vi phạm' },
+          targetId: { type: 'string', description: 'ID của Ngựa hoặc Kỵ sĩ bị phạt' },
+          targetType: { 
+            type: 'string', 
+            enum: ['Horse', 'User'], 
+            description: 'Đối tượng bị phạt (Ngựa hoặc Kỵ sĩ)' 
+          },
+          raceId: { type: 'string', description: 'Trận đua xảy ra vi phạm' },
+          notes: { type: 'string', example: 'Cố tình chèn ép ở vạch đích, đã check VAR.' },
+        },
+      },
+      // === KẾT THÚC NEW SCHEMAS ===
     },
   },
   tags: [
@@ -302,6 +352,65 @@ const swaggerDefinition = {
         responses: { 200: { description: 'User list' } },
       },
     },
+    // === NEW: ADMIN - QUẢN LÝ LUẬT VI PHẠM ===
+    '/api/admin/violation-rules': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Lấy danh sách các luật xử phạt',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'category', in: 'query', schema: { type: 'string' } },
+          { name: 'isActive', in: 'query', schema: { type: 'boolean' } }
+        ],
+        responses: { 
+          200: { 
+            description: 'Danh sách luật',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/ViolationRuleDto' } }
+              }
+            }
+          } 
+        },
+      },
+      post: {
+        tags: ['Admin'],
+        summary: 'Tạo mới một luật xử phạt',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateViolationRuleRequest' } }
+          }
+        },
+        responses: { 201: { description: 'Đã tạo luật thành công' } },
+      },
+    },
+    '/api/admin/violation-rules/{id}': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Cập nhật thông tin luật xử phạt',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateViolationRuleRequest' } }
+          }
+        },
+        responses: { 200: { description: 'Cập nhật thành công' } },
+      },
+    },
+    '/api/admin/violation-rules/{id}/status': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Bật/Tắt trạng thái áp dụng của luật',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Đã thay đổi trạng thái' } },
+      },
+    },
+    // === KẾT THÚC NEW ADMIN LUẬT ===
     '/api/admin/registrations': {
       get: {
         tags: ['Admin'],
@@ -575,6 +684,44 @@ const swaggerDefinition = {
         responses: { 200: { description: 'Dashboard data' } },
       },
     },
+    // === NEW: REFEREE - THI HÀNH ÁN PHẠT ===
+    '/api/referee/violation-rules': {
+      get: {
+        tags: ['Referee'],
+        summary: 'Lấy danh sách các luật ĐANG HOẠT ĐỘNG (dành cho dropdown chọn lỗi)',
+        security: [{ bearerAuth: [] }],
+        responses: { 
+          200: { 
+            description: 'Danh sách luật',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/ViolationRuleDto' } }
+              }
+            }
+          } 
+        },
+      },
+    },
+    '/api/referee/penalties': {
+      post: {
+        tags: ['Referee'],
+        summary: 'Ghi nhận vi phạm và áp dụng hình phạt',
+        description: 'Trọng tài chọn luật vi phạm và áp dụng lên Kỵ sĩ (User) hoặc Ngựa (Horse) trong một trận đua cụ thể.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/ApplyPenaltyRequest' } }
+          }
+        },
+        responses: { 
+          201: { description: 'Đã ghi nhận hình phạt thành công' },
+          400: { description: 'Luật này không tồn tại hoặc đối tượng không hợp lệ' },
+          403: { description: 'Trận đua đã kết thúc, không thể phạt thêm' }
+        },
+      },
+    },
+    // === KẾT THÚC NEW REFEREE PHẠT ===
     '/api/referee/races': {
       get: {
         tags: ['Referee'],
