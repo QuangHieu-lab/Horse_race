@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
-import { createPrediction } from '../services/prediction.service.js';
+import { cancelPrediction, createPrediction } from '../services/prediction.service.js';
 import * as paymentService from '../services/payment.service.js';
 import * as spectatorService from '../services/spectator.service.js';
 import * as viewingTicketService from '../services/viewing-ticket.service.js';
@@ -48,6 +48,11 @@ export class SpectatorController {
       riskMultiplier,
     });
     res.status(201).json({ prediction });
+  });
+
+  cancelPrediction = asyncHandler(async (req: Request, res: Response) => {
+    const result = await cancelPrediction(req.user!.id, req.params.id as string);
+    res.json(result);
   });
 
   getPoints = asyncHandler(async (req: Request, res: Response) => {

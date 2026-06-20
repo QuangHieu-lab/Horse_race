@@ -31,7 +31,7 @@ export type InvitationStatus = 'pending' | 'accepted' | 'declined';
 
 export type RegistrationStatus = 'pending' | 'approved' | 'rejected';
 
-export type PredictionStatus = 'pending' | 'partial' | 'correct' | 'incorrect';
+export type PredictionStatus = 'pending' | 'partial' | 'correct' | 'incorrect' | 'cancelled';
 
 export type PredictionPoolStatus = 'open' | 'locked' | 'settled';
 

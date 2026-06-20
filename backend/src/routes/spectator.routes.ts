@@ -14,9 +14,13 @@ spectatorRouter.post('/races/:id/viewing-pass', spectatorController.purchaseView
 
 spectatorRouter.get('/viewing-passes', spectatorController.listViewingPasses);
 
+spectatorRouter.get('/predictions/current', spectatorController.listPredictions);
+
 spectatorRouter.get('/predictions/:id', spectatorController.listPredictions);
 
 spectatorRouter.post('/predictions/:id', spectatorController.createPrediction);
+
+spectatorRouter.patch('/predictions/:id/cancel', spectatorController.cancelPrediction);
 
 spectatorRouter.get('/points', spectatorController.getPoints);
 

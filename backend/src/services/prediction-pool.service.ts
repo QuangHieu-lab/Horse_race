@@ -134,6 +134,39 @@ export async function chargePredictionTicket(
   return { contribution, poolId: pool._id, riskMultiplier };
 }
 
+export async function refundPredictionTicket(
+  spectatorId: string,
+  predictionId: mongoose.Types.ObjectId,
+  raceId: mongoose.Types.ObjectId,
+  contribution: number,
+  raceName: string,
+): Promise<void> {
+  if (contribution <= 0) return;
+
+  const pool = await PredictionPool.findOne({ raceId });
+  if (!pool) {
+    throw new HttpError(404, 'Không tìm thấy bounty pool');
+  }
+  if (pool.status !== 'open') {
+    throw new HttpError(409, 'Bounty pool đã đóng, không thể hủy dự đoán');
+  }
+
+  const spectatorObjectId = new mongoose.Types.ObjectId(spectatorId);
+  const profile = await getOrCreateProfile(spectatorObjectId);
+  await profile.addPoints(
+    contribution,
+    'refunded_pool',
+    'Prediction',
+    predictionId,
+    `Hoàn điểm hủy dự đoán cuộc đua ${raceName}`,
+  );
+
+  pool.totalTickets = Math.max(0, pool.totalTickets - 1);
+  pool.contributorCount = Math.max(0, pool.contributorCount - 1);
+  pool.totalBountyPool = Math.max(0, pool.totalBountyPool - contribution);
+  await pool.save();
+}
+
 export async function settlePredictionPoolFromResult(
   result: Pick<IResult, 'raceId' | 'rankings' | 'tournamentId' | 'publishedBy'>,
 ): Promise<void> {
@@ -144,7 +177,7 @@ export async function settlePredictionPoolFromResult(
   const pool = await PredictionPool.findOne({ raceId: result.raceId });
   if (!pool || pool.status === 'settled') return;
 
-  const predictions = await Prediction.find({ raceId: result.raceId });
+  const predictions = await Prediction.find({ raceId: result.raceId, status: { $ne: 'cancelled' } });
   if (predictions.length === 0) {
     pool.status = 'settled';
     pool.settledAt = new Date();

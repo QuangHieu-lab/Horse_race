@@ -70,7 +70,7 @@ async function buildSpectatorRaceDto(
       .select('name')
       .lean(),
     spectatorId
-      ? Prediction.findOne({ raceId: race._id, spectatorId }).select('_id').lean()
+      ? Prediction.findOne({ raceId: race._id, spectatorId, status: { $ne: 'cancelled' } }).select('_id').lean()
       : null,
     Result.findOne({ raceId: race._id, publishedAt: { $ne: null } }).lean(),
   ]);
