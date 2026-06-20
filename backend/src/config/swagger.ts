@@ -97,7 +97,7 @@ const swaggerDefinition = {
           tournamentName: { type: 'string' },
           status: {
             type: 'string',
-            enum: ['pending', 'partial', 'correct', 'incorrect'],
+            enum: ['pending', 'partial', 'correct', 'incorrect', 'cancelled'],
           },
           contribution: {
             type: 'number',
@@ -179,7 +179,7 @@ const swaggerDefinition = {
           },
           rankRewardRates: {
             type: 'string',
-            example: 'MVP pays RacingRewardPool to rank 1 horse only. Dead-heat rank 1 horses split it equally.',
+            example: 'RacingRewardPool is split by rank presets for 5-13 horses; same-rank dead heats split that rank share equally.',
           },
           userReward: {
             type: 'string',
@@ -223,6 +223,55 @@ const swaggerDefinition = {
           minScoreToShare: { type: 'number', example: 1 },
         },
       },
+      TopUpRequest: {
+        type: 'object',
+        required: ['points'],
+        properties: {
+          points: {
+            type: 'integer',
+            minimum: 100,
+            example: 100,
+            description: 'Minimum top-up is 100 points. Current mock exchange rate is 100 VND = 1 point.',
+          },
+        },
+      },
+      PaymentTransactionDto: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          provider: { type: 'string', example: 'mock' },
+          amountVnd: { type: 'number', example: 10000 },
+          points: { type: 'integer', example: 100 },
+          exchangeRateVndPerPoint: { type: 'number', example: 100 },
+          status: { type: 'string', example: 'paid' },
+          providerTransactionId: { type: 'string', nullable: true },
+          paidAt: { type: 'string', format: 'date-time', nullable: true },
+          expiredAt: { type: 'string', format: 'date-time', nullable: true },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      SpectatorPointsDto: {
+        type: 'object',
+        properties: {
+          currentBalance: { type: 'number', example: 1000 },
+          totalPointsEarned: { type: 'number', example: 1200 },
+          totalPointsSpent: { type: 'number', example: 200 },
+          transactions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                type: { type: 'string', example: 'topup' },
+                points: { type: 'number', example: 100 },
+                balanceAfter: { type: 'number', example: 1000 },
+                note: { type: 'string' },
+                createdAt: { type: 'string', format: 'date-time' },
+              },
+            },
+          },
+        },
+      },
       // === NEW: THÊM SCHEMAS CHO LUẬT VÀ PHẠT ===
       CreateViolationRuleRequest: {
         type: 'object',
@@ -259,16 +308,16 @@ const swaggerDefinition = {
       },
       ApplyPenaltyRequest: {
         type: 'object',
-        required: ['ruleId', 'targetId', 'targetType', 'raceId'],
+        required: ['ruleId', 'target'],
         properties: {
           ruleId: { type: 'string', description: 'ID của luật vi phạm' },
-          targetId: { type: 'string', description: 'ID của Ngựa hoặc Kỵ sĩ bị phạt' },
-          targetType: { 
-            type: 'string', 
-            enum: ['Horse', 'User'], 
-            description: 'Đối tượng bị phạt (Ngựa hoặc Kỵ sĩ)' 
+          horseId: { type: 'string', description: 'ID ngựa bị phạt nếu áp dụng cho horse hoặc both' },
+          jockeyId: { type: 'string', description: 'ID jockey bị phạt nếu áp dụng cho jockey hoặc both' },
+          target: {
+            type: 'string',
+            enum: ['horse', 'jockey', 'both'],
+            description: 'Đối tượng chịu án phạt'
           },
-          raceId: { type: 'string', description: 'Trận đua xảy ra vi phạm' },
           notes: { type: 'string', example: 'Cố tình chèn ép ở vạch đích, đã check VAR.' },
         },
       },
@@ -401,7 +450,7 @@ const swaggerDefinition = {
         responses: { 200: { description: 'Cập nhật thành công' } },
       },
     },
-    '/api/admin/violation-rules/{id}/status': {
+    '/api/admin/violation-rules/{id}/toggle-status': {
       patch: {
         tags: ['Admin'],
         summary: 'Bật/Tắt trạng thái áp dụng của luật',
@@ -470,6 +519,34 @@ const swaggerDefinition = {
         responses: { 200: { description: 'Reminder job result' } },
       },
     },
+    '/api/admin/race-meetings': {
+      get: {
+        tags: ['Admin'],
+        summary: 'List race meetings',
+        security: [{ bearerAuth: [] }],
+        responses: { 200: { description: 'Race meeting list' } },
+      },
+      post: {
+        tags: ['Admin'],
+        summary: 'Create a race meeting',
+        security: [{ bearerAuth: [] }],
+        responses: { 201: { description: 'Created race meeting' } },
+      },
+    },
+    '/api/admin/tracks': {
+      get: {
+        tags: ['Admin'],
+        summary: 'List race tracks',
+        security: [{ bearerAuth: [] }],
+        responses: { 200: { description: 'Track list' } },
+      },
+      post: {
+        tags: ['Admin'],
+        summary: 'Create a race track',
+        security: [{ bearerAuth: [] }],
+        responses: { 201: { description: 'Created track' } },
+      },
+    },
     '/api/tournaments': {
       get: {
         tags: ['Tournaments'],
@@ -491,6 +568,16 @@ const swaggerDefinition = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'Tournament details' } },
+      },
+      delete: {
+        tags: ['Tournaments'],
+        summary: 'Delete a draft or published tournament',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Deleted tournament' },
+          400: { description: 'Tournament cannot be deleted in its current state' },
+        },
       },
     },
     '/api/tournaments/{id}/status': {
@@ -553,6 +640,16 @@ const swaggerDefinition = {
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'Race details' } },
       },
+      delete: {
+        tags: ['Races'],
+        summary: 'Delete a race',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Deleted race' },
+          409: { description: 'Race cannot be deleted in its current state' },
+        },
+      },
     },
     '/api/races/{id}/participants': {
       post: {
@@ -594,6 +691,16 @@ const swaggerDefinition = {
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { 200: { description: 'Updated horse' } },
       },
+      delete: {
+        tags: ['Horse Owner'],
+        summary: 'Delete my horse',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Deleted horse' },
+          409: { description: 'Horse has active registration or cannot be deleted' },
+        },
+      },
     },
     '/api/horse-owner/registrations': {
       get: {
@@ -624,6 +731,36 @@ const swaggerDefinition = {
         summary: 'Invite a jockey',
         security: [{ bearerAuth: [] }],
         responses: { 201: { description: 'Created invitation' } },
+      },
+    },
+    '/api/horse-owner/jockeys/search': {
+      get: {
+        tags: ['Horse Owner'],
+        summary: 'Search jockeys by name',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'name', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Jockey search results' } },
+      },
+    },
+    '/api/horse-owner/tournaments': {
+      get: {
+        tags: ['Horse Owner'],
+        summary: 'List tournaments available to horse owners',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 100 } },
+        ],
+        responses: { 200: { description: 'Tournament list' } },
+      },
+    },
+    '/api/horse-owner/tournaments/{tournamentId}/races': {
+      get: {
+        tags: ['Horse Owner'],
+        summary: 'List races in a tournament for owner registration',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'tournamentId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Race list' } },
       },
     },
     '/api/jockey/dashboard': {
@@ -684,30 +821,13 @@ const swaggerDefinition = {
         responses: { 200: { description: 'Dashboard data' } },
       },
     },
-    // === NEW: REFEREE - THI HÀNH ÁN PHẠT ===
-    '/api/referee/violation-rules': {
-      get: {
-        tags: ['Referee'],
-        summary: 'Lấy danh sách các luật ĐANG HOẠT ĐỘNG (dành cho dropdown chọn lỗi)',
-        security: [{ bearerAuth: [] }],
-        responses: { 
-          200: { 
-            description: 'Danh sách luật',
-            content: {
-              'application/json': {
-                schema: { type: 'array', items: { $ref: '#/components/schemas/ViolationRuleDto' } }
-              }
-            }
-          } 
-        },
-      },
-    },
-    '/api/referee/penalties': {
+    '/api/referee/races/{id}/penalize': {
       post: {
         tags: ['Referee'],
-        summary: 'Ghi nhận vi phạm và áp dụng hình phạt',
-        description: 'Trọng tài chọn luật vi phạm và áp dụng lên Kỵ sĩ (User) hoặc Ngựa (Horse) trong một trận đua cụ thể.',
+        summary: 'Ghi nhận vi phạm và áp dụng hình phạt cho race',
+        description: 'Trọng tài chọn luật vi phạm và áp dụng lên ngựa, jockey, hoặc cả hai trong race phụ trách.',
         security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
         requestBody: {
           required: true,
           content: {
@@ -715,13 +835,12 @@ const swaggerDefinition = {
           }
         },
         responses: { 
-          201: { description: 'Đã ghi nhận hình phạt thành công' },
+          200: { description: 'Đã ghi nhận hình phạt thành công' },
           400: { description: 'Luật này không tồn tại hoặc đối tượng không hợp lệ' },
           403: { description: 'Trận đua đã kết thúc, không thể phạt thêm' }
         },
       },
     },
-    // === KẾT THÚC NEW REFEREE PHẠT ===
     '/api/referee/races': {
       get: {
         tags: ['Referee'],
@@ -813,6 +932,33 @@ const swaggerDefinition = {
         responses: { 200: { description: 'Viewing pass list' } },
       },
     },
+    '/api/spectator/predictions/current': {
+      get: {
+        tags: ['Spectator'],
+        summary: 'List my predictions',
+        description:
+          'Preferred prediction history endpoint. Returns predictions for the authenticated spectator using the JWT token.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Prediction list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    predictions: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/PredictionDto' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     '/api/spectator/predictions/{id}': {
       get: {
         tags: ['Spectator'],
@@ -900,12 +1046,95 @@ const swaggerDefinition = {
         },
       },
     },
+    '/api/spectator/predictions/{id}/cancel': {
+      patch: {
+        tags: ['Spectator'],
+        summary: 'Cancel a pending prediction and refund entry points',
+        description:
+          'Cancels an authenticated spectator prediction while it is still pending and the prediction window is open. Refunded points are returned to the spectator profile and the prediction is kept as cancelled for audit/history.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Prediction id' }],
+        responses: {
+          200: {
+            description: 'Cancelled prediction and updated points',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    prediction: { $ref: '#/components/schemas/PredictionDto' },
+                    points: { $ref: '#/components/schemas/SpectatorPointsDto' },
+                  },
+                },
+              },
+            },
+          },
+          409: { description: 'Prediction is no longer pending or prediction window is closed' },
+        },
+      },
+    },
     '/api/spectator/points': {
       get: {
         tags: ['Spectator'],
         summary: 'Get spectator points balance and history',
         security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'Points data' } },
+      },
+    },
+    '/api/spectator/top-ups': {
+      get: {
+        tags: ['Spectator'],
+        summary: 'List my top-up payments',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Top-up payment list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    payments: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/PaymentTransactionDto' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Spectator'],
+        summary: 'Mock top-up: convert money to points',
+        description: 'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 100 VND = 1 point; minimum top-up is 100 points.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/TopUpRequest' },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Created paid top-up and updated points',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    payment: { $ref: '#/components/schemas/PaymentTransactionDto' },
+                    points: { $ref: '#/components/schemas/SpectatorPointsDto' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'points is missing or below minimum' },
+        },
       },
     },
     '/api/spectator/products': {
