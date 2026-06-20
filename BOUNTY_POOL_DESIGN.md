@@ -114,9 +114,50 @@ PrizePool = 400,000 * 75% = 300,000
 
 ## 6. Chia Cho Horse Owner Va Jockey
 
-`RacingRewardPool` chi trao cho ngua ve nhat trong MVP.
+Ban dau MVP chi trao `RacingRewardPool` cho ngua ve nhat. Ban hien tai da mo rong de chia theo so ngua trong race, tu 5 den 13 ngua.
 
-Neu co nhieu ngua cung rank 1, cac ngua rank 1 chia deu `RacingRewardPool`.
+Mac dinh he thong dung preset theo so ngua thuc te:
+
+```text
+5 ngua : [50, 25, 15, 7, 3]
+6 ngua : [45, 23, 15, 8, 6, 3]
+7 ngua : [40, 22, 15, 10, 6, 4, 3]
+8 ngua : [36, 21, 15, 10, 7, 5, 4, 2]
+9 ngua : [33, 20, 15, 10, 7, 5, 4, 3, 3]
+10 ngua: [30, 19, 14, 10, 8, 6, 5, 3, 3, 2]
+11 ngua: [28, 18, 14, 10, 8, 6, 5, 4, 3, 2, 2]
+12 ngua: [26, 17, 14, 10, 8, 6, 5, 4, 3, 3, 2, 2]
+13 ngua: [25, 16, 13, 10, 8, 6, 5, 4, 3, 3, 3, 2, 2]
+```
+
+Moi so trong mang la phan tram cua `RacingRewardPool` cho rank tuong ung.
+
+Vi du race co 6 ngua:
+
+```text
+Rank 1 = 45%
+Rank 2 = 23%
+Rank 3 = 15%
+Rank 4 = 8%
+Rank 5 = 6%
+Rank 6 = 3%
+```
+
+Vi du race co 7 ngua:
+
+```text
+Rank 1 = 40%
+Rank 2 = 22%
+Rank 3 = 15%
+Rank 4 = 10%
+Rank 5 = 6%
+Rank 6 = 4%
+Rank 7 = 3%
+```
+
+Admin co the override bang `rankRewardRates`, nhung chi duoc ap dung khi so phan tu bang dung so ngua/so ranking va tong ti le bang 100. Neu khong khop, backend dung preset mac dinh theo so ngua.
+
+Neu co dead heat cung mot rank, phan thuong cua rank do duoc chia deu cho cac ngua cung rank.
 
 Trong tung ngua, owner va jockey chia nhu cu:
 
@@ -132,9 +173,13 @@ Vi du:
 
 ```text
 RacingRewardPool = 60,000
+Race co 6 ngua
+Rank 1 rate = 45%
 
-OwnerReward = 60,000 * 80% = 48,000
-JockeyReward = 60,000 * 20% = 12,000
+HorseReward rank 1 = 60,000 * 45% = 27,000
+
+OwnerReward = 27,000 * 80% = 21,600
+JockeyReward = 27,000 * 20% = 5,400
 ```
 
 ## 7. Chia Prize Pool Cho Nguoi Doan Dung

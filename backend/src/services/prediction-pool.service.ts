@@ -16,9 +16,38 @@ const RACING_REWARD_RATE = 15;
 const SPECTATOR_REWARD_RATE = 75;
 const OWNER_SHARE_RATE = 80;
 const JOCKEY_SHARE_RATE = 20;
+const RANK_REWARD_RATE_PRESETS: Record<number, number[]> = {
+  5: [50, 25, 15, 7, 3],
+  6: [45, 23, 15, 8, 6, 3],
+  7: [40, 22, 15, 10, 6, 4, 3],
+  8: [36, 21, 15, 10, 7, 5, 4, 2],
+  9: [33, 20, 15, 10, 7, 5, 4, 3, 3],
+  10: [30, 19, 14, 10, 8, 6, 5, 3, 3, 2],
+  11: [28, 18, 14, 10, 8, 6, 5, 4, 3, 2, 2],
+  12: [26, 17, 14, 10, 8, 6, 5, 4, 3, 3, 2, 2],
+  13: [25, 16, 13, 10, 8, 6, 5, 4, 3, 3, 3, 2, 2],
+};
 
 function pct(amount: number, rate: number): number {
   return Math.floor((amount * rate) / 100);
+}
+
+function sumRates(rates: number[]): number {
+  return rates.reduce((sum, rate) => sum + rate, 0);
+}
+
+function resolveRankRewardRates(participantCount: number, configuredRates?: number[]): number[] {
+  if (
+    configuredRates?.length === participantCount &&
+    Math.abs(sumRates(configuredRates) - 100) < 0.0001
+  ) {
+    return configuredRates;
+  }
+
+  const cappedCount = Math.min(13, Math.max(5, participantCount));
+  const preset = RANK_REWARD_RATE_PRESETS[cappedCount] ?? RANK_REWARD_RATE_PRESETS[5]!;
+  if (participantCount <= 13) return preset.slice(0, participantCount);
+  return [...preset, ...Array(participantCount - 13).fill(0)];
 }
 
 function isWinningPrediction(
@@ -252,13 +281,24 @@ export async function settlePredictionPoolFromResult(
     }
   }
 
-  const winningRankings = result.rankings.filter((ranking) => ranking.rank === 1);
-  if (winningRankings.length > 0) {
-    const horseReward = Math.floor(pool.racingRewardPool / winningRankings.length);
-    const isDeadHeat = winningRankings.length > 1 || winningRankings.some((r) => r.isDeadHeat);
+  const rankedGroups = new Map<number, typeof result.rankings>();
+  for (const ranking of result.rankings) {
+    if (!rankedGroups.has(ranking.rank)) rankedGroups.set(ranking.rank, []);
+    rankedGroups.get(ranking.rank)!.push(ranking);
+  }
+  const rankRewardRates = resolveRankRewardRates(
+    result.rankings.length,
+    tournament?.predictionConfig.rankRewardRates,
+  );
 
-    for (const ranking of winningRankings) {
-      const rank = 1;
+  for (const [rank, rankings] of [...rankedGroups.entries()].sort((a, b) => a[0] - b[0])) {
+    const rankRate = rankRewardRates[rank - 1] ?? 0;
+    if (rankRate <= 0 || rankings.length === 0) continue;
+    const rankReward = pct(pool.racingRewardPool, rankRate);
+    const horseReward = Math.floor(rankReward / rankings.length);
+    const isDeadHeat = rankings.length > 1 || rankings.some((r) => r.isDeadHeat);
+
+    for (const ranking of rankings) {
       const ownerReward = pct(horseReward, pool.ownerShareRate);
       const jockeyReward = horseReward - ownerReward;
       pool.ownerReward += ownerReward;
@@ -279,7 +319,7 @@ export async function settlePredictionPoolFromResult(
           userId: ranking.ownerId,
           type: 'prediction_reward',
           title: 'Thưởng owner từ bounty pool',
-          message: `Owner nhận ${ownerReward} điểm thưởng ngựa về nhất từ bounty pool cuộc đua ${race.name}.`,
+          message: `Owner nhận ${ownerReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
           refModel: 'PredictionPool',
           refId: pool._id,
         },
@@ -287,7 +327,7 @@ export async function settlePredictionPoolFromResult(
           userId: ranking.jockeyId,
           type: 'prediction_reward',
           title: 'Thưởng jockey từ bounty pool',
-          message: `Jockey nhận ${jockeyReward} điểm thưởng ngựa về nhất từ bounty pool cuộc đua ${race.name}.`,
+          message: `Jockey nhận ${jockeyReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
           refModel: 'PredictionPool',
           refId: pool._id,
         },
