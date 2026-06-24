@@ -36,6 +36,7 @@ const ViolationRuleSchema = new Schema<IViolationRule>(
       enum: [
         'warning', 
         'demote', 
+        'time_penalty',
         'disqualify', 
         'disqualification', 
         'restart', 

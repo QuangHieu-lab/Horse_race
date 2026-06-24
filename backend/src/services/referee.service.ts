@@ -6,6 +6,7 @@ import { Horse } from '../models/Horse.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
 import { activeParticipants } from '../utils/race-participants.js';
+import { simulateRace } from '../services/race.service.js';
 
 export interface RefereeRaceDto {
   id: string;
@@ -309,4 +310,73 @@ export async function revokeRacePenalty(
   // 4. Xóa vi phạm khỏi danh sách của Result và lưu biên bản tổng
   resultDoc.violations.splice(violationIndex, 1);
   await resultDoc.save();
+}
+export interface ApplyTimePenaltyInput {
+  horseId: string;
+  jockeyId: string;
+  addedTimeSeconds: number; // Số giây bị cộng thêm (VD: 5.5)
+  ruleId?: string; // Trỏ tới luật vi phạm (tùy chọn)
+  type: string; // Loại vi phạm (VD: 'race_conduct')
+  description: string; // Lời phê của Trọng tài
+}
+
+export async function applyViolationAndTimePenalty(raceId: string, input: ApplyTimePenaltyInput) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  // 1. Lấy bản nháp kết quả hiện tại
+  const result = await Result.findOne({ raceId: new mongoose.Types.ObjectId(raceId) });
+  
+  if (!result) {
+    throw new HttpError(404, 'Không tìm thấy kết quả của trận đua này');
+  }
+  if (result.confirmedAt) {
+    throw new HttpError(400, 'Không thể sửa đổi vì kết quả trận đấu đã được xác nhận');
+  }
+
+  // 2. Ghi chép lịch sử vi phạm vào mảng violations
+  result.violations.push({
+    ruleId: input.ruleId ? new mongoose.Types.ObjectId(input.ruleId) : null,
+    horseId: new mongoose.Types.ObjectId(input.horseId),
+    jockeyId: new mongoose.Types.ObjectId(input.jockeyId),
+    target: 'horse',
+    type: input.type,
+    description: `[Phạt cộng ${input.addedTimeSeconds}s] ${input.description}`,
+    recordedAt: new Date()
+  } as any);
+
+  // 3. Tìm ngựa bị phạt và cộng thêm thời gian
+  const targetRanking = result.rankings.find(r => r.horseId.toString() === input.horseId);
+  if (!targetRanking || targetRanking.finishTime === undefined) {
+    throw new HttpError(400, 'Ngựa này không có thời gian hoàn thành hợp lệ trong kết quả');
+  }
+  
+  // Cộng thời gian phạt vào thành tích thực tế
+  targetRanking.finishTime += input.addedTimeSeconds;
+  targetRanking.finishTime = parseFloat(targetRanking.finishTime.toFixed(3)); // Giữ 3 chữ số thập phân
+
+  // 4. SẮP XẾP VÀ CẬP NHẬT LẠI TOÀN BỘ THỨ HẠNG
+  // Do bị cộng thêm giây, con ngựa này có thể rơi từ Top 1 xuống Top 3
+  result.rankings.sort((a, b) => (a.finishTime || 0) - (b.finishTime || 0));
+
+  result.rankings.forEach((ranking, index) => {
+    ranking.rank = index + 1;
+    
+    if (index === 0) {
+      ranking.marginBehind = 0;
+      ranking.isDeadHeat = false;
+    } else {
+      const prevTime = result.rankings[index - 1]?.finishTime ?? 0;
+      const currentTime = ranking.finishTime ?? 0;
+      
+      ranking.marginBehind = parseFloat((currentTime - prevTime).toFixed(3));
+      ranking.isDeadHeat = ranking.marginBehind === 0; // Nếu bằng thời gian nhau thì đánh dấu hòa
+    }
+  });
+
+  // 5. Lưu lại bản cập nhật
+  await result.save();
+  
+  return result;
 }
