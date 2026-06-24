@@ -212,6 +212,9 @@ export interface HorseDto {
   age: number;
   weight?: number;
   color?: string;
+  trainerName?: string;
+  profilePdfUrl?: string;
+  profilePdfName?: string;
   healthStatus: HealthStatus;
   currentJockey?: UserSummaryDto | null;
   createdAt?: string;

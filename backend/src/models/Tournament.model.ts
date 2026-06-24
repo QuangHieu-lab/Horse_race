@@ -57,7 +57,10 @@ const PredictionConfigSchema = new Schema<IPredictionConfig>(
       default: () => [1, 2, 3, 6],
       validate: {
         validator(multipliers: number[]) {
-          return multipliers.every((multiplier) => Number.isInteger(multiplier) && multiplier >= 1);
+          return (
+            multipliers.length > 0 &&
+            multipliers.every((multiplier) => Number.isInteger(multiplier) && multiplier >= 1)
+          );
         },
         message: 'quickRiskMultipliers must contain positive integers',
       },

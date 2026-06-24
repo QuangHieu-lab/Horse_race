@@ -136,6 +136,12 @@ export async function chargePredictionTicket(
       `Mức rủi ro phải nằm trong khoảng ${pool.minRiskMultiplier}x đến ${pool.maxRiskMultiplier}x`,
     );
   }
+  if (!pool.quickRiskMultipliers.includes(riskMultiplier)) {
+    throw new HttpError(
+      400,
+      `Mức rủi ro chỉ được chọn trong danh sách: ${pool.quickRiskMultipliers.join('x, ')}x`,
+    );
+  }
   if (pool.ticketPrice < MIN_ENTRY_POINTS) {
     throw new HttpError(400, `Entry points tối thiểu là ${MIN_ENTRY_POINTS}`);
   }

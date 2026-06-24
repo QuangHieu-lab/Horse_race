@@ -14,6 +14,8 @@ export interface IHorse {
   weight?: number;
   healthStatus: HealthStatus;
   imageUrl?: string;
+  profilePdfUrl?: string;
+  profilePdfName?: string;
   currentJockeyId?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
@@ -45,7 +47,18 @@ const HorseSchema = new Schema<IHorse>(
   },
     healthStatus: {
       type: String, enum: ['fit', 'injured', 'retired'], default: 'fit', },
-     imageUrl: { type: String },
+    imageUrl: { type: String },
+    profilePdfUrl: {
+      type: String,
+      trim: true,
+      validate: {
+        validator(value?: string) {
+          return !value || /\.pdf($|\?)/i.test(value);
+        },
+        message: 'profilePdfUrl must point to a PDF file',
+      },
+    },
+    profilePdfName: { type: String, trim: true },
     currentJockeyId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
   },
   
