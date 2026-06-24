@@ -137,7 +137,7 @@ OwnerReward = 60,000 * 80% = 48,000
 JockeyReward = 60,000 * 20% = 12,000
 ```
 
-## 7. Chia Prize Pool Cho Nguoi Doan Dung
+## 7. Chia Prize Pool Cho Nguoi Doan Dung (Risk-Weighted)
 
 Nguoi doan dung nhan:
 
@@ -145,41 +145,50 @@ Nguoi doan dung nhan:
 TotalReturned = EntryPoints + PrizeReward
 ```
 
-Trong do:
+PrizePool duoc chia theo `PredictionScore` co TRONG SO RUI RO, khong chia theo
+EntryPoints thuan. Muc dich: dam risk cao ma doan dung thi phan thuong tang theo
+risk^2, nho do `riskMultiplier` la mot lua chon chien luoc that su.
 
 ```text
-TotalCorrectEntryPoints = sum(EntryPoints cua tat ca prediction dung)
+PredictionScore = EntryPoints * RiskMultiplier
+                = (EntryFee * RiskMultiplier) * RiskMultiplier
+                = EntryFee * RiskMultiplier^2     (chi tinh cho nguoi doan dung)
 
-PrizeReward =
-  PrizePool * (UserEntryPoints / TotalCorrectEntryPoints)
+TotalWinnerScore = sum(PredictionScore cua tat ca prediction dung)
+
+PrizeReward = PrizePool * (PredictionScore / TotalWinnerScore)
 ```
 
-Day la diem quan trong: user bo nhieu EntryPoints hon thi nhan ti le PrizePool lon hon, nhung chi khi doan dung.
+Phan du do lam tron (floor) duoc don cho nguoi co PredictionScore cao nhat de
+khong that thoat diem.
 
 Vi du:
 
 ```text
 PrizePool = 300,000
 
-User A dung, EntryPoints = 50,000
-User D dung, EntryPoints = 100,000
+User A dung, EntryPoints = 50,000,  risk 1x => PredictionScore = 50,000
+User D dung, EntryPoints = 100,000, risk 2x => PredictionScore = 200,000
 
-TotalCorrectEntryPoints = 150,000
+TotalWinnerScore = 250,000
 ```
 
 Chia prize:
 
 ```text
-User A PrizeReward = 300,000 * (50,000 / 150,000) = 100,000
-User D PrizeReward = 300,000 * (100,000 / 150,000) = 200,000
+User A PrizeReward = 300,000 * (50,000 / 250,000)  = 60,000
+User D PrizeReward = 300,000 * (200,000 / 250,000) = 240,000
 ```
 
 Tong diem user nhan lai:
 
 ```text
-User A TotalReturned = 50,000 + 100,000 = 150,000
-User D TotalReturned = 100,000 + 200,000 = 300,000
+User A TotalReturned = 50,000  + 60,000  = 110,000   (von 50k  -> lai 1.2x)
+User D TotalReturned = 100,000 + 240,000 = 340,000   (von 100k -> lai 2.4x)
 ```
+
+So voi cach chia cu (theo EntryPoints thuan), User D dam risk 2x nhan nhieu hon
+(240k thay vi 200k), con User A risk 1x nhan it hon (60k thay vi 100k).
 
 ## 8. Vi Du Day Du
 
@@ -226,20 +235,22 @@ OwnerReward = 60,000 * 80% = 48,000
 JockeyReward = 60,000 * 20% = 12,000
 ```
 
-Chia spectator dung:
+Chia spectator dung (theo PredictionScore = EntryPoints * risk):
 
 ```text
-TotalCorrectEntryPoints = User A 50,000 + User D 100,000 = 150,000
+User A score = 50,000 * 1  = 50,000
+User D score = 100,000 * 2 = 200,000
+TotalWinnerScore = 250,000
 
-User A PrizeReward = 300,000 * (50,000 / 150,000) = 100,000
-User D PrizeReward = 300,000 * (100,000 / 150,000) = 200,000
+User A PrizeReward = 300,000 * (50,000 / 250,000)  = 60,000
+User D PrizeReward = 300,000 * (200,000 / 250,000) = 240,000
 ```
 
 Tong tra ve:
 
 ```text
-User A TotalReturned = 50,000 + 100,000 = 150,000
-User D TotalReturned = 100,000 + 200,000 = 300,000
+User A TotalReturned = 50,000  + 60,000  = 110,000
+User D TotalReturned = 100,000 + 240,000 = 340,000
 ```
 
 ## 9. Truong Hop Dac Biet
@@ -270,4 +281,4 @@ Nguoi doan dung chi duoc hoan lai EntryPoints cua minh.
 
 ## 10. Tom Tat Mot Cau
 
-MVP bounty pool chi cho spectator chon ngua ve nhat: nguoi doan dung duoc hoan EntryPoints, diem cua nguoi doan sai tao thanh WinPool, WinPool chia 10% organizer, 15% horse owner/jockey, 75% PrizePool chia lai cho nguoi doan dung theo ty le EntryPoints dung.
+MVP bounty pool chi cho spectator chon ngua ve nhat: nguoi doan dung duoc hoan EntryPoints, diem cua nguoi doan sai tao thanh WinPool, WinPool chia 10% organizer, 15% horse owner/jockey, 75% PrizePool chia lai cho nguoi doan dung theo PredictionScore co trong so rui ro (EntryPoints * RiskMultiplier) — dam risk cao ma doan dung thi nhan phan lon hon.

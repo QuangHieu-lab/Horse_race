@@ -85,7 +85,10 @@ export async function scorePredictionsFromResult(
     for (const prediction of predictions) {
       const isWinner = predictsWinner(prediction.predictedRanks, actualRankings);
       prediction.status = isWinner ? 'correct' : 'incorrect';
-      prediction.scoringWeight = isWinner ? 1 : 0;
+      // Điểm có trọng số rủi ro (settle sẽ tính lại & chia thưởng dựa trên điểm này)
+      prediction.scoringWeight = isWinner
+        ? prediction.contribution * Math.max(1, prediction.riskMultiplier)
+        : 0;
       prediction.pointsEarned = 0;
       prediction.bonusPoints = 0;
       prediction.poolShare = 0;

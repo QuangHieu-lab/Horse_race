@@ -21,7 +21,9 @@ export interface RefereeCheckDto {
   raceName: string;
   horseId: string;
   horseName: string;
+  jockeyId: string;
   jockeyName: string;
+  ownerId: string;
   laneNumber: number;
   vetApproved: boolean;
   confirmed: boolean;
@@ -89,7 +91,9 @@ export async function listRefereeChecks(refereeId: string, raceId: string): Prom
       raceName: race.name,
       horseId: horse._id.toString(),
       horseName: horse.name,
+      jockeyId: jockey._id.toString(),
       jockeyName: jockey.fullName,
+      ownerId: p.ownerId.toString(),
       laneNumber: p.laneNumber,
       vetApproved: !!p.vetApprovedAt,
       confirmed: !!p.confirmedAt,

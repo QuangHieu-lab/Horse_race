@@ -20,6 +20,19 @@ function pct(amount: number, rate: number): number {
   return Math.floor((amount * rate) / 100);
 }
 
+/**
+ * Điểm dự đoán dùng để chia PrizePool giữa những người đoán ĐÚNG.
+ * Có trọng số rủi ro: chọn risk cao mà đoán đúng thì phần thưởng tăng theo risk²,
+ * không chỉ tuyến tính theo số điểm đã góp.
+ *
+ *   predictionScore = contribution × riskMultiplier
+ *                   = (entryFee × riskMultiplier) × riskMultiplier
+ *                   = entryFee × riskMultiplier²
+ */
+function predictionScoreOf(p: { contribution: number; riskMultiplier: number }): number {
+  return p.contribution * Math.max(1, p.riskMultiplier);
+}
+
 function isWinningPrediction(
   predictedRanks: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
   actualRankings: Array<{ rank: number; horseId: mongoose.Types.ObjectId }>,
@@ -160,7 +173,8 @@ export async function settlePredictionPoolFromResult(
   );
   const totalBountyPool = predictions.reduce((sum, p) => sum + p.contribution, 0);
   const winPool = losers.reduce((sum, p) => sum + p.contribution, 0);
-  const totalWinningContribution = winners.reduce((sum, p) => sum + p.contribution, 0);
+  // Tổng điểm có trọng số rủi ro của những người đoán đúng — dùng để chia PrizePool.
+  const totalWinnerScore = winners.reduce((sum, p) => sum + predictionScoreOf(p), 0);
   pool.totalTickets = predictions.length;
   pool.contributorCount = predictions.length;
   pool.totalBountyPool = totalBountyPool;
@@ -171,23 +185,45 @@ export async function settlePredictionPoolFromResult(
   pool.ownerReward = 0;
   pool.jockeyReward = 0;
   pool.racingRewards = [];
-  pool.totalWinnerScore = totalWinningContribution;
+  pool.totalWinnerScore = totalWinnerScore;
 
-  if (totalWinningContribution === 0) {
+  if (totalWinnerScore === 0) {
+    // Không ai đoán đúng → PrizePool thành jackpot, để xử lý/cộng dồn sau.
     pool.jackpotAmount = pool.spectatorRewardPool;
     pool.spectatorRewardPool = 0;
   }
 
+  // Chia PrizePool theo tỷ lệ predictionScore. Phần dư do làm tròn (floor) được
+  // dồn cho người có điểm cao nhất để không thất thoát điểm.
+  const prizeShareByPrediction = new Map<string, number>();
+  if (totalWinnerScore > 0 && pool.spectatorRewardPool > 0) {
+    let distributed = 0;
+    let topWinnerId: string | null = null;
+    let topScore = -1;
+    for (const winner of winners) {
+      const score = predictionScoreOf(winner);
+      const share = Math.floor((score / totalWinnerScore) * pool.spectatorRewardPool);
+      prizeShareByPrediction.set(winner._id.toString(), share);
+      distributed += share;
+      if (score > topScore) {
+        topScore = score;
+        topWinnerId = winner._id.toString();
+      }
+    }
+    const remainder = pool.spectatorRewardPool - distributed;
+    if (remainder > 0 && topWinnerId) {
+      prizeShareByPrediction.set(topWinnerId, (prizeShareByPrediction.get(topWinnerId) ?? 0) + remainder);
+    }
+  }
+
   for (const prediction of predictions) {
     const isWinner = winners.some((winner) => winner._id.equals(prediction._id));
-    const prizeShare =
-      isWinner && totalWinningContribution > 0
-        ? Math.floor((prediction.contribution / totalWinningContribution) * pool.spectatorRewardPool)
-        : 0;
+    const score = isWinner ? predictionScoreOf(prediction) : 0;
+    const prizeShare = prizeShareByPrediction.get(prediction._id.toString()) ?? 0;
     const refund = isWinner ? prediction.contribution : 0;
     const totalReturned = refund + prizeShare;
 
-    prediction.scoringWeight = isWinner ? 1 : 0;
+    prediction.scoringWeight = score; // DTO hiển thị là predictionScore
     prediction.pointsEarned = refund;
     prediction.bonusPoints = 0;
     prediction.poolShare = prizeShare;
