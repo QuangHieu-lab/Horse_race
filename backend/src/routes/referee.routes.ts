@@ -16,4 +16,4 @@ refereeRouter.post('/races/:id/penalize', refereeController.penalize);
 refereeRouter.post('/races/:id/result', refereeController.upsertResult);
 refereeRouter.post('/races/:id/penalties/time', refereeController.applyTimePenalty); // <-- Thêm API phạt thời gian vào đây
 refereeRouter.patch('/races/:id/result/confirm', refereeController.confirmResult);
-refereeRouter.delete('/races/:id/penalties/:violationId', refereeController.revokePenalty);
+
