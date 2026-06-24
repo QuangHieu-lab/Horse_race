@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import * as refereeService from '../services/referee.service.js';
-import type {ApplyTimePenaltyInput} from '../services/referee.service.js'
+import type { ApplyTimePenaltyInput } from '../services/referee.service.js';
 import * as resultService from '../services/result.service.js';
 import { HttpError } from '../utils/http-error.js';
-import { simulateRace } from '../services/race.service.js';
+
 export class RefereeController {
   getDashboard = asyncHandler(async (req: Request, res: Response) => {
     const dashboard = await refereeService.getRefereeDashboard(req.user!.id);
@@ -41,6 +41,30 @@ export class RefereeController {
     res.json({ ok: true });
   });
 
+  // 🚀 Đã được chuyển từ Admin sang Trọng tài
+  addParticipant = asyncHandler(async (req: Request, res: Response) => {
+    const input = req.body as refereeService.AddParticipantInput;
+
+    // 1. Chỉ bắt buộc 3 thông tin định danh
+    if (!input.horseId || !input.jockeyId || !input.ownerId) {
+      throw new HttpError(400, 'Thiếu thông tin bắt buộc (horseId, jockeyId, ownerId)');
+    }
+
+    // 2. Làn chạy và áo số là optional, nhưng nếu có truyền thì phải > 0
+    if (input.laneNumber !== undefined && input.laneNumber <= 0) {
+      throw new HttpError(400, 'Làn chạy phải lớn hơn 0');
+    }
+    if (input.clothNumber !== undefined && input.clothNumber <= 0) {
+      throw new HttpError(400, 'Số áo phải lớn hơn 0');
+    }
+
+    // 3. Gọi Service (ép kiểu ID theo đúng chuẩn bạn đang dùng)
+    const race = await refereeService.addParticipantToRace(req.params.id as string, input);
+
+    // 4. Trả về đúng format giống hệt RaceController cũ
+    res.json({ race });
+  });
+
   upsertResult = asyncHandler(async (req: Request, res: Response) => {
     const rankings =
       (req.body as { rankings?: unknown }).rankings ??
@@ -60,8 +84,8 @@ export class RefereeController {
     const result = await resultService.getResultByRaceId(req.params.id as string);
     res.json({ result });
   });
-penalize = asyncHandler(async (req: Request, res: Response) => {
-    // 🚀 Bổ sung thêm 'target' vào body
+
+  penalize = asyncHandler(async (req: Request, res: Response) => {
     const { ruleId, horseId, jockeyId, target, notes } = req.body as {
       ruleId?: string;
       horseId?: string;
@@ -79,7 +103,7 @@ penalize = asyncHandler(async (req: Request, res: Response) => {
     await refereeService.applyRacePenalty(
       req.user!.id,
       req.params.id as string,
-      { ruleId, horseId, jockeyId, target, notes } // Truyền target xuống Service
+      { ruleId, horseId, jockeyId, target, notes } 
     );
 
     res.json({ 
@@ -105,11 +129,11 @@ penalize = asyncHandler(async (req: Request, res: Response) => {
       message: 'Đã hoàn tác án phạt và khôi phục trạng thái thành công.' 
     });
   });
+
   applyTimePenalty = asyncHandler(async (req: Request, res: Response) => {
     const raceId = req.params.id;
     const input = req.body as ApplyTimePenaltyInput;
 
-    // 1. Kiểm tra đầu vào (Validation)
     if (!input.horseId || !input.jockeyId || typeof input.addedTimeSeconds !== 'number' || !input.type || !input.description) {
       throw new HttpError(400, 'Thiếu thông tin bắt buộc để phạt thời gian (horseId, jockeyId, addedTimeSeconds, type, description)');
     }
@@ -118,10 +142,8 @@ penalize = asyncHandler(async (req: Request, res: Response) => {
       throw new HttpError(400, 'Thời gian phạt cộng thêm phải lớn hơn 0');
     }
 
-    // 2. Gọi xuống Service để xử lý nghiệp vụ
     const updatedResult = await refereeService.applyViolationAndTimePenalty(raceId as string, input);
 
-    // 3. Trả về kết quả cho Frontend render lại bảng xếp hạng
     res.status(200).json({
       success: true,
       message: `Đã áp dụng hình phạt cộng ${input.addedTimeSeconds} giây và cập nhật bảng xếp hạng.`,
@@ -132,10 +154,9 @@ penalize = asyncHandler(async (req: Request, res: Response) => {
   startSimulation = asyncHandler(async (req: Request, res: Response) => {
     const raceId = req.params.id as string;
 
-    // Gọi hàm giả lập từ Service
-    const draftResult = await simulateRace(raceId);
+    // 🚀 Gọi hàm giả lập chuẩn từ refereeService thay vì raceService
+    const draftResult = await refereeService.simulateRace(raceId);
 
-    // Trả kết quả về cho Client
     res.status(200).json({
       success: true,
       message: 'Trận đua đã hoàn tất! Bản nháp xếp hạng đã sẵn sàng để kiểm tra VAR và bắt lỗi.',
@@ -143,4 +164,3 @@ penalize = asyncHandler(async (req: Request, res: Response) => {
     });
   });
 }
-

@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import {
-  addParticipantToRace,
   createRace,
   getRaceById,
   getRacesByTournament,
@@ -25,10 +24,6 @@ export class RaceController {
     res.json({ race });
   });
 
-  addParticipant = asyncHandler(async (req: Request, res: Response) => {
-    const race = await addParticipantToRace(String(req.params.id), req.body);
-    res.json({ race });
-  });
 
   updateStatus = asyncHandler(async (req: Request, res: Response) => {
     const race = await updateRaceStatus(String(req.params.id), req.body.status);
