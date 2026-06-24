@@ -202,7 +202,7 @@ const swaggerDefinition = {
             items: { type: 'integer', minimum: 1 },
             example: [1, 2, 3, 6],
             description:
-              'Suggested quick-pick multipliers for frontend buttons. Users can still enter any whole number within min/max.',
+              'Allowed risk multipliers for bounty-pool predictions. The backend rejects riskMultiplier values outside this list.',
           },
           organizerFeeRate: { type: 'number', example: 10 },
           racingRewardRate: { type: 'number', example: 15 },
@@ -680,6 +680,33 @@ const swaggerDefinition = {
         tags: ['Horse Owner'],
         summary: 'Create a horse',
         security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'breed', 'age'],
+                properties: {
+                  name: { type: 'string', example: 'Thunder Echo' },
+                  registrationId: { type: 'string', example: 'VN-HRS-2026-001' },
+                  breed: { type: 'string', example: 'Thoroughbred' },
+                  age: { type: 'integer', minimum: 1, maximum: 30, example: 4 },
+                  weight: { type: 'number', minimum: 350, maximum: 600, example: 460 },
+                  color: { type: 'string', example: 'Bay' },
+                  trainerName: { type: 'string', example: 'Nguyen Van A' },
+                  profilePdfUrl: {
+                    type: 'string',
+                    format: 'uri',
+                    example: 'https://example.com/horses/thunder-echo-profile.pdf',
+                    description: 'Optional PDF URL for pedigree, health certificate, or profile document.',
+                  },
+                  profilePdfName: { type: 'string', example: 'Health certificate' },
+                },
+              },
+            },
+          },
+        },
         responses: { 201: { description: 'Created horse' } },
       },
     },
@@ -689,6 +716,31 @@ const swaggerDefinition = {
         summary: 'Update horse information',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  registrationId: { type: 'string' },
+                  breed: { type: 'string' },
+                  age: { type: 'integer', minimum: 1, maximum: 30 },
+                  weight: { type: 'number', minimum: 350, maximum: 600 },
+                  color: { type: 'string' },
+                  trainerName: { type: 'string' },
+                  profilePdfUrl: {
+                    type: 'string',
+                    format: 'uri',
+                    description: 'Optional PDF URL for horse documents. Must point to a .pdf file.',
+                  },
+                  profilePdfName: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
         responses: { 200: { description: 'Updated horse' } },
       },
       delete: {
