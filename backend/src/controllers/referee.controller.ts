@@ -1,9 +1,10 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import * as refereeService from '../services/referee.service.js';
+import type {ApplyTimePenaltyInput} from '../services/referee.service.js'
 import * as resultService from '../services/result.service.js';
 import { HttpError } from '../utils/http-error.js';
-
+import { simulateRace } from '../services/race.service.js';
 export class RefereeController {
   getDashboard = asyncHandler(async (req: Request, res: Response) => {
     const dashboard = await refereeService.getRefereeDashboard(req.user!.id);
@@ -104,4 +105,42 @@ penalize = asyncHandler(async (req: Request, res: Response) => {
       message: 'Đã hoàn tác án phạt và khôi phục trạng thái thành công.' 
     });
   });
+  applyTimePenalty = asyncHandler(async (req: Request, res: Response) => {
+    const raceId = req.params.id;
+    const input = req.body as ApplyTimePenaltyInput;
+
+    // 1. Kiểm tra đầu vào (Validation)
+    if (!input.horseId || !input.jockeyId || typeof input.addedTimeSeconds !== 'number' || !input.type || !input.description) {
+      throw new HttpError(400, 'Thiếu thông tin bắt buộc để phạt thời gian (horseId, jockeyId, addedTimeSeconds, type, description)');
+    }
+
+    if (input.addedTimeSeconds <= 0) {
+      throw new HttpError(400, 'Thời gian phạt cộng thêm phải lớn hơn 0');
+    }
+
+    // 2. Gọi xuống Service để xử lý nghiệp vụ
+    const updatedResult = await refereeService.applyViolationAndTimePenalty(raceId as string, input);
+
+    // 3. Trả về kết quả cho Frontend render lại bảng xếp hạng
+    res.status(200).json({
+      success: true,
+      message: `Đã áp dụng hình phạt cộng ${input.addedTimeSeconds} giây và cập nhật bảng xếp hạng.`,
+      data: updatedResult
+    });
+  });
+
+  startSimulation = asyncHandler(async (req: Request, res: Response) => {
+    const raceId = req.params.id as string;
+
+    // Gọi hàm giả lập từ Service
+    const draftResult = await simulateRace(raceId);
+
+    // Trả kết quả về cho Client
+    res.status(200).json({
+      success: true,
+      message: 'Trận đua đã hoàn tất! Bản nháp xếp hạng đã sẵn sàng để kiểm tra VAR và bắt lỗi.',
+      data: draftResult
+    });
+  });
 }
+
