@@ -7,6 +7,7 @@ import { Tournament } from '../models/Tournament.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceStatus } from '../types/shared.types.js';
+import { Result } from '../models/Result.model.js';
 import { activeParticipants, nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
 import {
   normalizeViewingTicket,
@@ -232,4 +233,68 @@ export async function deleteRace(raceId: string) {
 
   await Race.findByIdAndDelete(raceId);
   return true;
+}
+export async function simulateRace(raceId: string) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  const race = await Race.findById(raceId);
+  if (!race) {
+    throw new HttpError(404, 'Không tìm thấy trận đua để giả lập');
+  }
+
+  // Chặn nếu trận đua đã kết thúc hoặc bị hủy
+  if (race.status === 'completed' || race.status === 'cancelled') {
+    throw new HttpError(409, 'Không thể giả lập trận đua đã kết thúc hoặc bị hủy');
+  }
+
+  // Tận dụng hàm activeParticipants của bạn để lấy đúng thí sinh hợp lệ
+  const activeList = activeParticipants(race.participants);
+  if (activeList.length < 2) {
+    throw new HttpError(409, 'Cần ít nhất 2 thí sinh đang hoạt động để chạy giả lập');
+  }
+
+  // THUẬT TOÁN GIẢ LẬP
+  // Tạo thời gian chạy ngẫu nhiên từ 90s đến 120s
+  const simulatedData = activeList.map(participant => {
+    const randomFinishTime = 90 + (Math.random() * 30);
+    return {
+      horseId: participant.horseId,
+      jockeyId: participant.jockeyId,
+      finishTime: parseFloat(randomFinishTime.toFixed(3)), // Làm tròn 3 chữ số
+    };
+  });
+
+  // Sắp xếp thời gian chạy từ nhanh nhất đến chậm nhất
+  simulatedData.sort((a, b) => a.finishTime - b.finishTime);
+
+  // Tạo mảng xếp hạng (rankings)
+  const rankings = simulatedData.map((data, index) => ({
+    horseId: data.horseId,
+    jockeyId: data.jockeyId,
+    rank: index + 1,
+    finishTime: data.finishTime
+  }));
+
+  // Lưu bản nháp vào RaceResult (isConfirmed = false)
+  const resultDraft = await Result.findOneAndUpdate(
+    { raceId: new mongoose.Types.ObjectId(raceId) },
+    {
+      rankings,
+      isConfirmed: false,
+      isPhotoFinish: false
+    },
+    { upsert: true, new: true } // upsert: Chưa có thì tạo, có rồi thì ghi đè
+  );
+
+  // Cập nhật trạng thái trận đua thành 'completed' để chờ Trọng tài duyệt
+  race.status = 'completed';
+  try {
+    await race.save();
+  } catch (err) {
+    throw mapRaceSaveError(err);
+  }
+
+  return resultDraft;
 }
