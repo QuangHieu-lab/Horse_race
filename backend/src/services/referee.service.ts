@@ -1,8 +1,11 @@
 import mongoose from 'mongoose';
-import { Race } from '../models/Race.model.js';
+import { Race, type IParticipant } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
+import { User } from '../models/User.model.js';
+import { Horse } from '../models/Horse.model.js';
 import { HttpError } from '../utils/http-error.js';
-import { activeParticipants } from '../utils/race-participants.js';
+import { ViolationRule } from '../models/ViolationRule.model.js';
+import { activeParticipants, nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
 
 export interface RefereeRaceDto {
   id: string;
@@ -27,6 +30,24 @@ export interface RefereeCheckDto {
   laneNumber: number;
   vetApproved: boolean;
   confirmed: boolean;
+}
+
+export interface ApplyTimePenaltyInput {
+  horseId: string;
+  jockeyId: string;
+  addedTimeSeconds: number;
+  ruleId?: string;
+  type: string;
+  description: string;
+}
+
+// 🚀 Chuyển từ bên kia sang
+export interface AddParticipantInput {
+  horseId: string;
+  jockeyId: string;
+  ownerId: string;
+  laneNumber?: number;
+  clothNumber?: number;
 }
 
 export async function getRefereeDashboard(refereeId: string) {
@@ -125,6 +146,122 @@ export async function toggleParticipantCheck(
   await race.save();
 }
 
+// 🚀 Chuyển từ race.service sang
+export async function addParticipantToRace(raceId: string, payload: AddParticipantInput) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  const objectIds = [payload.horseId, payload.jockeyId, payload.ownerId];
+  if (!objectIds.every((id) => mongoose.isValidObjectId(id))) {
+    throw new HttpError(400, 'horseId/jockeyId/ownerId không hợp lệ');
+  }
+
+  const [horse, jockey, owner, race] = await Promise.all([
+    Horse.findById(payload.horseId).lean(),
+    User.findById(payload.jockeyId).select('role isActive').lean(),
+    User.findById(payload.ownerId).select('role isActive').lean(),
+    Race.findById(raceId),
+  ]);
+
+  if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
+  if (!horse) throw new HttpError(404, 'Không tìm thấy ngựa');
+  if (horse.healthStatus !== 'fit') throw new HttpError(409, 'Ngựa không đủ điều kiện thi đấu');
+  if (!jockey?.isActive || jockey.role !== 'jockey') {
+    throw new HttpError(400, 'jockeyId phải là tài khoản jockey đang hoạt động');
+  }
+  if (!owner?.isActive || owner.role !== 'horse_owner') {
+    throw new HttpError(400, 'ownerId phải là tài khoản horse_owner đang hoạt động');
+  }
+
+  if (race.status === 'cancelled' || race.status === 'completed') {
+    throw new HttpError(409, 'Không thể thêm participant vào trận đua đã kết thúc hoặc hủy');
+  }
+
+  const laneNumber = payload.laneNumber ?? nextLaneNumber(race.participants);
+  const clothNumber = payload.clothNumber ?? laneNumber;
+
+  const participant: IParticipant = {
+    horseId: new mongoose.Types.ObjectId(payload.horseId),
+    jockeyId: new mongoose.Types.ObjectId(payload.jockeyId),
+    ownerId: new mongoose.Types.ObjectId(payload.ownerId),
+    laneNumber,
+    clothNumber,
+    confirmedAt: null,
+    vetApprovedAt: null,
+    scratchedAt: null,
+  };
+
+  const nextParticipants = [...race.participants, participant];
+  const participantErr = validateParticipants(nextParticipants, race.maxParticipants);
+  if (participantErr) {
+    throw new HttpError(409, participantErr);
+  }
+
+  race.participants = nextParticipants;
+  await race.save();
+
+  return race.toObject();
+}
+
+// 🚀 Chuyển từ race.service sang
+export async function simulateRace(raceId: string) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  const race = await Race.findById(raceId);
+  if (!race) {
+    throw new HttpError(404, 'Không tìm thấy trận đua để giả lập');
+  }
+
+  if (race.status === 'completed' || race.status === 'cancelled') {
+    throw new HttpError(409, 'Không thể giả lập trận đua đã kết thúc hoặc bị hủy');
+  }
+
+  const activeList = activeParticipants(race.participants);
+  if (activeList.length < 2) {
+    throw new HttpError(409, 'Cần ít nhất 2 thí sinh đang hoạt động để chạy giả lập');
+  }
+
+  const simulatedData = activeList.map(participant => {
+    const randomFinishTime = 90 + (Math.random() * 30);
+    return {
+      horseId: participant.horseId,
+      jockeyId: participant.jockeyId,
+      finishTime: parseFloat(randomFinishTime.toFixed(3)), 
+    };
+  });
+
+  simulatedData.sort((a, b) => a.finishTime - b.finishTime);
+
+  const rankings = simulatedData.map((data, index) => ({
+    horseId: data.horseId,
+    jockeyId: data.jockeyId,
+    rank: index + 1,
+    finishTime: data.finishTime
+  }));
+
+  const resultDraft = await Result.findOneAndUpdate(
+    { raceId: new mongoose.Types.ObjectId(raceId) },
+    {
+      rankings,
+      isConfirmed: false,
+      isPhotoFinish: false
+    },
+    { upsert: true, new: true } 
+  );
+
+  race.status = 'completed';
+  try {
+    await race.save();
+  } catch (err) {
+    throw new HttpError(500, err instanceof Error ? err.message : 'Lỗi khi lưu trận đua');
+  }
+
+  return resultDraft;
+}
+
 export async function buildResultFromRace(raceId: string, refereeId: string) {
   const race = await Race.findById(raceId).lean();
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
@@ -141,4 +278,210 @@ export async function buildResultFromRace(raceId: string, refereeId: string) {
     finishTime: 120 + idx * 2,
     prize: 1000 - idx * 100,
   }));
+}
+
+export async function applyRacePenalty(
+  refereeId: string,
+  raceId: string,
+  payload: { ruleId: string; target: 'horse' | 'jockey' | 'both'; horseId?: string; jockeyId?: string; notes?: string; }
+): Promise<void> {
+  const race = await Race.findById(raceId);
+  if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
+  if (race.refereeId?.toString() !== refereeId) throw new HttpError(403, 'Không có quyền truy cập');
+  if (race.status !== 'ongoing') throw new HttpError(400, 'Chỉ áp dụng khi trận đua đang diễn ra');
+
+  const rule = await ViolationRule.findById(payload.ruleId);
+  if (!rule || !rule.isActive) throw new HttpError(404, 'Luật vi phạm không hợp lệ');
+
+  const participant = race.participants.find((p) => 
+    (payload.horseId && p.horseId.toString() === payload.horseId) || 
+    (payload.jockeyId && p.jockeyId.toString() === payload.jockeyId)
+  );
+  if (!participant) throw new HttpError(404, 'Không tìm thấy đối tượng trong trận');
+
+  const isDQ = ['disqualify', 'disqualification'].includes(rule.penaltyApplied);
+  if (isDQ) {
+    (participant as any).isDisqualified = true;
+    const faultOf = payload.target === 'horse' ? 'Ngựa' : payload.target === 'jockey' ? 'Kỵ sĩ' : 'Cả hai';
+    (participant as any).disqualifiedReason = `${rule.name} (Lỗi từ: ${faultOf})`;
+    (participant as any).disqualifiedAt = new Date();
+    participant.scratchedAt = new Date();
+    await race.save();
+  }
+
+  let resultDoc = await Result.findOne({ raceId: race._id });
+  if (!resultDoc) {
+    resultDoc = new Result({ raceId: race._id, tournamentId: race.tournamentId, rankings: [], violations: [], protests: [] });
+  }
+
+  let bannedUntil: Date | null = null;
+  if (rule.penaltyApplied === 'time_ban' && rule.banDurationDays > 0) {
+    bannedUntil = new Date();
+    bannedUntil.setDate(bannedUntil.getDate() + rule.banDurationDays);
+  }
+
+  resultDoc.violations.push({
+    ruleId: rule._id,
+    target: payload.target, 
+    horseId: participant.horseId, 
+    jockeyId: participant.jockeyId,
+    type: rule.category,
+    description: payload.notes ? `${rule.name} - Ghi chú: ${payload.notes}` : rule.description,
+    penaltyApplied: rule.penaltyApplied,
+    bannedUntil,
+    recordedAt: new Date(),
+  });
+
+  const savedResult = await resultDoc.save();
+
+  const isBannedPenalty = ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
+  
+  if (isBannedPenalty) {
+    const latestViolationId = savedResult.violations[savedResult.violations.length - 1]?._id;
+    const banReason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.name;
+
+    if (['horse', 'both'].includes(payload.target) && participant.horseId) {
+      await Horse.findByIdAndUpdate(participant.horseId, {
+        $set: {
+          penaltyStatus: {
+            isBanned: true,
+            bannedUntil: bannedUntil, 
+            currentViolationId: latestViolationId,
+            reason: banReason
+          }
+        }
+      });
+    }
+
+    if (['jockey', 'both'].includes(payload.target) && participant.jockeyId) {
+      await User.findByIdAndUpdate(participant.jockeyId, {
+        $set: {
+          'jockeyProfile.penaltyStatus': {
+            isBanned: true,
+            bannedUntil: bannedUntil,
+            currentViolationId: latestViolationId,
+            reason: banReason
+          }
+        }
+      });
+    }
+  }
+}
+
+export async function revokeRacePenalty(
+  refereeId: string,
+  raceId: string,
+  violationId: string
+): Promise<void> {
+  const race = await Race.findById(raceId);
+  if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
+  if (race.refereeId?.toString() !== refereeId) {
+    throw new HttpError(403, 'Bạn không phải trọng tài phụ trách trận đua này');
+  }
+  if (race.status === 'completed') {
+    throw new HttpError(400, 'Không thể hoàn tác án phạt khi trận đua đã kết thúc');
+  }
+
+  const resultDoc = await Result.findOne({ raceId: race._id });
+  if (!resultDoc) throw new HttpError(404, 'Chưa có biên bản kết quả nào được ghi nhận');
+
+  const violationIndex = resultDoc.violations.findIndex(v => v._id?.toString() === violationId);
+  if (violationIndex === -1) throw new HttpError(404, 'Không tìm thấy biên bản vi phạm này');
+
+  const violation = resultDoc.violations[violationIndex]!;
+
+  const isDQ = ['disqualify', 'disqualification'].includes(violation.penaltyApplied || '');
+  if (isDQ) {
+    const participant = race.participants.find(p => 
+      (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
+      (violation.jockeyId && p.jockeyId.toString() === violation.jockeyId.toString())
+    );
+
+    if (participant) {
+      participant.isDisqualified = false;
+      participant.disqualifiedReason = undefined;
+      participant.disqualifiedAt = null;
+      participant.scratchedAt = null; 
+      await race.save();
+    }
+  }
+
+  const isBannedPenalty = ['time_ban', 'permanent_ban'].includes(violation.penaltyApplied || '');
+  if (isBannedPenalty) {
+    const resetStatus = {
+      isBanned: false,
+      bannedUntil: null,
+      currentViolationId: null,
+      reason: null
+    };
+
+    if (['horse', 'both'].includes(violation.target) && violation.horseId) {
+      await Horse.findByIdAndUpdate(violation.horseId, {
+        $set: { penaltyStatus: resetStatus }
+      });
+    }
+
+    if (['jockey', 'both'].includes(violation.target) && violation.jockeyId) {
+      await User.findByIdAndUpdate(violation.jockeyId, {
+        $set: { 'jockeyProfile.penaltyStatus': resetStatus }
+      });
+    }
+  }
+
+  resultDoc.violations.splice(violationIndex, 1);
+  await resultDoc.save();
+}
+
+export async function applyViolationAndTimePenalty(raceId: string, input: ApplyTimePenaltyInput) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  const result = await Result.findOne({ raceId: new mongoose.Types.ObjectId(raceId) });
+  
+  if (!result) {
+    throw new HttpError(404, 'Không tìm thấy kết quả của trận đua này');
+  }
+  if (result.confirmedAt) {
+    throw new HttpError(400, 'Không thể sửa đổi vì kết quả trận đấu đã được xác nhận');
+  }
+
+  result.violations.push({
+    ruleId: input.ruleId ? new mongoose.Types.ObjectId(input.ruleId) : null,
+    horseId: new mongoose.Types.ObjectId(input.horseId),
+    jockeyId: new mongoose.Types.ObjectId(input.jockeyId),
+    target: 'horse',
+    type: input.type,
+    description: `[Phạt cộng ${input.addedTimeSeconds}s] ${input.description}`,
+    recordedAt: new Date()
+  } as any);
+
+  const targetRanking = result.rankings.find(r => r.horseId.toString() === input.horseId);
+  if (!targetRanking || targetRanking.finishTime === undefined) {
+    throw new HttpError(400, 'Ngựa này không có thời gian hoàn thành hợp lệ trong kết quả');
+  }
+  
+  targetRanking.finishTime += input.addedTimeSeconds;
+  targetRanking.finishTime = parseFloat(targetRanking.finishTime.toFixed(3)); 
+
+  result.rankings.sort((a, b) => (a.finishTime || 0) - (b.finishTime || 0));
+
+  result.rankings.forEach((ranking, index) => {
+    ranking.rank = index + 1;
+    
+    if (index === 0) {
+      ranking.marginBehind = 0;
+      ranking.isDeadHeat = false;
+    } else {
+      const prevTime = result.rankings[index - 1]?.finishTime ?? 0;
+      const currentTime = ranking.finishTime ?? 0;
+      
+      ranking.marginBehind = parseFloat((currentTime - prevTime).toFixed(3));
+      ranking.isDeadHeat = ranking.marginBehind === 0; 
+    }
+  });
+
+  await result.save();
+  
+  return result;
 }

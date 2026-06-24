@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
-import { createPrediction } from '../services/prediction.service.js';
+import { cancelPrediction, createPrediction } from '../services/prediction.service.js';
+import * as paymentService from '../services/payment.service.js';
 import * as spectatorService from '../services/spectator.service.js';
 import * as viewingTicketService from '../services/viewing-ticket.service.js';
 import { listNotificationsForUser } from '../services/notification.service.js';
@@ -49,9 +50,28 @@ export class SpectatorController {
     res.status(201).json({ prediction });
   });
 
+  cancelPrediction = asyncHandler(async (req: Request, res: Response) => {
+    const result = await cancelPrediction(req.user!.id, req.params.id as string);
+    res.json(result);
+  });
+
   getPoints = asyncHandler(async (req: Request, res: Response) => {
     const points = await spectatorService.getOrCreateProfile(req.user!.id);
     res.json({ points });
+  });
+
+  createTopUp = asyncHandler(async (req: Request, res: Response) => {
+    const { points } = req.body as { points?: number };
+    if (points === undefined) {
+      throw new HttpError(400, 'points là bắt buộc');
+    }
+    const result = await paymentService.createMockTopUp(req.user!.id, points);
+    res.status(201).json(result);
+  });
+
+  listTopUps = asyncHandler(async (req: Request, res: Response) => {
+    const payments = await paymentService.listTopUps(req.user!.id);
+    res.json({ payments });
   });
 
   listProducts = asyncHandler(async (_req: Request, res: Response) => {

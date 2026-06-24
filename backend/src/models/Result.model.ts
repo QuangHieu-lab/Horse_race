@@ -19,10 +19,15 @@ export interface IRanking {
 }
 
 export interface IViolation {
-  horseId: mongoose.Types.ObjectId;
-  type: ViolationType;
+  _id?: mongoose.Types.ObjectId;
+  ruleId?: mongoose.Types.ObjectId; // Trỏ về bảng Master Data ViolationRule
+  horseId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt kỵ sĩ
+  jockeyId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt ngựa
+  target: 'horse' | 'jockey' | 'both';
+  type: string;
   description: string;
-  penaltyApplied?: PenaltyApplied;
+  penaltyApplied?: PenaltyApplied | null;
+  bannedUntil?: Date | null; // Lưu thời hạn cấm thi đấu
   recordedAt: Date;
 }
 
@@ -67,19 +72,18 @@ const RankingSchema = new Schema<IRanking>(
 
 const ViolationSchema = new Schema<IViolation>(
   {
-    horseId: { type: Schema.Types.ObjectId, ref: 'Horse', required: true },
-    type: {
-      type: String,
-      enum: ['false_start', 'obstruction', 'doping', 'other'],
-      required: true,
-    },
+    ruleId: { type: Schema.Types.ObjectId, ref: 'ViolationRule', default: null },
+    horseId: { type: Schema.Types.ObjectId, ref: 'Horse', default: null },
+    jockeyId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    type: { type: String, required: true },
     description: { type: String, required: true, trim: true },
     penaltyApplied: { type: String, enum: PENALTY_APPLIED, default: null },
+    bannedUntil: { type: Date, default: null },
     recordedAt: { type: Date, default: () => new Date() },
+    target: { type: String, enum: ['horse', 'jockey', 'both'], required: true },
   },
-  { _id: false },
+  { _id: true }, // Mở _id để dễ dàng khiếu nại (Protest) một lỗi cụ thể
 );
-
 const ProtestSchema = new Schema<IProtest>(
   {
     filedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -131,6 +135,18 @@ ResultSchema.set('toObject', { virtuals: true });
 ResultSchema.pre('save', async function (next) {
   const race = await Race.findById(this.raceId);
   if (!race) return next(new Error('Race not found for result'));
+  
+  for (const [i, v] of this.violations.entries()) {
+  if (!v.horseId && !v.jockeyId) {
+    return next(new Error(`Violation tại vị trí ${i + 1} phải chỉ định ngựa (horseId) hoặc kỵ sĩ (jockeyId) vi phạm.`));
+  }
+}
+
+  if (this.rankings.length > 0 && !['ongoing', 'completed'].includes(race.status)) {
+    return next(new Error('Rankings can only be set when race is ongoing or completed'));
+  }  
+
+
 
   if (this.rankings.length > 0 && !['ongoing', 'completed'].includes(race.status)) {
     return next(new Error('Rankings can only be set when race is ongoing or completed'));

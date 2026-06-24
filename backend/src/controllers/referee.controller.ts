@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import * as refereeService from '../services/referee.service.js';
+import type { ApplyTimePenaltyInput } from '../services/referee.service.js';
 import * as resultService from '../services/result.service.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -40,6 +41,30 @@ export class RefereeController {
     res.json({ ok: true });
   });
 
+  // 🚀 Đã được chuyển từ Admin sang Trọng tài
+  addParticipant = asyncHandler(async (req: Request, res: Response) => {
+    const input = req.body as refereeService.AddParticipantInput;
+
+    // 1. Chỉ bắt buộc 3 thông tin định danh
+    if (!input.horseId || !input.jockeyId || !input.ownerId) {
+      throw new HttpError(400, 'Thiếu thông tin bắt buộc (horseId, jockeyId, ownerId)');
+    }
+
+    // 2. Làn chạy và áo số là optional, nhưng nếu có truyền thì phải > 0
+    if (input.laneNumber !== undefined && input.laneNumber <= 0) {
+      throw new HttpError(400, 'Làn chạy phải lớn hơn 0');
+    }
+    if (input.clothNumber !== undefined && input.clothNumber <= 0) {
+      throw new HttpError(400, 'Số áo phải lớn hơn 0');
+    }
+
+    // 3. Gọi Service (ép kiểu ID theo đúng chuẩn bạn đang dùng)
+    const race = await refereeService.addParticipantToRace(req.params.id as string, input);
+
+    // 4. Trả về đúng format giống hệt RaceController cũ
+    res.json({ race });
+  });
+
   upsertResult = asyncHandler(async (req: Request, res: Response) => {
     const rankings =
       (req.body as { rankings?: unknown }).rankings ??
@@ -58,5 +83,84 @@ export class RefereeController {
   getResult = asyncHandler(async (req: Request, res: Response) => {
     const result = await resultService.getResultByRaceId(req.params.id as string);
     res.json({ result });
+  });
+
+  penalize = asyncHandler(async (req: Request, res: Response) => {
+    const { ruleId, horseId, jockeyId, target, notes } = req.body as {
+      ruleId?: string;
+      horseId?: string;
+      jockeyId?: string;
+      target?: 'horse' | 'jockey' | 'both';
+      notes?: string;
+    };
+
+    if (!ruleId) throw new HttpError(400, 'Vui lòng cung cấp mã luật vi phạm (ruleId)');
+    if (!horseId && !jockeyId) throw new HttpError(400, 'Phải chỉ định ít nhất Ngựa hoặc Kỵ sĩ');
+    if (!target || !['horse', 'jockey', 'both'].includes(target)) {
+      throw new HttpError(400, 'Vui lòng chỉ định đối tượng chịu án phạt (target: horse, jockey, both)');
+    }
+
+    await refereeService.applyRacePenalty(
+      req.user!.id,
+      req.params.id as string,
+      { ruleId, horseId, jockeyId, target, notes } 
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Đã áp dụng hình thức xử phạt và ghi nhận vào biên bản thành công.' 
+    });
+  });
+
+  revokePenalty = asyncHandler(async (req: Request, res: Response) => {
+    const { violationId } = req.params;
+    if (!violationId) {
+      throw new HttpError(400, 'Vui lòng cung cấp ID của biên bản vi phạm cần hủy');
+    }
+
+    await refereeService.revokeRacePenalty(
+      req.user!.id,
+      req.params.id as string,
+      violationId as string
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Đã hoàn tác án phạt và khôi phục trạng thái thành công.' 
+    });
+  });
+
+  applyTimePenalty = asyncHandler(async (req: Request, res: Response) => {
+    const raceId = req.params.id;
+    const input = req.body as ApplyTimePenaltyInput;
+
+    if (!input.horseId || !input.jockeyId || typeof input.addedTimeSeconds !== 'number' || !input.type || !input.description) {
+      throw new HttpError(400, 'Thiếu thông tin bắt buộc để phạt thời gian (horseId, jockeyId, addedTimeSeconds, type, description)');
+    }
+
+    if (input.addedTimeSeconds <= 0) {
+      throw new HttpError(400, 'Thời gian phạt cộng thêm phải lớn hơn 0');
+    }
+
+    const updatedResult = await refereeService.applyViolationAndTimePenalty(raceId as string, input);
+
+    res.status(200).json({
+      success: true,
+      message: `Đã áp dụng hình phạt cộng ${input.addedTimeSeconds} giây và cập nhật bảng xếp hạng.`,
+      data: updatedResult
+    });
+  });
+
+  startSimulation = asyncHandler(async (req: Request, res: Response) => {
+    const raceId = req.params.id as string;
+
+    // 🚀 Gọi hàm giả lập chuẩn từ refereeService thay vì raceService
+    const draftResult = await refereeService.simulateRace(raceId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Trận đua đã hoàn tất! Bản nháp xếp hạng đã sẵn sàng để kiểm tra VAR và bắt lỗi.',
+      data: draftResult
+    });
   });
 }

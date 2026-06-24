@@ -19,6 +19,8 @@ export interface CreateHorseInput {
   weight?: number;
   color?: string;
   trainerName?: string;
+  profilePdfUrl?: string;
+  profilePdfName?: string;
 }
 
 export interface RegisterRaceInput {
@@ -45,6 +47,9 @@ function toHorseDto(horse: any): HorseDto {
     age: horse.age,
     weight: horse.weight,
     color: horse.color,
+    trainerName: horse.trainerName,
+    profilePdfUrl: horse.profilePdfUrl,
+    profilePdfName: horse.profilePdfName,
     healthStatus: horse.healthStatus,
     currentJockey: horse.currentJockeyId ? {
       id: horse.currentJockeyId._id.toString(),

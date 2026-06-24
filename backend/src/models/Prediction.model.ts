@@ -54,7 +54,7 @@ const PredictionSchema = new Schema<IPrediction>(
     },
     status: {
       type: String,
-      enum: ['pending', 'partial', 'correct', 'incorrect'],
+      enum: ['pending', 'partial', 'correct', 'incorrect', 'cancelled'],
       default: 'pending',
     },
     riskMultiplier: { type: Number, default: 1, min: 1 },

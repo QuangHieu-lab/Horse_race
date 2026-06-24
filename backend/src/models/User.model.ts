@@ -8,6 +8,12 @@ export interface IJockeyProfile {
   licenseNumber?: string;
   licenseExpiry?: Date | null;
   isSuspended: boolean;
+  penaltyStatus: {
+    isBanned: boolean;
+    bannedUntil: Date | null;
+    currentViolationId: mongoose.Types.ObjectId | null;
+    reason: string | null;
+  };
 }
 
 export interface IRefereeProfile {
@@ -39,6 +45,12 @@ const JockeyProfileSchema = new Schema<IJockeyProfile>(
     licenseNumber: { type: String, trim: true },
     licenseExpiry: { type: Date, default: null },
     isSuspended: { type: Boolean, default: false },
+    penaltyStatus: {
+      isBanned: { type: Boolean, default: false },
+      bannedUntil: { type: Date, default: null },
+      currentViolationId: { type: Schema.Types.ObjectId, ref: 'Result', default: null },
+      reason: { type: String, default: null }
+    },
   },
   { _id: false },
 );

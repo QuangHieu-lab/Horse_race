@@ -49,7 +49,7 @@ const PredictionConfigSchema = new Schema<IPredictionConfig>(
     predictionCloseAt: { type: Date, default: null },
     maxPredictionsPerRace: { type: Number, default: 1, min: 1, max: 5 },
     poolEnabled: { type: Boolean, default: false },
-    entryFee: { type: Number, default: 0, min: 0 },
+    entryFee: { type: Number, default: 100, min: 100 },
     minRiskMultiplier: { type: Number, default: 1, min: 1 },
     maxRiskMultiplier: { type: Number, default: 10, min: 1 },
     quickRiskMultipliers: {
@@ -57,7 +57,10 @@ const PredictionConfigSchema = new Schema<IPredictionConfig>(
       default: () => [1, 2, 3, 6],
       validate: {
         validator(multipliers: number[]) {
-          return multipliers.every((multiplier) => Number.isInteger(multiplier) && multiplier >= 1);
+          return (
+            multipliers.length > 0 &&
+            multipliers.every((multiplier) => Number.isInteger(multiplier) && multiplier >= 1)
+          );
         },
         message: 'quickRiskMultipliers must contain positive integers',
       },
