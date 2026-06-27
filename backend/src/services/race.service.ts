@@ -1,11 +1,13 @@
 import mongoose from 'mongoose';
 import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
-import { Race, type IRace } from '../models/Race.model.js';
+import { Race, type IRace, type IParticipant } from '../models/Race.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { Tournament } from '../models/Tournament.model.js';
+import { Horse } from '../models/Horse.model.js';
+import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceStatus } from '../types/shared.types.js';
-import { activeParticipants } from '../utils/race-participants.js';
+import { activeParticipants, nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
 import {
   normalizeViewingTicket,
   type ViewingTicketInput,
@@ -29,6 +31,14 @@ export interface CreateRaceInput {
   refereeId?: string;
   streamUrl?: string;
   viewingTicket?: ViewingTicketInput;
+}
+
+export interface AddParticipantInput {
+  horseId: string;
+  jockeyId: string;
+  ownerId: string;
+  laneNumber?: number;
+  clothNumber?: number;
 }
 
 export async function createRace(input: CreateRaceInput) {
@@ -87,6 +97,63 @@ export async function getRaceById(id: string) {
   }
 
   return race;
+}
+
+export async function addParticipantToRace(raceId: string, payload: AddParticipantInput) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+
+  const objectIds = [payload.horseId, payload.jockeyId, payload.ownerId];
+  if (!objectIds.every((id) => mongoose.isValidObjectId(id))) {
+    throw new HttpError(400, 'horseId/jockeyId/ownerId không hợp lệ');
+  }
+
+  const [horse, jockey, owner, race] = await Promise.all([
+    Horse.findById(payload.horseId).lean(),
+    User.findById(payload.jockeyId).select('role isActive').lean(),
+    User.findById(payload.ownerId).select('role isActive').lean(),
+    Race.findById(raceId),
+  ]);
+
+  if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
+  if (!horse) throw new HttpError(404, 'Không tìm thấy ngựa');
+  if (horse.healthStatus !== 'fit') throw new HttpError(409, 'Ngựa không đủ điều kiện thi đấu');
+  if (!jockey?.isActive || jockey.role !== 'jockey') {
+    throw new HttpError(400, 'jockeyId phải là tài khoản jockey đang hoạt động');
+  }
+  if (!owner?.isActive || owner.role !== 'horse_owner') {
+    throw new HttpError(400, 'ownerId phải là tài khoản horse_owner đang hoạt động');
+  }
+
+  if (race.status === 'cancelled' || race.status === 'completed') {
+    throw new HttpError(409, 'Không thể thêm participant vào trận đua đã kết thúc hoặc hủy');
+  }
+
+  const laneNumber = payload.laneNumber ?? nextLaneNumber(race.participants);
+  const clothNumber = payload.clothNumber ?? laneNumber;
+
+  const participant: IParticipant = {
+    horseId: new mongoose.Types.ObjectId(payload.horseId),
+    jockeyId: new mongoose.Types.ObjectId(payload.jockeyId),
+    ownerId: new mongoose.Types.ObjectId(payload.ownerId),
+    laneNumber,
+    clothNumber,
+    confirmedAt: null,
+    vetApprovedAt: null,
+    scratchedAt: null,
+  };
+
+  const nextParticipants = [...race.participants, participant];
+  const participantErr = validateParticipants(nextParticipants, race.maxParticipants);
+  if (participantErr) {
+    throw new HttpError(409, participantErr);
+  }
+
+  race.participants = nextParticipants;
+  await race.save();
+
+  return race.toObject();
 }
 
 function mapRaceSaveError(err: unknown): HttpError {
