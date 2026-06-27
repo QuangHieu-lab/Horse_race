@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import { UPLOAD_ROOT } from './middleware/upload.middleware.js';
 import { buildCorsOptions } from './config/cors.js';
 import { setupSwagger } from './config/swagger.js';
 import { authenticate } from './middleware/auth.middleware.js';
@@ -28,6 +29,9 @@ export function createApp() {
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
   });
+
+  // File tĩnh đã tải lên (hồ sơ PDF của ngựa) — admin mở để xem & duyệt
+  app.use('/uploads', express.static(UPLOAD_ROOT));
 
   setupSwagger(app);
 

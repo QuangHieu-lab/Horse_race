@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
+import { runHorsePdfUpload } from '../middleware/upload.middleware.js';
 import { HorseOwnerService } from '../services/horse-owner.service.js';
 import { HttpError } from '../utils/http-error.js';
 import type {
@@ -31,6 +32,19 @@ export class HorseOwnerController {
       success: true,
       message: 'Đăng ký ngựa thành công!',
       data: newHorse
+    });
+  });
+
+  // Tải lên file PDF hồ sơ ngựa → trả về URL để gắn vào ngựa
+  uploadHorsePdf = asyncHandler(async (req: Request, res: Response) => {
+    await runHorsePdfUpload(req, res);
+    if (!req.file) throw new HttpError(400, 'Thiếu file PDF (field "file")');
+
+    const url = `${req.protocol}://${req.get('host')}/uploads/horses/${req.file.filename}`;
+    res.status(201).json({
+      success: true,
+      message: 'Tải lên hồ sơ PDF thành công!',
+      data: { url, name: req.file.originalname },
     });
   });
 

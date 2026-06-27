@@ -229,6 +229,8 @@ export interface RegistrationDto {
     healthStatus: HealthStatus;
     breed?: string;
     age?: number;
+    profilePdfUrl?: string;
+    profilePdfName?: string;
   };
   race: {
     id: string;

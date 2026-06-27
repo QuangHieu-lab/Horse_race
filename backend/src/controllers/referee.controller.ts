@@ -24,6 +24,24 @@ export class RefereeController {
     res.json({ checks });
   });
 
+  startRace = asyncHandler(async (req: Request, res: Response) => {
+    await refereeService.startRefereeRace(req.user!.id, req.params.id as string);
+    res.json({ ok: true });
+  });
+
+  listViolationRules = asyncHandler(async (_req: Request, res: Response) => {
+    const rules = await refereeService.listActiveViolationRules();
+    res.json({ rules });
+  });
+
+  listRaceViolations = asyncHandler(async (req: Request, res: Response) => {
+    const violations = await refereeService.listRaceViolations(
+      req.user!.id,
+      req.params.id as string,
+    );
+    res.json({ violations });
+  });
+
   toggleCheck = asyncHandler(async (req: Request, res: Response) => {
     const { horseId, field } = req.body as {
       horseId?: string;
@@ -39,30 +57,6 @@ export class RefereeController {
       field,
     );
     res.json({ ok: true });
-  });
-
-  // 🚀 Đã được chuyển từ Admin sang Trọng tài
-  addParticipant = asyncHandler(async (req: Request, res: Response) => {
-    const input = req.body as refereeService.AddParticipantInput;
-
-    // 1. Chỉ bắt buộc 3 thông tin định danh
-    if (!input.horseId || !input.jockeyId || !input.ownerId) {
-      throw new HttpError(400, 'Thiếu thông tin bắt buộc (horseId, jockeyId, ownerId)');
-    }
-
-    // 2. Làn chạy và áo số là optional, nhưng nếu có truyền thì phải > 0
-    if (input.laneNumber !== undefined && input.laneNumber <= 0) {
-      throw new HttpError(400, 'Làn chạy phải lớn hơn 0');
-    }
-    if (input.clothNumber !== undefined && input.clothNumber <= 0) {
-      throw new HttpError(400, 'Số áo phải lớn hơn 0');
-    }
-
-    // 3. Gọi Service (ép kiểu ID theo đúng chuẩn bạn đang dùng)
-    const race = await refereeService.addParticipantToRace(req.params.id as string, input);
-
-    // 4. Trả về đúng format giống hệt RaceController cũ
-    res.json({ race });
   });
 
   upsertResult = asyncHandler(async (req: Request, res: Response) => {

@@ -14,6 +14,8 @@ function toRegistrationDto(reg: {
     healthStatus: string;
     breed?: string;
     age?: number;
+    profilePdfUrl?: string;
+    profilePdfName?: string;
   };
   raceId: {
     _id: mongoose.Types.ObjectId;
@@ -39,6 +41,8 @@ function toRegistrationDto(reg: {
       healthStatus: reg.horseId.healthStatus as RegistrationDto['horse']['healthStatus'],
       breed: reg.horseId.breed,
       age: reg.horseId.age,
+      profilePdfUrl: reg.horseId.profilePdfUrl,
+      profilePdfName: reg.horseId.profilePdfName,
     },
     race: {
       id: reg.raceId._id.toString(),
@@ -71,7 +75,7 @@ export async function listRegistrations(
 
   const items = await RaceRegistration.find(filter)
     .populate('raceId', 'name round status scheduledAt')
-    .populate('horseId', 'name healthStatus breed age')
+    .populate('horseId', 'name healthStatus breed age profilePdfUrl profilePdfName')
     .populate('ownerId', 'fullName')
     .populate('jockeyId', 'fullName')
     .populate('processedBy', 'fullName')
@@ -120,7 +124,7 @@ export async function updateRegistrationStatus(
 
   const populated = await RaceRegistration.findById(reg._id)
     .populate('raceId', 'name round status scheduledAt')
-    .populate('horseId', 'name healthStatus breed age')
+    .populate('horseId', 'name healthStatus breed age profilePdfUrl profilePdfName')
     .populate('ownerId', 'fullName')
     .populate('jockeyId', 'fullName')
     .populate('processedBy', 'fullName')

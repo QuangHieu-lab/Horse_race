@@ -6,6 +6,7 @@ export const horseOwnerRouter = Router();
 const controller = new HorseOwnerController();
 
 // --- API Quản lý Ngựa ---
+horseOwnerRouter.post('/horses/upload-pdf', controller.uploadHorsePdf);
 horseOwnerRouter.post('/horses', controller.createHorse);
 horseOwnerRouter.get('/horses', controller.listMyHorses);
 horseOwnerRouter.patch('/horses/:id', controller.updateHorseInfo);

@@ -7,6 +7,8 @@ import {
   updateRaceStatus,
   deleteRace,
 } from '../services/race.service.js';
+import { addParticipant, listEligibleEntries } from '../services/race-participant.service.js';
+import { simulateAndPublishRace } from '../services/race-simulation.service.js';
 
 export class RaceController {
   create = asyncHandler(async (req: Request, res: Response) => {
@@ -24,6 +26,21 @@ export class RaceController {
     res.json({ race });
   });
 
+
+  eligibleEntries = asyncHandler(async (req: Request, res: Response) => {
+    const entries = await listEligibleEntries(String(req.params.id));
+    res.json({ entries });
+  });
+
+  addParticipant = asyncHandler(async (req: Request, res: Response) => {
+    const participants = await addParticipant(String(req.params.id), req.body);
+    res.status(201).json({ participants });
+  });
+
+  simulate = asyncHandler(async (req: Request, res: Response) => {
+    const timeline = await simulateAndPublishRace(String(req.params.id), req.user!.id);
+    res.json({ timeline });
+  });
 
   updateStatus = asyncHandler(async (req: Request, res: Response) => {
     const race = await updateRaceStatus(String(req.params.id), req.body.status);

@@ -10,7 +10,10 @@ raceRouter.get('/tournament/:tournamentId', raceController.getByTournament);
 
 raceRouter.get('/:id', raceController.getById);
 
+raceRouter.get('/:id/eligible-entries', raceController.eligibleEntries);
 raceRouter.post('/:id/participants', raceController.addParticipant);
+
+raceRouter.post('/:id/simulate', raceController.simulate);
 
 raceRouter.patch('/:id/status', raceController.updateStatus);
 
