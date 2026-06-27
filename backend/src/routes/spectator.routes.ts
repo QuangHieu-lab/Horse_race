@@ -26,6 +26,8 @@ spectatorRouter.get('/points', spectatorController.getPoints);
 
 spectatorRouter.post('/top-ups', spectatorController.createTopUp);
 
+spectatorRouter.post('/top-ups/payos', spectatorController.createPayosTopUp);
+
 spectatorRouter.get('/top-ups', spectatorController.listTopUps);
 
 spectatorRouter.get('/products', spectatorController.listProducts);
