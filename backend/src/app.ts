@@ -24,6 +24,7 @@ export function createApp() {
   app.use(cors(corsOptions));
   app.options(/.*/, cors(corsOptions));
   app.use(express.json());
+  app.use('/demo-files', express.static('public/demo-files'));
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });

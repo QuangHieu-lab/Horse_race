@@ -61,7 +61,27 @@ spectator2@demo.local
 - Spectator flow: tournaments, races, points wallet, top-up payments, prediction data, products, and a viewing pass.
 - Prediction settlement flow: a completed race with confirmed result waiting for admin publish, including one correct prediction and one incorrect prediction.
 - Referee flow: draft result race for testing time penalty, disqualification-style penalty through `penalize`, revoke penalty, and result confirmation.
-- Horse PDF data: sample `profilePdfUrl` and `profilePdfName` on demo horses.
+- Horse PDF data: demo horses point to a local copy of the NJ 4-H Horse Registration Form PDF.
+
+## Demo PDF
+
+The demo PDF is stored in the backend app folder:
+
+```text
+backend/public/demo-files/horses/horse-reg-form.pdf
+```
+
+Original source:
+
+```text
+https://nj4h.rutgers.edu/horses/horse-reg-form.pdf
+```
+
+When the backend server is running on port `3000`, the seeded horse profile PDF URL is:
+
+```text
+http://localhost:3000/demo-files/horses/horse-reg-form.pdf
+```
 
 ## Useful Notes
 
