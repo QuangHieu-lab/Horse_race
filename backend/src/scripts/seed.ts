@@ -227,8 +227,8 @@ async function seed(): Promise<void> {
       color: 'Chestnut',
       weight: 450,
       healthStatus: 'fit',
-      profilePdfUrl: 'https://example.com/demo/horses/song-gio-health.pdf',
-      profilePdfName: 'Health certificate',
+      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
+      profilePdfName: 'NJ 4-H Horse Registration Form',
     },
     {
       ownerId: owner._id,
@@ -240,8 +240,8 @@ async function seed(): Promise<void> {
       color: 'Bay',
       weight: 480,
       healthStatus: 'fit',
-      profilePdfUrl: 'https://example.com/demo/horses/bong-may-pedigree.pdf',
-      profilePdfName: 'Pedigree profile',
+      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
+      profilePdfName: 'NJ 4-H Horse Registration Form',
     },
     {
       ownerId: owner._id,
