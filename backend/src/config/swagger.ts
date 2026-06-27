@@ -1066,6 +1066,20 @@ const swaggerDefinition = {
         responses: { 200: { description: 'Updated check' } },
       },
     },
+    '/api/races/{id}/participants': {
+      post: {
+        tags: ['Races'],
+        summary: 'Add a participant to the race (Xếp làn chạy/Áo số)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/AddParticipantRequest' } } }
+        },
+        responses: { 201: { description: 'Added participant' } },
+      },
+    },
+    
     '/api/referee/races/{id}/result': {
       get: {
         tags: ['Referee'],
