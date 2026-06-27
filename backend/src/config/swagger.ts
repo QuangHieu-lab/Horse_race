@@ -231,7 +231,18 @@ const swaggerDefinition = {
             type: 'integer',
             minimum: 100,
             example: 100,
-            description: 'Minimum top-up is 100 points. Current mock exchange rate is 100 VND = 1 point.',
+            description: 'Minimum top-up is 100 points. Current exchange rate is 1000 VND = 1 point.',
+          },
+        },
+      },
+      PayosTopUpResponse: {
+        type: 'object',
+        properties: {
+          payment: { $ref: '#/components/schemas/PaymentTransactionDto' },
+          paymentUrl: {
+            type: 'string',
+            format: 'uri',
+            description: 'Redirect the spectator browser to this PayOS checkout URL.',
           },
         },
       },
@@ -239,10 +250,10 @@ const swaggerDefinition = {
         type: 'object',
         properties: {
           id: { type: 'string' },
-          provider: { type: 'string', example: 'mock' },
-          amountVnd: { type: 'number', example: 10000 },
+          provider: { type: 'string', example: 'payos' },
+          amountVnd: { type: 'number', example: 100000 },
           points: { type: 'integer', example: 100 },
-          exchangeRateVndPerPoint: { type: 'number', example: 100 },
+          exchangeRateVndPerPoint: { type: 'number', example: 1000 },
           status: { type: 'string', example: 'paid' },
           providerTransactionId: { type: 'string', nullable: true },
           paidAt: { type: 'string', format: 'date-time', nullable: true },
@@ -1369,7 +1380,7 @@ const swaggerDefinition = {
       post: {
         tags: ['Spectator'],
         summary: 'Mock top-up: convert money to points',
-        description: 'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 100 VND = 1 point; minimum top-up is 100 points.',
+        description: 'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 1000 VND = 1 point; minimum top-up is 100 points.',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1396,6 +1407,59 @@ const swaggerDefinition = {
           },
           400: { description: 'points is missing or below minimum' },
         },
+      },
+    },
+    '/api/spectator/top-ups/payos': {
+      post: {
+        tags: ['Spectator'],
+        summary: 'Create a PayOS top-up checkout URL',
+        description: 'Creates a pending PayOS payment transaction. Redirect the spectator to paymentUrl, then PayOS calls the public webhook/return/cancel endpoints.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/TopUpRequest' },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Created pending PayOS transaction and checkout URL',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PayosTopUpResponse' },
+              },
+            },
+          },
+          500: { description: 'PayOS credentials are not configured' },
+        },
+      },
+    },
+    '/api/payments/payos/return': {
+      get: {
+        tags: ['Spectator'],
+        summary: 'PayOS browser return callback',
+        description: 'Public callback used by PayOS after the customer completes payment. Confirms the order locally for demo and redirects to frontend when configured.',
+        parameters: [{ name: 'orderCode', in: 'query', schema: { type: 'string' } }],
+        responses: { 200: { description: 'Payment result JSON or frontend redirect if configured' } },
+      },
+    },
+    '/api/payments/payos/cancel': {
+      get: {
+        tags: ['Spectator'],
+        summary: 'PayOS browser cancel callback',
+        description: 'Public callback used by PayOS when the customer cancels payment.',
+        parameters: [{ name: 'orderCode', in: 'query', schema: { type: 'string' } }],
+        responses: { 200: { description: 'Payment cancellation JSON or frontend redirect if configured' } },
+      },
+    },
+    '/api/payments/payos/webhook': {
+      post: {
+        tags: ['Spectator'],
+        summary: 'PayOS webhook callback',
+        description: 'Public server-to-server callback used by PayOS. Verifies signature and idempotently confirms the top-up.',
+        responses: { 200: { description: 'PayOS code and desc' } },
       },
     },
     '/api/spectator/products': {

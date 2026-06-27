@@ -1,6 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 
-export type PaymentProvider = 'mock' | 'fdi';
+export type PaymentProvider = 'mock' | 'fdi' | 'payos';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled';
 
 export interface IPaymentTransaction {
@@ -21,7 +21,7 @@ export interface IPaymentTransaction {
 const PaymentTransactionSchema = new Schema<IPaymentTransaction>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    provider: { type: String, enum: ['mock', 'fdi'], default: 'mock', required: true },
+    provider: { type: String, enum: ['mock', 'fdi', 'payos'], default: 'mock', required: true },
     amountVnd: { type: Number, required: true, min: 0 },
     points: { type: Number, required: true, min: 1 },
     exchangeRateVndPerPoint: { type: Number, required: true, min: 1 },
@@ -46,4 +46,3 @@ export const PaymentTransaction = mongoose.model<IPaymentTransaction>(
   'PaymentTransaction',
   PaymentTransactionSchema,
 );
-

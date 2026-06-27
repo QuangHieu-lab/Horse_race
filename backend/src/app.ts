@@ -17,6 +17,7 @@ import { refereeRouter } from './routes/referee.routes.js';
 import { adminRaceMeetingRouter } from './routes/admin-racemeeting.routes.js';
 import { adminTrackRouter } from './routes/admin-track.routes.js';
 import { adminViolationRuleRouter } from './routes/admin-violation-rule.routes.js';
+import { paymentRouter } from './routes/payment.routes.js';
 export function createApp() {
   const app = express();
   const corsOptions = buildCorsOptions();
@@ -32,6 +33,7 @@ export function createApp() {
 
   setupSwagger(app);
 
+  app.use('/api/payments', paymentRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/jockey', authenticate, requireRole('jockey'), jockeyRouter);
   app.use('/api/spectator', authenticate, requireRole('spectator'), spectatorRouter);

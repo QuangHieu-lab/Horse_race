@@ -88,3 +88,24 @@ http://localhost:3000/demo-files/horses/horse-reg-form.pdf
 - The script prints ready-to-use IDs for referee penalty testing after it finishes.
 - Running the seed repeatedly is safe for demo use because it resets the configured demo collections each time.
 - Do not run this against production data.
+
+## Payment Notes
+
+The current exchange rate is:
+
+```text
+1000 VND = 1 point
+```
+
+Mock top-up works without external credentials. PayOS top-up requires these environment variables:
+
+```text
+ALLOW_MOCK_TOPUP=true
+PAYOS_CLIENT_ID=your-payos-client-id
+PAYOS_API_KEY=your-payos-api-key
+PAYOS_CHECKSUM_KEY=your-payos-checksum-key
+PAYOS_API_URL=https://api-merchant.payos.vn
+PAYOS_RETURN_URL=http://localhost:3000/api/payments/payos/return
+PAYOS_CANCEL_URL=http://localhost:3000/api/payments/payos/cancel
+PAYOS_FRONTEND_RETURN_URL=http://localhost:5173
+```

@@ -69,6 +69,15 @@ export class SpectatorController {
     res.status(201).json(result);
   });
 
+  createPayosTopUp = asyncHandler(async (req: Request, res: Response) => {
+    const { points } = req.body as { points?: number };
+    if (points === undefined) {
+      throw new HttpError(400, 'points là bắt buộc');
+    }
+    const result = await paymentService.createPayosTopUp(req.user!.id, points);
+    res.status(201).json(result);
+  });
+
   listTopUps = asyncHandler(async (req: Request, res: Response) => {
     const payments = await paymentService.listTopUps(req.user!.id);
     res.json({ payments });

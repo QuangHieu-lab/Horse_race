@@ -194,7 +194,7 @@ async function seed(): Promise<void> {
     {
       userId: spectator._id,
       provider: 'mock',
-      amountVnd: 25_000_000,
+      amountVnd: 250_000_000,
       points: 250_000,
       exchangeRateVndPerPoint: 100,
       status: 'paid',
@@ -205,7 +205,7 @@ async function seed(): Promise<void> {
     {
       userId: spectator2._id,
       provider: 'mock',
-      amountVnd: 15_000_000,
+      amountVnd: 150_000_000,
       points: 150_000,
       exchangeRateVndPerPoint: 100,
       status: 'paid',
