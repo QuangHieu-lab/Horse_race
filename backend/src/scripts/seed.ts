@@ -24,6 +24,8 @@ import {
   PredictionPool,
   Product,
   Notification,
+  PaymentTransaction,
+  RaceViewingPass,
   SpectatorProfile,
   ViolationRule, 
 } from '../models/index.js';
@@ -147,6 +149,13 @@ async function seed(): Promise<void> {
       fullName: 'Khách Xem Demo',
       phone: '0900000006',
     },
+    {
+      email: 'spectator2@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'spectator',
+      fullName: 'Khách Dự Đoán Phụ',
+      phone: '0900000008',
+    },
   ]);
   const admin = users[0]!;
   const owner = users[1]!;
@@ -155,6 +164,7 @@ async function seed(): Promise<void> {
   const jockey3 = users[4]!; 
   const referee = users[5]!;
   const spectator = users[6]!;
+  const spectator2 = users[7]!;
 
   console.log('Setting spectator points…');
   await SpectatorProfile.findOneAndUpdate(
@@ -168,6 +178,42 @@ async function seed(): Promise<void> {
     },
     { upsert: true },
   );
+  await SpectatorProfile.findOneAndUpdate(
+    { userId: spectator2._id },
+    {
+      $set: {
+        currentBalance: 120000,
+        totalPointsEarned: 150000,
+        totalPointsSpent: 30000,
+      },
+    },
+    { upsert: true },
+  );
+
+  await PaymentTransaction.create([
+    {
+      userId: spectator._id,
+      provider: 'mock',
+      amountVnd: 250_000_000,
+      points: 250_000,
+      exchangeRateVndPerPoint: 100,
+      status: 'paid',
+      providerTransactionId: 'seed_mock_topup_spectator',
+      providerPayload: { mode: 'seed' },
+      paidAt: daysFromNow(-2),
+    },
+    {
+      userId: spectator2._id,
+      provider: 'mock',
+      amountVnd: 150_000_000,
+      points: 150_000,
+      exchangeRateVndPerPoint: 100,
+      status: 'paid',
+      providerTransactionId: 'seed_mock_topup_spectator2',
+      providerPayload: { mode: 'seed' },
+      paidAt: daysFromNow(-1),
+    },
+  ]);
 
   console.log('Creating horses…');
   const horses = await Horse.create([
@@ -181,6 +227,8 @@ async function seed(): Promise<void> {
       color: 'Chestnut',
       weight: 450,
       healthStatus: 'fit',
+      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
+      profilePdfName: 'NJ 4-H Horse Registration Form',
     },
     {
       ownerId: owner._id,
@@ -192,6 +240,8 @@ async function seed(): Promise<void> {
       color: 'Bay',
       weight: 480,
       healthStatus: 'fit',
+      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
+      profilePdfName: 'NJ 4-H Horse Registration Form',
     },
     {
       ownerId: owner._id,
@@ -537,10 +587,25 @@ async function seed(): Promise<void> {
     minRiskMultiplier: 1,
     maxRiskMultiplier: 10,
     quickRiskMultipliers: [1, 2, 3, 6],
-    totalTickets: 1,
-    totalBountyPool: 50_000,
+    totalTickets: 2,
+    totalBountyPool: 100_000,
     winPool: 0,
-    contributorCount: 1,
+    contributorCount: 2,
+  });
+
+  await Prediction.create({
+    spectatorId: spectator2._id,
+    raceId: raceCompleted._id,
+    tournamentId: tournamentSpring._id,
+    predictedRanks: [
+      { rank: 1, horseId: horseB._id },
+    ],
+    status: 'pending',
+    riskMultiplier: 1,
+    contribution: 50_000,
+    pointsEarned: 0,
+    bonusPoints: 0,
+    totalPoints: 0,
   });
 
   // --- 🚀 SCENARIO D: BẢN NHÁP CHO REFEREE TEST PHẠT ---
@@ -654,6 +719,15 @@ async function seed(): Promise<void> {
     createdBy: admin._id,
   });
 
+  const viewingPass = await RaceViewingPass.create({
+    spectatorId: spectator._id,
+    raceId: raceOpen._id,
+    source: 'purchase',
+    pointsPaid: 200,
+    purchasedAt: daysFromNow(-1),
+    status: 'active',
+  });
+
   console.log('Creating notifications…');
   await Notification.insertMany([
     {
@@ -672,6 +746,14 @@ async function seed(): Promise<void> {
       refModel: 'Result',
       refId: resultConfirmed._id,
     },
+    {
+      userId: spectator._id,
+      type: 'viewing_ticket_purchased',
+      title: 'Vé xem đã sẵn sàng',
+      message: `Bạn đã có vé xem ${raceOpen.name}.`,
+      refModel: 'RaceViewingPass',
+      refId: viewingPass._id,
+    },
   ]);
 
   console.log('\n=== Seed completed ===\n');
@@ -681,6 +763,7 @@ async function seed(): Promise<void> {
   console.log('D — Referee:  result DRAFT created on', raceDraft.name);
   console.log('E — Independent: Horse registered, NO Jockey on', raceIndependent.name);
   console.log('   -> Free Jockey available: jockey3@demo.local');
+  console.log('   -> Extra spectator account: spectator2@demo.local');
 
   // 🚀 IN RA CÁC MẪU JSON ĐỂ TEST TRỰC TIẾP TRÊN POSTMAN
   console.log('\n======================================================');
@@ -698,14 +781,14 @@ async function seed(): Promise<void> {
     description: "Chèn ép ở khúc cua cuối, phạt 5.5 giây theo lỗi ERR-002"
   }, null, 2));
 
-  console.log(`\n🔴 2. TEST TƯỚC QUYỀN THI ĐẤU (Ngựa C bị gạch tên khỏi bảng xếp hạng)`);
-  console.log(`POST /api/referee/races/${raceDraft._id}/penalties/disqualify`);
+  console.log(`\n🔴 2. TEST TƯỚC QUYỀN THI ĐẤU (ghi nhận lỗi disqualify bằng endpoint penalize)`);
+  console.log(`POST /api/referee/races/${raceDraft._id}/penalize`);
   console.log(JSON.stringify({
     horseId: horseC._id.toString(),
     jockeyId: jockey1._id.toString(),
     ruleId: ruleFalseStart._id.toString(),
-    type: ruleFalseStart.category,
-    description: "Ngựa C sử dụng chất cấm theo lỗi ERR-001, tước quyền thi đấu."
+    target: "horse",
+    notes: "Ngựa C xuất phát sớm theo lỗi ERR-001, tước quyền thi đấu."
   }, null, 2));
   
   console.log('\n======================================================');

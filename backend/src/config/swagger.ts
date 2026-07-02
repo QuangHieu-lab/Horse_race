@@ -84,7 +84,7 @@ const swaggerDefinition = {
             minimum: 1,
             example: 2,
             description:
-              'Custom prediction risk multiplier. Must be a whole number within the tournament predictionConfig min/max range.',
+              'Prediction risk multiplier. Must be one of tournament predictionConfig.quickRiskMultipliers.',
           },
         },
       },
@@ -231,7 +231,18 @@ const swaggerDefinition = {
             type: 'integer',
             minimum: 100,
             example: 100,
-            description: 'Minimum top-up is 100 points. Current mock exchange rate is 100 VND = 1 point.',
+            description: 'Minimum top-up is 100 points. Current exchange rate is 1000 VND = 1 point.',
+          },
+        },
+      },
+      PayosTopUpResponse: {
+        type: 'object',
+        properties: {
+          payment: { $ref: '#/components/schemas/PaymentTransactionDto' },
+          paymentUrl: {
+            type: 'string',
+            format: 'uri',
+            description: 'Redirect the spectator browser to this PayOS checkout URL.',
           },
         },
       },
@@ -239,10 +250,10 @@ const swaggerDefinition = {
         type: 'object',
         properties: {
           id: { type: 'string' },
-          provider: { type: 'string', example: 'mock' },
-          amountVnd: { type: 'number', example: 10000 },
+          provider: { type: 'string', example: 'payos' },
+          amountVnd: { type: 'number', example: 100000 },
           points: { type: 'integer', example: 100 },
-          exchangeRateVndPerPoint: { type: 'number', example: 100 },
+          exchangeRateVndPerPoint: { type: 'number', example: 1000 },
           status: { type: 'string', example: 'paid' },
           providerTransactionId: { type: 'string', nullable: true },
           paidAt: { type: 'string', format: 'date-time', nullable: true },
@@ -270,6 +281,116 @@ const swaggerDefinition = {
               },
             },
           },
+        },
+      },
+      CreateRaceRequest: {
+        type: 'object',
+        required: ['tournamentId', 'name', 'round', 'scheduledAt', 'maxParticipants'],
+        properties: {
+          tournamentId: { type: 'string', example: '665f1e000000000000000100' },
+          name: { type: 'string', example: 'Final Heat 1' },
+          round: { type: 'integer', example: 1 },
+          raceClass: { type: 'string', example: 'Open' },
+          scheduledAt: { type: 'string', format: 'date-time' },
+          distance: { type: 'number', example: 1600 },
+          surface: { type: 'string', enum: ['turf', 'dirt', 'synthetic'], example: 'turf' },
+          going: { type: 'string', enum: ['firm', 'good', 'soft', 'heavy'], example: 'good' },
+          weather: { type: 'string', example: 'Clear' },
+          predictionOpenAt: { type: 'string', format: 'date-time', nullable: true },
+          predictionCloseAt: { type: 'string', format: 'date-time', nullable: true },
+          maxParticipants: { type: 'integer', minimum: 2, example: 8 },
+          refereeId: { type: 'string', nullable: true },
+          streamUrl: { type: 'string', format: 'uri', nullable: true },
+          viewingTicket: { $ref: '#/components/schemas/ViewingTicketConfig' },
+        },
+      },
+      ViewingTicketConfig: {
+        type: 'object',
+        properties: {
+          enabled: { type: 'boolean', example: true },
+          pricePoints: { type: 'integer', minimum: 0, example: 200 },
+          announceAt: { type: 'string', format: 'date-time', nullable: true },
+          saleOpensAt: { type: 'string', format: 'date-time', nullable: true },
+          saleExpiresAt: { type: 'string', format: 'date-time', nullable: true },
+          announcementMessage: { type: 'string', example: 'VIP live stream ticket is now available.' },
+          allowVipRedemption: { type: 'boolean', example: true },
+        },
+      },
+      UpdateRaceStatusRequest: {
+        type: 'object',
+        required: ['status'],
+        properties: {
+          status: { type: 'string', enum: ['scheduled', 'ongoing', 'completed', 'cancelled'] },
+        },
+      },
+      CreateRaceMeetingRequest: {
+        type: 'object',
+        required: ['tournamentId', 'trackId', 'meetingDate', 'name'],
+        properties: {
+          tournamentId: { type: 'string' },
+          trackId: { type: 'string' },
+          meetingDate: { type: 'string', format: 'date-time' },
+          name: { type: 'string', example: 'Opening race day' },
+          status: { type: 'string', enum: ['scheduled', 'completed', 'cancelled'], example: 'scheduled' },
+        },
+      },
+      CreateTrackRequest: {
+        type: 'object',
+        required: ['name', 'location', 'countryCode'],
+        properties: {
+          name: { type: 'string', example: 'Binh Duong Racecourse' },
+          location: { type: 'string', example: 'Thu Dau Mot, Binh Duong' },
+          countryCode: { type: 'string', example: 'VN' },
+          surfaceDefault: { type: 'string', enum: ['turf', 'dirt', 'synthetic'], example: 'turf' },
+          isActive: { type: 'boolean', example: true },
+        },
+      },
+      ToggleRaceCheckRequest: {
+        type: 'object',
+        required: ['horseId', 'field'],
+        properties: {
+          horseId: { type: 'string' },
+          field: { type: 'string', enum: ['vetApprovedAt', 'confirmedAt'] },
+        },
+      },
+      UpsertRaceResultRequest: {
+        type: 'object',
+        properties: {
+          rankings: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['rank', 'horseId'],
+              properties: {
+                rank: { type: 'integer', minimum: 1 },
+                horseId: { type: 'string' },
+                jockeyId: { type: 'string' },
+                finishTime: { type: 'number', example: 98.42 },
+                marginBehind: { type: 'number', example: 0 },
+                prize: { type: 'number', example: 30000000 },
+              },
+            },
+          },
+        },
+      },
+      ApplyTimePenaltyRequest: {
+        type: 'object',
+        required: ['horseId', 'jockeyId', 'addedTimeSeconds', 'type', 'description'],
+        properties: {
+          horseId: { type: 'string' },
+          jockeyId: { type: 'string' },
+          addedTimeSeconds: { type: 'number', minimum: 0.001, example: 5.5 },
+          ruleId: { type: 'string' },
+          type: { type: 'string', example: 'race_conduct' },
+          description: { type: 'string', example: 'Obstruction in the final turn.' },
+        },
+      },
+      RedeemProductRequest: {
+        type: 'object',
+        required: ['productId'],
+        properties: {
+          productId: { type: 'string' },
+          quantity: { type: 'integer', minimum: 1, default: 1 },
         },
       },
       // === NEW: THÊM SCHEMAS CHO LUẬT VÀ PHẠT ===
@@ -524,12 +645,22 @@ const swaggerDefinition = {
         tags: ['Admin'],
         summary: 'List race meetings',
         security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'status', in: 'query', schema: { type: 'string' } },
+          { name: 'tournamentId', in: 'query', schema: { type: 'string' } },
+        ],
         responses: { 200: { description: 'Race meeting list' } },
       },
       post: {
         tags: ['Admin'],
         summary: 'Create a race meeting',
         security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateRaceMeetingRequest' } },
+          },
+        },
         responses: { 201: { description: 'Created race meeting' } },
       },
     },
@@ -538,12 +669,19 @@ const swaggerDefinition = {
         tags: ['Admin'],
         summary: 'List race tracks',
         security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'isActive', in: 'query', schema: { type: 'boolean' } }],
         responses: { 200: { description: 'Track list' } },
       },
       post: {
         tags: ['Admin'],
         summary: 'Create a race track',
         security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateTrackRequest' } },
+          },
+        },
         responses: { 201: { description: 'Created track' } },
       },
     },
@@ -598,7 +736,7 @@ const swaggerDefinition = {
         tags: ['Tournaments'],
         summary: 'Update prediction bounty pool configuration',
         description:
-          'Admin-only endpoint. Allows changing entry fee, 10/15/75 pool rates, owner/jockey split, and rank reward split while the tournament is draft or published.',
+          'Admin-only endpoint. Allows changing entry fee, allowed risk multipliers, pool distribution, and rank reward split while the tournament is draft or published. Owner/jockey split remains an internal backend configuration.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
@@ -620,6 +758,12 @@ const swaggerDefinition = {
         tags: ['Races'],
         summary: 'Create a race',
         security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateRaceRequest' } },
+          },
+        },
         responses: { 201: { description: 'Created race' } },
       },
     },
@@ -651,21 +795,18 @@ const swaggerDefinition = {
         },
       },
     },
-    '/api/races/{id}/participants': {
-      post: {
-        tags: ['Races'],
-        summary: 'Add a race participant',
-        security: [{ bearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 201: { description: 'Added participant' } },
-      },
-    },
     '/api/races/{id}/status': {
       patch: {
         tags: ['Races'],
         summary: 'Update race status',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/UpdateRaceStatusRequest' } },
+          },
+        },
         responses: { 200: { description: 'Updated race' } },
       },
     },
@@ -893,6 +1034,19 @@ const swaggerDefinition = {
         },
       },
     },
+    '/api/referee/races/{id}/start-simulation': {
+      post: {
+        tags: ['Referee'],
+        summary: 'Simulate a race and create a draft result',
+        description: 'Generates randomized finish times for active participants, stores a draft result, and marks the race completed for referee review.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
+        responses: {
+          200: { description: 'Draft result generated' },
+          409: { description: 'Race is completed/cancelled or has fewer than two active participants' },
+        },
+      },
+    },
     '/api/referee/races': {
       get: {
         tags: ['Referee'],
@@ -914,9 +1068,29 @@ const swaggerDefinition = {
         summary: 'Toggle a pre-race check',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/ToggleRaceCheckRequest' } },
+          },
+        },
         responses: { 200: { description: 'Updated check' } },
       },
     },
+    '/api/races/{id}/participants': {
+      post: {
+        tags: ['Races'],
+        summary: 'Add a participant to the race (Xếp làn chạy/Áo số)',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/AddParticipantRequest' } } }
+        },
+        responses: { 201: { description: 'Added participant' } },
+      },
+    },
+    
     '/api/referee/races/{id}/result': {
       get: {
         tags: ['Referee'],
@@ -930,7 +1104,46 @@ const swaggerDefinition = {
         summary: 'Create or update race result',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/UpsertRaceResultRequest' } },
+          },
+        },
         responses: { 200: { description: 'Updated result' } },
+      },
+    },
+    '/api/referee/races/{id}/penalties/time': {
+      post: {
+        tags: ['Referee'],
+        summary: 'Apply a time penalty and reorder draft result',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/ApplyTimePenaltyRequest' } },
+          },
+        },
+        responses: {
+          200: { description: 'Time penalty applied and rankings recalculated' },
+          400: { description: 'Invalid penalty payload' },
+        },
+      },
+    },
+    '/api/referee/races/{id}/penalties/{violationId}': {
+      delete: {
+        tags: ['Referee'],
+        summary: 'Revoke a race penalty',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' },
+          { name: 'violationId', in: 'path', required: true, schema: { type: 'string' }, description: 'Violation id' },
+        ],
+        responses: {
+          200: { description: 'Penalty revoked and horse/jockey state restored when applicable' },
+          404: { description: 'Violation not found' },
+        },
       },
     },
     '/api/referee/races/{id}/result/confirm': {
@@ -955,6 +1168,9 @@ const swaggerDefinition = {
         tags: ['Spectator'],
         summary: 'List spectator-visible races',
         security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'filter', in: 'query', schema: { type: 'string', enum: ['open', 'upcoming', 'completed'] } },
+        ],
         responses: { 200: { description: 'Race list' } },
       },
     },
@@ -973,7 +1189,10 @@ const swaggerDefinition = {
         summary: 'Purchase a race viewing pass',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 201: { description: 'Created viewing pass' } },
+        responses: {
+          201: { description: 'Created viewing pass and spent points' },
+          409: { description: 'Already has pass, insufficient points, or sale has expired' },
+        },
       },
     },
     '/api/spectator/viewing-passes': {
@@ -981,6 +1200,7 @@ const swaggerDefinition = {
         tags: ['Spectator'],
         summary: 'List my viewing passes',
         security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'filter', in: 'query', schema: { type: 'string', enum: ['upcoming'] } }],
         responses: { 200: { description: 'Viewing pass list' } },
       },
     },
@@ -1160,7 +1380,7 @@ const swaggerDefinition = {
       post: {
         tags: ['Spectator'],
         summary: 'Mock top-up: convert money to points',
-        description: 'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 100 VND = 1 point; minimum top-up is 100 points.',
+        description: 'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 1000 VND = 1 point; minimum top-up is 100 points.',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1189,6 +1409,59 @@ const swaggerDefinition = {
         },
       },
     },
+    '/api/spectator/top-ups/payos': {
+      post: {
+        tags: ['Spectator'],
+        summary: 'Create a PayOS top-up checkout URL',
+        description: 'Creates a pending PayOS payment transaction. Redirect the spectator to paymentUrl, then PayOS calls the public webhook/return/cancel endpoints.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/TopUpRequest' },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Created pending PayOS transaction and checkout URL',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PayosTopUpResponse' },
+              },
+            },
+          },
+          500: { description: 'PayOS credentials are not configured' },
+        },
+      },
+    },
+    '/api/payments/payos/return': {
+      get: {
+        tags: ['Spectator'],
+        summary: 'PayOS browser return callback',
+        description: 'Public callback used by PayOS after the customer completes payment. Confirms the order locally for demo and redirects to frontend when configured.',
+        parameters: [{ name: 'orderCode', in: 'query', schema: { type: 'string' } }],
+        responses: { 200: { description: 'Payment result JSON or frontend redirect if configured' } },
+      },
+    },
+    '/api/payments/payos/cancel': {
+      get: {
+        tags: ['Spectator'],
+        summary: 'PayOS browser cancel callback',
+        description: 'Public callback used by PayOS when the customer cancels payment.',
+        parameters: [{ name: 'orderCode', in: 'query', schema: { type: 'string' } }],
+        responses: { 200: { description: 'Payment cancellation JSON or frontend redirect if configured' } },
+      },
+    },
+    '/api/payments/payos/webhook': {
+      post: {
+        tags: ['Spectator'],
+        summary: 'PayOS webhook callback',
+        description: 'Public server-to-server callback used by PayOS. Verifies signature and idempotently confirms the top-up.',
+        responses: { 200: { description: 'PayOS code and desc' } },
+      },
+    },
     '/api/spectator/products': {
       get: {
         tags: ['Spectator'],
@@ -1202,7 +1475,16 @@ const swaggerDefinition = {
         tags: ['Spectator'],
         summary: 'Redeem points for a product',
         security: [{ bearerAuth: [] }],
-        responses: { 201: { description: 'Created redemption' } },
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/RedeemProductRequest' } },
+          },
+        },
+        responses: {
+          201: { description: 'Created redemption. VIP race-viewing vouchers may grant a RaceViewingPass.' },
+          409: { description: 'Insufficient points or product is out of stock' },
+        },
       },
     },
     '/api/spectator/notifications': {

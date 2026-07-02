@@ -230,8 +230,8 @@ export async function applyRacePenalty(
   const rule = await ViolationRule.findById(payload.ruleId);
   if (!rule || !rule.isActive) throw new HttpError(404, 'Luật vi phạm không hợp lệ');
 
-  const participant = race.participants.find((p) => 
-    (payload.horseId && p.horseId.toString() === payload.horseId) || 
+  const participant = race.participants.find((p) =>
+    (payload.horseId && p.horseId.toString() === payload.horseId) ||
     (payload.jockeyId && p.jockeyId.toString() === payload.jockeyId)
   );
   if (!participant) throw new HttpError(404, 'Không tìm thấy đối tượng trong trận');
@@ -259,8 +259,8 @@ export async function applyRacePenalty(
 
   resultDoc.violations.push({
     ruleId: rule._id,
-    target: payload.target, 
-    horseId: participant.horseId, 
+    target: payload.target,
+    horseId: participant.horseId,
     jockeyId: participant.jockeyId,
     type: rule.category,
     description: payload.notes ? `${rule.name} - Ghi chú: ${payload.notes}` : rule.description,
@@ -272,7 +272,7 @@ export async function applyRacePenalty(
   const savedResult = await resultDoc.save();
 
   const isBannedPenalty = ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
-  
+
   if (isBannedPenalty) {
     const latestViolationId = savedResult.violations[savedResult.violations.length - 1]?._id;
     const banReason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.name;
@@ -282,7 +282,7 @@ export async function applyRacePenalty(
         $set: {
           penaltyStatus: {
             isBanned: true,
-            bannedUntil: bannedUntil, 
+            bannedUntil: bannedUntil,
             currentViolationId: latestViolationId,
             reason: banReason
           }
@@ -329,7 +329,7 @@ export async function revokeRacePenalty(
 
   const isDQ = ['disqualify', 'disqualification'].includes(violation.penaltyApplied || '');
   if (isDQ) {
-    const participant = race.participants.find(p => 
+    const participant = race.participants.find(p =>
       (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
       (violation.jockeyId && p.jockeyId.toString() === violation.jockeyId.toString())
     );
@@ -338,7 +338,7 @@ export async function revokeRacePenalty(
       participant.isDisqualified = false;
       participant.disqualifiedReason = undefined;
       participant.disqualifiedAt = null;
-      participant.scratchedAt = null; 
+      participant.scratchedAt = null;
       await race.save();
     }
   }
@@ -375,7 +375,7 @@ export async function applyViolationAndTimePenalty(raceId: string, input: ApplyT
   }
 
   const result = await Result.findOne({ raceId: new mongoose.Types.ObjectId(raceId) });
-  
+
   if (!result) {
     throw new HttpError(404, 'Không tìm thấy kết quả của trận đua này');
   }
@@ -397,24 +397,24 @@ export async function applyViolationAndTimePenalty(raceId: string, input: ApplyT
   if (!targetRanking || targetRanking.finishTime === undefined) {
     throw new HttpError(400, 'Ngựa này không có thời gian hoàn thành hợp lệ trong kết quả');
   }
-  
+
   targetRanking.finishTime += input.addedTimeSeconds;
-  targetRanking.finishTime = parseFloat(targetRanking.finishTime.toFixed(3)); 
+  targetRanking.finishTime = parseFloat(targetRanking.finishTime.toFixed(3));
 
   result.rankings.sort((a, b) => (a.finishTime || 0) - (b.finishTime || 0));
 
   result.rankings.forEach((ranking, index) => {
     ranking.rank = index + 1;
-    
+
     if (index === 0) {
       ranking.marginBehind = 0;
       ranking.isDeadHeat = false;
     } else {
       const prevTime = result.rankings[index - 1]?.finishTime ?? 0;
       const currentTime = ranking.finishTime ?? 0;
-      
+
       ranking.marginBehind = parseFloat((currentTime - prevTime).toFixed(3));
-      ranking.isDeadHeat = ranking.marginBehind === 0; 
+      ranking.isDeadHeat = ranking.marginBehind === 0;
     }
   });
 

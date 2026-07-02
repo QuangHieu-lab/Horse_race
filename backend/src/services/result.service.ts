@@ -67,6 +67,8 @@ export async function upsertRaceResult(
   if (result) {
     if (result.publishedAt) throw new HttpError(409, 'Kết quả đã công bố, không thể sửa');
     result.rankings = rankings;
+    // 🚀 Nếu có cập nhật lại bản nháp thì trạng thái confirm phải trả về false
+    (result as any).isConfirmed = false;
     await result.save();
   } else {
     result = await Result.create({
@@ -76,6 +78,7 @@ export async function upsertRaceResult(
       violations: [],
       protests: [],
       isPhotoFinish: false,
+      isConfirmed: false,
     });
   }
 
@@ -107,6 +110,8 @@ export async function confirmRaceResult(
 
   result.confirmedBy = new mongoose.Types.ObjectId(refereeId);
   result.confirmedAt = new Date();
+  // 🚀 Đồng bộ cờ isConfirmed với hàm simulateRace
+  (result as any).isConfirmed = true; 
   await result.save();
 
   await Notification.create({
