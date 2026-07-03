@@ -422,4 +422,21 @@ export async function listPredictions(spectatorId: string): Promise<PredictionDt
   });
 }
 
+export async function getRaceSimulation(raceId: string) {
+  if (!mongoose.isValidObjectId(raceId)) throw new HttpError(400, 'ID không hợp lệ');
+  const race = await Race.findById(raceId).lean();
+  if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
+  if (race.status !== 'completed') return { available: false as const, rankings: [] };
+  const result = await Result.findOne({ raceId: race._id }).lean();
+  if (!result) return { available: false as const, rankings: [] };
+  return {
+    available: true as const,
+    rankings: result.rankings.map(r => ({
+      horseId: r.horseId.toString(),
+      rank: r.rank,
+      finishTime: r.finishTime,
+    })),
+  };
+}
+
 export { buildSpectatorRaceDto, isPredictionWindowOpen };

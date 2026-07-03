@@ -121,6 +121,28 @@ export async function getMe(userId: string): Promise<AuthUserDto> {
   return toUserDto(user);
 }
 
+export async function changePassword(
+  userId: string,
+  oldPassword: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  if (!mongoose.isValidObjectId(userId)) {
+    throw new HttpError(401, 'Token không hợp lệ');
+  }
+  const user = await User.findById(userId).select('+passwordHash');
+  if (!user || !user.isActive) {
+    throw new HttpError(401, 'Token không hợp lệ');
+  }
+  const valid = await user.comparePassword(oldPassword);
+  if (!valid) {
+    throw new HttpError(401, 'Mật khẩu cũ không đúng');
+  }
+  validatePassword(newPassword);
+  user.passwordHash = newPassword;
+  await user.save();
+  return { message: 'Đổi mật khẩu thành công' };
+}
+
 export function verifyToken(token: string): JwtPayload {
   try {
     const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload;
