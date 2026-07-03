@@ -164,6 +164,12 @@ async function buildSpectatorRaceDto(
     hasPrediction: !!existingPrediction,
     predictionOpenAt: openAt?.toISOString() ?? null,
     predictionCloseAt: closeAt?.toISOString() ?? null,
+    predictionConfig: {
+      isEnabled: tournament.predictionConfig.isEnabled,
+      poolEnabled: tournament.predictionConfig.poolEnabled,
+      entryFee: tournament.predictionConfig.entryFee,
+      quickRiskMultipliers: tournament.predictionConfig.quickRiskMultipliers,
+    },
     result: resultDto,
     viewingTicket: viewingTicketService.buildViewingTicketDto(ticketState),
     streamUrl,
