@@ -6,6 +6,7 @@ import { Horse } from '../models/Horse.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
 import { activeParticipants } from '../utils/race-participants.js';
+import type { RaceSimTimeline } from './race-simulation.service.js';
 
 export interface RefereeRaceDto {
   id: string;
@@ -178,7 +179,7 @@ export async function simulateRace(raceId: string) {
     prize: 0,
   }));
 
-  const resultDraft = await Result.findOneAndUpdate(
+  await Result.findOneAndUpdate(
     { raceId: new mongoose.Types.ObjectId(raceId) },
     {
       rankings,
@@ -196,7 +197,56 @@ export async function simulateRace(raceId: string) {
     throw new HttpError(500, err instanceof Error ? err.message : 'Lỗi khi lưu trận đua');
   }
 
-  return resultDraft;
+  // Dựng timeline phát lại (giống admin) để trọng tài xem đua trực tiếp
+  const populated = await Race.findById(raceId)
+    .populate('trackId', 'name location surfaceDefault')
+    .populate('participants.horseId', 'name')
+    .populate('participants.jockeyId', 'fullName')
+    .lean();
+  if (!populated) throw new HttpError(500, 'Lỗi khi dựng dữ liệu trận đua');
+
+  const pByHorse = new Map<string, (typeof populated.participants)[number]>();
+  for (const p of populated.participants) {
+    const h = p.horseId as unknown as { _id: mongoose.Types.ObjectId } | null;
+    if (h?._id) pByHorse.set(h._id.toString(), p);
+  }
+
+  const horses = rankings.map((r) => {
+    const p = pByHorse.get(r.horseId.toString());
+    const horse = p?.horseId as unknown as { _id: mongoose.Types.ObjectId; name: string };
+    const jockey = p?.jockeyId as unknown as { _id: mongoose.Types.ObjectId; fullName: string };
+    return {
+      horseId: horse._id.toString(),
+      horseName: horse.name,
+      jockeyId: jockey._id.toString(),
+      jockeyName: jockey.fullName,
+      ownerId: r.ownerId.toString(),
+      laneNumber: p?.laneNumber ?? r.rank,
+      clothNumber: p?.clothNumber ?? p?.laneNumber ?? r.rank,
+      rank: r.rank,
+      finishTime: r.finishTime,
+      prize: r.prize,
+    };
+  });
+
+  const track = populated.trackId as unknown as
+    | { name: string; location: string; surfaceDefault: string }
+    | null;
+
+  const timeline: RaceSimTimeline = {
+    raceId,
+    name: populated.name,
+    distance: populated.distance ?? 1200,
+    laps: 1,
+    trackCondition: populated.going && populated.going !== 'unknown' ? populated.going : 'good',
+    trackName: track?.name ?? null,
+    trackLocation: track?.location ?? null,
+    surface: track?.surfaceDefault ?? populated.surface ?? 'turf',
+    durationMs: 18000,
+    horses,
+  };
+
+  return timeline;
 }
 
 export async function buildResultFromRace(raceId: string, refereeId: string) {

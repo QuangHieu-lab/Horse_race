@@ -23,6 +23,9 @@ export interface RaceSimTimeline {
   distance: number;
   laps: number;
   trackCondition: string;
+  trackName: string | null;
+  trackLocation: string | null;
+  surface: string; // turf | synthetic | dirt
   durationMs: number; // thời lượng phát lại gợi ý cho FE
   horses: RaceSimHorse[];
 }
@@ -43,6 +46,7 @@ export async function simulateAndPublishRace(
   }
 
   const race = await Race.findById(raceId)
+    .populate('trackId', 'name location surfaceDefault')
     .populate('participants.horseId', 'name')
     .populate('participants.jockeyId', 'fullName');
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
@@ -122,12 +126,20 @@ export async function simulateAndPublishRace(
     };
   });
 
+  const track = race.trackId as unknown as
+    | { name: string; location: string; surfaceDefault: string }
+    | null;
+  const surface = track?.surfaceDefault ?? race.surface ?? 'turf';
+
   return {
     raceId: race._id.toString(),
     name: race.name,
     distance: race.distance ?? 1200,
     laps: 1,
     trackCondition: race.going && race.going !== 'unknown' ? race.going : 'good',
+    trackName: track?.name ?? null,
+    trackLocation: track?.location ?? null,
+    surface,
     durationMs: 18000,
     horses,
   };

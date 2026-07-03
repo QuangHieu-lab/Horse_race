@@ -148,13 +148,13 @@ export class RefereeController {
   startSimulation = asyncHandler(async (req: Request, res: Response) => {
     const raceId = req.params.id as string;
 
-    // 🚀 Gọi hàm giả lập chuẩn từ refereeService thay vì raceService
-    const draftResult = await refereeService.simulateRace(raceId);
+    // Trả về timeline phát lại để trọng tài xem đua trực tiếp (giống admin)
+    const timeline = await refereeService.simulateRace(raceId);
 
     res.status(200).json({
       success: true,
       message: 'Trận đua đã hoàn tất! Bản nháp xếp hạng đã sẵn sàng để kiểm tra VAR và bắt lỗi.',
-      data: draftResult
+      timeline,
     });
   });
 }

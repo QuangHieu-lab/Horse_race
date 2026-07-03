@@ -80,8 +80,16 @@ export async function listTournaments(page = 1, limit = 10) {
     Tournament.countDocuments(),
   ]);
 
+  // Đếm số trận đua của từng giải trong danh sách (1 truy vấn gộp)
+  const ids = items.map((t) => t._id);
+  const counts = await Race.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+    { $match: { tournamentId: { $in: ids } } },
+    { $group: { _id: '$tournamentId', count: { $sum: 1 } } },
+  ]);
+  const countByTournament = new Map(counts.map((c) => [c._id.toString(), c.count]));
+
   return {
-    items,
+    items: items.map((t) => ({ ...t, raceCount: countByTournament.get(t._id.toString()) ?? 0 })),
     total,
     page: normalizedPage,
     pages: Math.ceil(total / normalizedLimit) || 1,

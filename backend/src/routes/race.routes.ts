@@ -15,6 +15,8 @@ raceRouter.post('/:id/participants', raceController.addParticipant);
 
 raceRouter.post('/:id/simulate', raceController.simulate);
 
+raceRouter.patch('/:id/referee', raceController.assignReferee);
+
 raceRouter.patch('/:id/status', raceController.updateStatus);
 
 raceRouter.delete('/:id', raceController.delete);

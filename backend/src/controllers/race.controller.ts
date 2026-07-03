@@ -8,8 +8,9 @@ import {
   updateRaceStatus,
   deleteRace,
   addParticipantToRace,
+  assignRaceReferee,
 } from '../services/race.service.js';
-import { addParticipant, listEligibleEntries } from '../services/race-participant.service.js';
+import { listEligibleEntries } from '../services/race-participant.service.js';
 import { simulateAndPublishRace } from '../services/race-simulation.service.js';
 
 export class RaceController {
@@ -62,14 +63,15 @@ export class RaceController {
     res.json({ entries });
   });
 
-  addParticipant = asyncHandler(async (req: Request, res: Response) => {
-    const participants = await addParticipant(String(req.params.id), req.body);
-    res.status(201).json({ participants });
-  });
-
   simulate = asyncHandler(async (req: Request, res: Response) => {
     const timeline = await simulateAndPublishRace(String(req.params.id), req.user!.id);
     res.json({ timeline });
+  });
+
+  assignReferee = asyncHandler(async (req: Request, res: Response) => {
+    const { refereeId } = req.body as { refereeId?: string | null };
+    const race = await assignRaceReferee(String(req.params.id), refereeId ?? null);
+    res.json({ race });
   });
 
   updateStatus = asyncHandler(async (req: Request, res: Response) => {

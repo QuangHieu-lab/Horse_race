@@ -3,6 +3,7 @@ import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
 import { Race, type IRace, type IParticipant } from '../models/Race.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { Tournament } from '../models/Tournament.model.js';
+import { Track } from '../models/Track.model.js';
 import { Horse } from '../models/Horse.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
@@ -17,6 +18,7 @@ const RACE_STATUSES: RaceStatus[] = ['scheduled', 'ongoing', 'completed', 'cance
 
 export interface CreateRaceInput {
   tournamentId: string;
+  trackId?: string | null;
   name: string;
   round: number;
   raceClass?: string;
@@ -58,9 +60,25 @@ export async function createRace(input: CreateRaceInput) {
 
   const viewingTicket = normalizeViewingTicket(scheduledAt, input.viewingTicket);
 
+  // Gắn trường đua (nếu có) và kế thừa mặt sân mặc định của trường
+  let trackId: mongoose.Types.ObjectId | null = null;
+  let surface = input.surface;
+  if (input.trackId) {
+    if (!mongoose.isValidObjectId(input.trackId)) {
+      throw new HttpError(400, 'trackId không hợp lệ');
+    }
+    const track = await Track.findById(input.trackId).lean();
+    if (!track) throw new HttpError(404, 'Trường đua không tồn tại');
+    if (!track.isActive) throw new HttpError(409, 'Trường đua đang ngừng hoạt động');
+    trackId = track._id;
+    if (!surface) surface = track.surfaceDefault;
+  }
+
   const race = await Race.create({
     ...input,
     tournamentId: new mongoose.Types.ObjectId(input.tournamentId),
+    trackId,
+    surface,
     scheduledAt,
     predictionOpenAt: input.predictionOpenAt ? new Date(input.predictionOpenAt) : null,
     predictionCloseAt: input.predictionCloseAt ? new Date(input.predictionCloseAt) : null,
@@ -68,6 +86,31 @@ export async function createRace(input: CreateRaceInput) {
     viewingTicket,
   });
 
+  return race.toObject();
+}
+
+/** Admin gán (hoặc bỏ gán) trọng tài phụ trách một cuộc đua. */
+export async function assignRaceReferee(raceId: string, refereeId: string | null) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID trận đua không hợp lệ');
+  }
+  const race = await Race.findById(raceId);
+  if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
+
+  if (refereeId) {
+    if (!mongoose.isValidObjectId(refereeId)) {
+      throw new HttpError(400, 'refereeId không hợp lệ');
+    }
+    const ref = await User.findById(refereeId).select('role isActive').lean();
+    if (!ref?.isActive || ref.role !== 'referee') {
+      throw new HttpError(400, 'refereeId phải là tài khoản trọng tài đang hoạt động');
+    }
+    race.refereeId = new mongoose.Types.ObjectId(refereeId);
+  } else {
+    race.refereeId = null;
+  }
+
+  await race.save();
   return race.toObject();
 }
 
@@ -87,6 +130,7 @@ export async function getRaceById(id: string) {
   }
 
   const race = await Race.findById(id)
+    .populate('trackId', 'name location surfaceDefault')
     .populate('participants.horseId', 'name breed')
     .populate('participants.jockeyId', 'fullName')
     .populate('participants.ownerId', 'fullName')
