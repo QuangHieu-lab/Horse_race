@@ -118,11 +118,24 @@ export async function createPrediction(
     evaluatedAt: null,
   };
 
-  if (existing?.status === 'cancelled') {
-    existing.set(predictionPayload);
-    await existing.save();
-  } else {
-    await Prediction.create(predictionPayload);
+  try {
+    if (existing?.status === 'cancelled') {
+      existing.set(predictionPayload);
+      await existing.save();
+    } else {
+      await Prediction.create(predictionPayload);
+    }
+  } catch (error) {
+    if (contribution > 0) {
+      await refundPredictionTicket(
+        spectatorId,
+        existing?._id ?? new mongoose.Types.ObjectId(),
+        race._id,
+        contribution,
+        race.name,
+      ).catch(() => undefined);
+    }
+    throw error;
   }
 
   const all = await listPredictions(spectatorId);

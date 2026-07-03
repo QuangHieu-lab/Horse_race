@@ -116,6 +116,12 @@ export interface SpectatorRaceDto {
   hasPrediction: boolean;
   predictionOpenAt?: string | null;
   predictionCloseAt?: string | null;
+  predictionConfig: {
+    isEnabled: boolean;
+    poolEnabled: boolean;
+    entryFee: number;
+    quickRiskMultipliers: number[];
+  };
   result?: RaceResultDto | null;
   viewingTicket: ViewingTicketInfoDto;
   streamUrl?: string;
