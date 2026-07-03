@@ -80,6 +80,17 @@ async function getOrCreateProfile(userId: mongoose.Types.ObjectId) {
   return profile;
 }
 
+async function awardPoolPoints(
+  userId: mongoose.Types.ObjectId,
+  points: number,
+  note: string,
+  poolId: mongoose.Types.ObjectId,
+): Promise<void> {
+  if (points <= 0) return;
+  const profile = await getOrCreateProfile(userId);
+  await profile.addPoints(points, 'earned_pool_share', 'PredictionPool', poolId, note);
+}
+
 export async function getOrCreatePredictionPool(race: {
   _id: mongoose.Types.ObjectId;
   tournamentId: mongoose.Types.ObjectId;
@@ -245,8 +256,10 @@ export async function settlePredictionPoolFromResult(
   );
   const totalBountyPool = predictions.reduce((sum, p) => sum + p.contribution, 0);
   const winPool = losers.reduce((sum, p) => sum + p.contribution, 0);
+  const minScoreToShare = tournament?.predictionConfig.minScoreToShare ?? 1;
+  const qualifiedWinners = winners.filter((prediction) => predictionScoreOf(prediction) >= minScoreToShare);
   // Tổng điểm có trọng số rủi ro của những người đoán đúng — dùng để chia PrizePool.
-  const totalWinnerScore = winners.reduce((sum, p) => sum + predictionScoreOf(p), 0);
+  const totalWinnerScore = qualifiedWinners.reduce((sum, p) => sum + predictionScoreOf(p), 0);
   pool.totalTickets = predictions.length;
   pool.contributorCount = predictions.length;
   pool.totalBountyPool = totalBountyPool;
@@ -260,9 +273,17 @@ export async function settlePredictionPoolFromResult(
   pool.totalWinnerScore = totalWinnerScore;
 
   if (totalWinnerScore === 0) {
-    // Không ai đoán đúng → PrizePool thành jackpot, để xử lý/cộng dồn sau.
+    // Không ai đủ điều kiện nhận PrizePool. Chính sách xử lý phần dư nằm ở rolloverPolicy.
     pool.jackpotAmount = pool.spectatorRewardPool;
-    pool.spectatorRewardPool = 0;
+    if (tournament?.predictionConfig.rolloverPolicy === 'refund') {
+      pool.jackpotAmount = 0;
+    } else if (tournament?.predictionConfig.rolloverPolicy === 'to_organizer') {
+      pool.organizerFee += pool.spectatorRewardPool;
+      pool.jackpotAmount = 0;
+      pool.spectatorRewardPool = 0;
+    } else {
+      pool.spectatorRewardPool = 0;
+    }
   }
 
   // Chia PrizePool theo tỷ lệ predictionScore. Phần dư do làm tròn (floor) được
@@ -272,7 +293,7 @@ export async function settlePredictionPoolFromResult(
     let distributed = 0;
     let topWinnerId: string | null = null;
     let topScore = -1;
-    for (const winner of winners) {
+    for (const winner of qualifiedWinners) {
       const score = predictionScoreOf(winner);
       const share = Math.floor((score / totalWinnerScore) * pool.spectatorRewardPool);
       prizeShareByPrediction.set(winner._id.toString(), share);
@@ -290,9 +311,14 @@ export async function settlePredictionPoolFromResult(
 
   for (const prediction of predictions) {
     const isWinner = winners.some((winner) => winner._id.equals(prediction._id));
+    const isQualifiedWinner = qualifiedWinners.some((winner) => winner._id.equals(prediction._id));
     const score = isWinner ? predictionScoreOf(prediction) : 0;
     const prizeShare = prizeShareByPrediction.get(prediction._id.toString()) ?? 0;
-    const refund = isWinner ? prediction.contribution : 0;
+    const noWinnerRefund =
+      totalWinnerScore === 0 && tournament?.predictionConfig.rolloverPolicy === 'refund'
+        ? prediction.contribution
+        : 0;
+    const refund = isWinner || isQualifiedWinner ? prediction.contribution : noWinnerRefund;
     const totalReturned = refund + prizeShare;
 
     prediction.scoringWeight = score; // DTO hiển thị là predictionScore
@@ -309,7 +335,9 @@ export async function settlePredictionPoolFromResult(
         'earned_pool_share',
         'PredictionPool',
         pool._id,
-        `Hoàn điểm dự đoán đúng và chia thưởng bounty pool cuộc đua ${race.name}`,
+        noWinnerRefund > 0
+          ? `Hoàn điểm do bounty pool cuộc đua ${race.name} không có người thắng`
+          : `Hoàn điểm dự đoán đúng và chia thưởng bounty pool cuộc đua ${race.name}`,
       );
 
       await Notification.create({
@@ -355,6 +383,19 @@ export async function settlePredictionPoolFromResult(
         jockeyReward,
         isDeadHeat,
       });
+
+      await awardPoolPoints(
+        ranking.ownerId,
+        ownerReward,
+        `Thưởng owner hạng ${rank} từ bounty pool cuộc đua ${race.name}`,
+        pool._id,
+      );
+      await awardPoolPoints(
+        ranking.jockeyId,
+        jockeyReward,
+        `Thưởng jockey hạng ${rank} từ bounty pool cuộc đua ${race.name}`,
+        pool._id,
+      );
 
       await Notification.create([
         {

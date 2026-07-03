@@ -167,27 +167,42 @@ async function seed(): Promise<void> {
   const spectator2 = users[7]!;
 
   console.log('Setting spectator points…');
-  await SpectatorProfile.findOneAndUpdate(
-    { userId: spectator._id },
-    {
-      $set: {
-        currentBalance: 250000,
-        totalPointsEarned: 250000,
-        totalPointsSpent: 0,
-      },
-    },
-    { upsert: true },
+  const spectatorProfile =
+    (await SpectatorProfile.findOne({ userId: spectator._id })) ??
+    (await SpectatorProfile.create({ userId: spectator._id }));
+  spectatorProfile.currentBalance = 0;
+  spectatorProfile.totalPointsEarned = 0;
+  spectatorProfile.totalPointsSpent = 0;
+  spectatorProfile.transactions = [];
+  await spectatorProfile.save();
+  await spectatorProfile.addPoints(
+    250_000,
+    'topup',
+    undefined,
+    undefined,
+    'Seed demo top-up: 250,000 points',
   );
-  await SpectatorProfile.findOneAndUpdate(
-    { userId: spectator2._id },
-    {
-      $set: {
-        currentBalance: 120000,
-        totalPointsEarned: 150000,
-        totalPointsSpent: 30000,
-      },
-    },
-    { upsert: true },
+  const spectator2Profile =
+    (await SpectatorProfile.findOne({ userId: spectator2._id })) ??
+    (await SpectatorProfile.create({ userId: spectator2._id }));
+  spectator2Profile.currentBalance = 0;
+  spectator2Profile.totalPointsEarned = 0;
+  spectator2Profile.totalPointsSpent = 0;
+  spectator2Profile.transactions = [];
+  await spectator2Profile.save();
+  await spectator2Profile.addPoints(
+    150_000,
+    'topup',
+    undefined,
+    undefined,
+    'Seed demo top-up: 150,000 points',
+  );
+  await spectator2Profile.spendPoints(
+    30_000,
+    'spent_viewing_ticket',
+    undefined,
+    undefined,
+    'Seed demo spend: viewing ticket',
   );
 
   await PaymentTransaction.create([
@@ -196,7 +211,7 @@ async function seed(): Promise<void> {
       provider: 'mock',
       amountVnd: 250_000_000,
       points: 250_000,
-      exchangeRateVndPerPoint: 100,
+      exchangeRateVndPerPoint: 1000,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator',
       providerPayload: { mode: 'seed' },
@@ -207,7 +222,7 @@ async function seed(): Promise<void> {
       provider: 'mock',
       amountVnd: 150_000_000,
       points: 150_000,
-      exchangeRateVndPerPoint: 100,
+      exchangeRateVndPerPoint: 1000,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator2',
       providerPayload: { mode: 'seed' },
@@ -578,6 +593,13 @@ async function seed(): Promise<void> {
     bonusPoints: 0,
     totalPoints: 0,
   });
+  await spectatorProfile.spendPoints(
+    50_000,
+    'spent_pool_entry',
+    'Prediction',
+    predictionPending._id,
+    `Seed demo pool entry: ${raceCompleted.name}`,
+  );
 
   await PredictionPool.create({
     raceId: raceCompleted._id,
@@ -593,7 +615,7 @@ async function seed(): Promise<void> {
     contributorCount: 2,
   });
 
-  await Prediction.create({
+  const predictionPending2 = await Prediction.create({
     spectatorId: spectator2._id,
     raceId: raceCompleted._id,
     tournamentId: tournamentSpring._id,
@@ -607,6 +629,13 @@ async function seed(): Promise<void> {
     bonusPoints: 0,
     totalPoints: 0,
   });
+  await spectator2Profile.spendPoints(
+    50_000,
+    'spent_pool_entry',
+    'Prediction',
+    predictionPending2._id,
+    `Seed demo pool entry: ${raceCompleted.name}`,
+  );
 
   // --- 🚀 SCENARIO D: BẢN NHÁP CHO REFEREE TEST PHẠT ---
   console.log('Scenario D — Referee Draft Result for Testing Penalties…');

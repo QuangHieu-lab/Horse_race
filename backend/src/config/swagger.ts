@@ -147,7 +147,8 @@ const swaggerDefinition = {
       },
       BountyPoolFormula: {
         type: 'object',
-        description: 'Prediction bounty pool settlement formula used when admin publishes race results.',
+        description:
+          'Prediction bounty pool settlement formula used when admin publishes race results. Points are internal credits; current exchange for top-up is 1000 VND = 1 point.',
         properties: {
           totalBountyPool: {
             type: 'string',
@@ -183,7 +184,13 @@ const swaggerDefinition = {
           },
           userReward: {
             type: 'string',
-            example: 'entryPoints + prizePool * (entryPoints / totalCorrectEntryPoints)',
+            example:
+              'Correct spectator receives returned contribution + spectatorRewardPool * (predictionScore / totalWinnerScore), where predictionScore = contribution * riskMultiplier.',
+          },
+          noWinnerPolicy: {
+            type: 'string',
+            example:
+              'If totalWinnerScore is 0, rolloverPolicy controls the spectator reward pool: refund, rollover_next_race, or to_organizer.',
           },
         },
       },
@@ -273,7 +280,12 @@ const swaggerDefinition = {
               type: 'object',
               properties: {
                 id: { type: 'string' },
-                type: { type: 'string', example: 'topup' },
+                type: {
+                  type: 'string',
+                  example: 'spent_pool_entry',
+                  description:
+                    'Point ledger type. Betting flow uses topup, spent_pool_entry, refunded_pool, earned_pool_share, spent_viewing_ticket, and spent_redemption.',
+                },
                 points: { type: 'number', example: 100 },
                 balanceAfter: { type: 'number', example: 1000 },
                 note: { type: 'string' },
@@ -281,6 +293,85 @@ const swaggerDefinition = {
               },
             },
           },
+        },
+      },
+      SpectatorRacePredictionConfig: {
+        type: 'object',
+        description:
+          'Public prediction settings needed by FE/mobile before creating a prediction.',
+        properties: {
+          isEnabled: { type: 'boolean', example: true },
+          poolEnabled: { type: 'boolean', example: true },
+          entryFee: {
+            type: 'integer',
+            minimum: 100,
+            example: 50000,
+            description: 'Base entry points. Final cost is entryFee * riskMultiplier.',
+          },
+          quickRiskMultipliers: {
+            type: 'array',
+            items: { type: 'integer', minimum: 1 },
+            example: [1, 2, 3, 6],
+            description: 'Allowed risk multipliers for this race tournament.',
+          },
+        },
+      },
+      ViewingTicketInfoDto: {
+        type: 'object',
+        properties: {
+          requiresTicket: { type: 'boolean', example: false },
+          hasPass: { type: 'boolean', example: false },
+          canPurchase: { type: 'boolean', example: false },
+          pricePoints: { type: 'integer', example: 200 },
+          announceAt: { type: 'string', format: 'date-time', nullable: true },
+          saleOpensAt: { type: 'string', format: 'date-time', nullable: true },
+          saleExpiresAt: { type: 'string', format: 'date-time', nullable: true },
+          announcementMessage: { type: 'string', nullable: true },
+          allowVipRedemption: { type: 'boolean', example: false },
+        },
+      },
+      SpectatorRaceDto: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string', example: 'Chung kết — Vòng 1' },
+          round: { type: 'integer', example: 1 },
+          scheduledAt: { type: 'string', format: 'date-time' },
+          status: {
+            type: 'string',
+            enum: ['scheduled', 'ongoing', 'completed', 'cancelled'],
+          },
+          distance: { type: 'number', example: 1600 },
+          tournament: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+            },
+          },
+          participants: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                laneNumber: { type: 'integer', example: 1 },
+              },
+            },
+          },
+          canPredict: {
+            type: 'boolean',
+            description:
+              'True only when prediction is enabled, race is scheduled, window is open, participant list is non-empty, and spectator has no active prediction.',
+          },
+          hasPrediction: { type: 'boolean' },
+          predictionOpenAt: { type: 'string', format: 'date-time', nullable: true },
+          predictionCloseAt: { type: 'string', format: 'date-time', nullable: true },
+          predictionConfig: { $ref: '#/components/schemas/SpectatorRacePredictionConfig' },
+          viewingTicket: { $ref: '#/components/schemas/ViewingTicketInfoDto' },
+          streamUrl: { type: 'string', nullable: true },
+          result: { type: 'object', nullable: true },
         },
       },
       CreateRaceRequest: {
@@ -603,7 +694,7 @@ const swaggerDefinition = {
         tags: ['Admin'],
         summary: 'Publish a race result and settle prediction bounty pool',
         description:
-          'Publishes confirmed race results, scores pending predictions, charges the bounty formula, records organizer fee, notifies owner/jockey, and distributes spectator pool shares.',
+          'Publishes confirmed race results and settles the point betting pool. Correct spectators receive returned contribution plus spectator pool share; owner and jockey rewards are added to their point ledgers from the racing reward pool; organizer fee is recorded in OrganizerLedger. If no prediction qualifies, rolloverPolicy controls refund, jackpot rollover, or transfer to organizer.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: {
@@ -736,7 +827,7 @@ const swaggerDefinition = {
         tags: ['Tournaments'],
         summary: 'Update prediction bounty pool configuration',
         description:
-          'Admin-only endpoint. Allows changing entry fee, allowed risk multipliers, pool distribution, and rank reward split while the tournament is draft or published. Owner/jockey split remains an internal backend configuration.',
+          'Admin-only endpoint. Allows changing entry fee, allowed risk multipliers, pool distribution, owner/jockey split, rank reward split, rolloverPolicy, and minScoreToShare while the tournament is draft or published. Pool distribution and rank reward rates must each sum to 100.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
@@ -1167,11 +1258,69 @@ const swaggerDefinition = {
       get: {
         tags: ['Spectator'],
         summary: 'List spectator-visible races',
+        description:
+          'Returns races visible to the spectator. FE/mobile should use canPredict plus predictionConfig.entryFee and predictionConfig.quickRiskMultipliers to calculate point betting cost before calling create prediction.',
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: 'filter', in: 'query', schema: { type: 'string', enum: ['open', 'upcoming', 'completed'] } },
         ],
-        responses: { 200: { description: 'Race list' } },
+        responses: {
+          200: {
+            description: 'Race list',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    races: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/SpectatorRaceDto' },
+                    },
+                  },
+                },
+                examples: {
+                  openPredictionRace: {
+                    value: {
+                      races: [
+                        {
+                          id: '665f1e000000000000000010',
+                          name: 'Chung kết — Vòng 1',
+                          round: 1,
+                          scheduledAt: '2026-07-05T09:00:00.000Z',
+                          status: 'scheduled',
+                          tournament: { id: '665f1e000000000000000100', name: 'Giải Đua Mùa Xuân 2026' },
+                          participants: [
+                            { id: '665f1e000000000000000001', name: 'Sóng Gió', laneNumber: 1 },
+                          ],
+                          canPredict: true,
+                          hasPrediction: false,
+                          predictionOpenAt: '2026-07-01T00:00:00.000Z',
+                          predictionCloseAt: '2026-07-05T08:30:00.000Z',
+                          predictionConfig: {
+                            isEnabled: true,
+                            poolEnabled: true,
+                            entryFee: 50000,
+                            quickRiskMultipliers: [1, 2, 3, 6],
+                          },
+                          viewingTicket: {
+                            requiresTicket: false,
+                            hasPass: false,
+                            canPurchase: false,
+                            pricePoints: 0,
+                            announceAt: null,
+                            saleOpensAt: null,
+                            saleExpiresAt: null,
+                            allowVipRedemption: false,
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     '/api/spectator/races/{id}': {
@@ -1180,7 +1329,21 @@ const swaggerDefinition = {
         summary: 'Get spectator race details',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Race details' } },
+        responses: {
+          200: {
+            description: 'Race details',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    race: { $ref: '#/components/schemas/SpectatorRaceDto' },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     '/api/spectator/races/{id}/viewing-pass': {
@@ -1270,7 +1433,7 @@ const swaggerDefinition = {
         tags: ['Spectator'],
         summary: 'Create a race prediction with optional risk multiplier',
         description:
-          'Creates one winner prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee * riskMultiplier points from the spectator profile and records it as entry points.',
+          'Creates one winner prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee * riskMultiplier points from the spectator profile and records a spent_pool_entry ledger transaction. If saving the prediction fails after spending points, the backend attempts to refund the entry points.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1312,6 +1475,7 @@ const swaggerDefinition = {
               },
             },
           },
+          400: { description: 'Invalid race id, horse id, rank payload, or unsupported risk multiplier' },
           409: {
             description: 'Prediction window closed, duplicate prediction, pool closed, or insufficient points',
           },
@@ -1349,8 +1513,24 @@ const swaggerDefinition = {
       get: {
         tags: ['Spectator'],
         summary: 'Get spectator points balance and history',
+        description:
+          'Returns the spectator point wallet. Transactions are ordered newest first and include top-up, prediction entry spend, prediction refunds, pool rewards, viewing ticket spend, and redemption spend.',
         security: [{ bearerAuth: [] }],
-        responses: { 200: { description: 'Points data' } },
+        responses: {
+          200: {
+            description: 'Points data',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    points: { $ref: '#/components/schemas/SpectatorPointsDto' },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     '/api/spectator/top-ups': {
@@ -1380,7 +1560,8 @@ const swaggerDefinition = {
       post: {
         tags: ['Spectator'],
         summary: 'Mock top-up: convert money to points',
-        description: 'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 1000 VND = 1 point; minimum top-up is 100 points.',
+        description:
+          'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 1000 VND = 1 point; minimum top-up is 100 points. Intended for local/demo testing and can be disabled by environment config.',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1406,6 +1587,7 @@ const swaggerDefinition = {
             },
           },
           400: { description: 'points is missing or below minimum' },
+          403: { description: 'Mock top-up is disabled on this environment' },
         },
       },
     },
