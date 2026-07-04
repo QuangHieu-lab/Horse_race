@@ -37,6 +37,7 @@ const COLLECTIONS_TO_CLEAR = [
   'organizerledgers',
   'notifications',
   'redemptions',
+  'paymenttransactions',
   'products',
   'predictions',
   'predictionpools',
