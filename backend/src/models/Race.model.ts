@@ -164,6 +164,49 @@ RaceSchema.pre('save', async function (next) {
   next();
 });
 
+// ─── Đồng bộ trạng thái giải đấu theo trạng thái trận đua ────────────────────
+// Bắt đầu đua (ongoing) → giải "Live"; đua xong (completed/cancelled) và không
+// còn trận nào đang chạy → giải trở lại "Registration" (published).
+// Không đụng tới giải đã 'completed' (admin tự bấm hoàn tất).
+async function syncTournamentStatusForRace(
+  tournamentId: mongoose.Types.ObjectId,
+  raceStatus: string,
+): Promise<void> {
+  const { Tournament } = await import('./Tournament.model.js');
+  const tour = await Tournament.findById(tournamentId).select('status').lean();
+  if (!tour || tour.status === 'completed') return;
+
+  if (raceStatus === 'ongoing') {
+    if (tour.status !== 'ongoing') {
+      await Tournament.updateOne({ _id: tournamentId }, { $set: { status: 'ongoing' } });
+    }
+    return;
+  }
+
+  if (raceStatus === 'completed' || raceStatus === 'cancelled') {
+    const RaceModel = mongoose.models.Race as mongoose.Model<IRace>;
+    const stillOngoing = await RaceModel.countDocuments({ tournamentId, status: 'ongoing' });
+    if (stillOngoing === 0 && tour.status === 'ongoing') {
+      await Tournament.updateOne({ _id: tournamentId }, { $set: { status: 'published' } });
+    }
+  }
+}
+
+RaceSchema.pre('save', function (next) {
+  this.$locals.raceStatusChangedTo = this.isModified('status') ? this.status : null;
+  next();
+});
+
+RaceSchema.post('save', async function (doc) {
+  const changed = doc.$locals?.raceStatusChangedTo as string | null | undefined;
+  if (!changed) return;
+  try {
+    await syncTournamentStatusForRace(doc.tournamentId, changed);
+  } catch (err) {
+    console.error('syncTournamentStatusForRace failed:', err);
+  }
+});
+
 RaceSchema.index({ tournamentId: 1, status: 1 });
 RaceSchema.index({ meetingId: 1 });
 RaceSchema.index({ trackId: 1 });

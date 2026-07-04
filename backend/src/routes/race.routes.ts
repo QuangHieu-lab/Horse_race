@@ -14,6 +14,7 @@ raceRouter.get('/:id/eligible-entries', raceController.eligibleEntries);
 raceRouter.post('/:id/participants', raceController.addParticipant);
 
 raceRouter.post('/:id/simulate', raceController.simulate);
+raceRouter.post('/:id/finish', raceController.finishRace);
 
 raceRouter.patch('/:id/referee', raceController.assignReferee);
 

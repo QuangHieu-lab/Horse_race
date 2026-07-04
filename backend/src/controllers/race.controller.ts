@@ -11,7 +11,7 @@ import {
   assignRaceReferee,
 } from '../services/race.service.js';
 import { listEligibleEntries } from '../services/race-participant.service.js';
-import { simulateAndPublishRace } from '../services/race-simulation.service.js';
+import { startRaceSimulation, finishRaceSimulation } from '../services/race-simulation.service.js';
 
 export class RaceController {
   create = asyncHandler(async (req: Request, res: Response) => {
@@ -64,8 +64,13 @@ export class RaceController {
   });
 
   simulate = asyncHandler(async (req: Request, res: Response) => {
-    const timeline = await simulateAndPublishRace(String(req.params.id), req.user!.id);
+    const timeline = await startRaceSimulation(String(req.params.id));
     res.json({ timeline });
+  });
+
+  finishRace = asyncHandler(async (req: Request, res: Response) => {
+    await finishRaceSimulation(String(req.params.id), req.user!.id);
+    res.json({ ok: true });
   });
 
   assignReferee = asyncHandler(async (req: Request, res: Response) => {

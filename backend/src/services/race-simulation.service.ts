@@ -37,10 +37,12 @@ const RACING_PRIZE_BY_RANK: Record<number, number> = { 1: 500, 2: 300, 3: 200 };
  * (kéo theo chấm điểm dự đoán + settle bounty pool qua hook của Result).
  * Trả về timeline để FE phát lại animation — thứ hạng cuối luôn khớp finishTime đã lưu.
  */
-export async function simulateAndPublishRace(
-  raceId: string,
-  adminId: string,
-): Promise<RaceSimTimeline> {
+/**
+ * BƯỚC 1 — Admin bắt đầu đua: đưa race sang 'ongoing' (hook: giải đấu → Live),
+ * mô phỏng kết quả và lưu BẢN NHÁP (chưa công bố). Trả timeline để phát animation.
+ * Kết quả chỉ được công bố ở bước finish (khi animation kết thúc).
+ */
+export async function startRaceSimulation(raceId: string): Promise<RaceSimTimeline> {
   if (!mongoose.isValidObjectId(raceId)) {
     throw new HttpError(400, 'ID cuộc đua không hợp lệ');
   }
@@ -58,13 +60,12 @@ export async function simulateAndPublishRace(
     throw new HttpError(409, 'Cần ít nhất 2 ngựa để bắt đầu đua');
   }
 
-  // Không cho mô phỏng lại nếu kết quả đã công bố trước đó
   const existing = await Result.findOne({ raceId: race._id });
   if (existing?.publishedAt) {
     throw new HttpError(409, 'Kết quả cuộc đua này đã được công bố');
   }
 
-  // scheduled -> ongoing -> completed (Race model bắt buộc ongoing trước completed)
+  // scheduled -> ongoing (hook đồng bộ: giải đấu -> Live)
   if (race.status === 'scheduled') {
     race.status = 'ongoing';
     await race.save();
@@ -88,26 +89,12 @@ export async function simulateAndPublishRace(
     };
   });
 
-  race.status = 'completed';
-  await race.save();
-
-  // Ghi kết quả + tự xác nhận + công bố (hook publishedAt sẽ settle dự đoán)
-  let result = existing ?? new Result({
-    raceId: race._id,
-    tournamentId: race.tournamentId,
-    rankings: [],
-    violations: [],
-    protests: [],
-    isPhotoFinish: false,
-  });
-  result.rankings = rankings;
-  const now = new Date();
-  const adminObjectId = new mongoose.Types.ObjectId(adminId);
-  result.confirmedBy = adminObjectId;
-  result.confirmedAt = now;
-  result.publishedBy = adminObjectId;
-  result.publishedAt = now;
-  await result.save();
+  // Lưu bản nháp (chưa confirm/publish) — công bố ở bước finish
+  await Result.findOneAndUpdate(
+    { raceId: race._id },
+    { rankings, isPhotoFinish: false, $setOnInsert: { tournamentId: race.tournamentId } },
+    { upsert: true, new: true },
+  );
 
   const horses: RaceSimHorse[] = sims.map((s, i) => {
     const horse = s.p.horseId as unknown as { _id: mongoose.Types.ObjectId; name: string };
@@ -143,4 +130,39 @@ export async function simulateAndPublishRace(
     durationMs: 18000,
     horses,
   };
+}
+
+/**
+ * BƯỚC 2 — Kết thúc đua (khi animation xong): race -> 'completed'
+ * (hook: giải đấu trở lại Registration), rồi tự xác nhận + công bố kết quả
+ * (hook publishedAt settle dự đoán). Idempotent nếu đã công bố.
+ */
+export async function finishRaceSimulation(raceId: string, adminId: string): Promise<void> {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID cuộc đua không hợp lệ');
+  }
+  const race = await Race.findById(raceId);
+  if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
+
+  const result = await Result.findOne({ raceId: race._id });
+  if (!result || result.rankings.length === 0) {
+    throw new HttpError(409, 'Chưa có kết quả — hãy bắt đầu đua trước.');
+  }
+  if (result.publishedAt) return; // đã công bố -> bỏ qua (idempotent)
+
+  // ongoing -> completed (hook đồng bộ: giải đấu -> Registration)
+  if (race.status === 'ongoing') {
+    race.status = 'completed';
+    await race.save();
+  } else if (race.status !== 'completed') {
+    throw new HttpError(409, 'Cuộc đua chưa bắt đầu');
+  }
+
+  const now = new Date();
+  const adminObjectId = new mongoose.Types.ObjectId(adminId);
+  result.confirmedBy = adminObjectId;
+  result.confirmedAt = now;
+  result.publishedBy = adminObjectId;
+  result.publishedAt = now;
+  await result.save();
 }

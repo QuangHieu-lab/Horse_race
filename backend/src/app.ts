@@ -19,6 +19,7 @@ import { adminRaceMeetingRouter } from './routes/admin-racemeeting.routes.js';
 import { adminTrackRouter } from './routes/admin-track.routes.js';
 import { adminViolationRuleRouter } from './routes/admin-violation-rule.routes.js';
 import { paymentRouter } from './routes/payment.routes.js';
+import { leaderboardRouter } from './routes/leaderboard.routes.js';
 export function createApp() {
   const app = express();
   const corsOptions = buildCorsOptions();
@@ -50,6 +51,8 @@ export function createApp() {
   app.use('/api/admin/violation-rules',authenticate, requireRole('admin'),adminViolationRuleRouter)
   app.use('/api/referee', authenticate, requireRole('referee'), refereeRouter);
   app.use('/api/horse-owner', authenticate, requireRole('horse_owner'), horseOwnerRouter);
+  // Bảng xếp hạng dùng chung — mọi role đã đăng nhập (không giới hạn role).
+  app.use('/api/leaderboards', authenticate, leaderboardRouter);
 ;
   app.use(errorHandler);
 
