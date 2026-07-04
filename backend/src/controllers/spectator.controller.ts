@@ -120,4 +120,9 @@ export class SpectatorController {
     const notifications = await listNotificationsForUser(req.user!.id);
     res.json({ notifications });
   });
+
+  getRaceSimulation = asyncHandler(async (req: Request, res: Response) => {
+    const data = await spectatorService.getRaceSimulation(req.params.id as string);
+    res.json(data);
+  });
 }

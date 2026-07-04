@@ -35,4 +35,14 @@ export class AuthController {
     const user = await authService.getMe(req.user!.id);
     res.json({ user });
   });
+
+  changePassword = asyncHandler(async (req: Request, res: Response) => {
+    const { oldPassword, newPassword } = req.body as { oldPassword?: string; newPassword?: string };
+    if (!oldPassword || !newPassword) {
+      res.status(400).json({ message: 'Mật khẩu cũ và mật khẩu mới là bắt buộc', statusCode: 400 });
+      return;
+    }
+    const result = await authService.changePassword(req.user!.id, oldPassword, newPassword);
+    res.json(result);
+  });
 }
