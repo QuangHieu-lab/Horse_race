@@ -37,6 +37,7 @@ const COLLECTIONS_TO_CLEAR = [
   'organizerledgers',
   'notifications',
   'redemptions',
+  'paymenttransactions',
   'products',
   'predictions',
   'predictionpools',
@@ -156,6 +157,13 @@ async function seed(): Promise<void> {
       fullName: 'Khách Dự Đoán Phụ',
       phone: '0900000008',
     },
+    {
+      email: 'spectator3@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'spectator',
+      fullName: 'Khách Risk 2x',
+      phone: '0900000009',
+    },
   ]);
   const admin = users[0]!;
   const owner = users[1]!;
@@ -165,6 +173,7 @@ async function seed(): Promise<void> {
   const referee = users[5]!;
   const spectator = users[6]!;
   const spectator2 = users[7]!;
+  const spectator3 = users[8]!;
 
   console.log('Setting spectator points…');
   const spectatorProfile =
@@ -204,6 +213,21 @@ async function seed(): Promise<void> {
     undefined,
     'Seed demo spend: viewing ticket',
   );
+  const spectator3Profile =
+    (await SpectatorProfile.findOne({ userId: spectator3._id })) ??
+    (await SpectatorProfile.create({ userId: spectator3._id }));
+  spectator3Profile.currentBalance = 0;
+  spectator3Profile.totalPointsEarned = 0;
+  spectator3Profile.totalPointsSpent = 0;
+  spectator3Profile.transactions = [];
+  await spectator3Profile.save();
+  await spectator3Profile.addPoints(
+    300_000,
+    'topup',
+    undefined,
+    undefined,
+    'Seed demo top-up: 300,000 points',
+  );
 
   await PaymentTransaction.create([
     {
@@ -225,6 +249,17 @@ async function seed(): Promise<void> {
       exchangeRateVndPerPoint: 1000,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator2',
+      providerPayload: { mode: 'seed' },
+      paidAt: daysFromNow(-1),
+    },
+    {
+      userId: spectator3._id,
+      provider: 'mock',
+      amountVnd: 300_000_000,
+      points: 300_000,
+      exchangeRateVndPerPoint: 1000,
+      status: 'paid',
+      providerTransactionId: 'seed_mock_topup_spectator3',
       providerPayload: { mode: 'seed' },
       paidAt: daysFromNow(-1),
     },
@@ -554,6 +589,24 @@ async function seed(): Promise<void> {
         clothNumber: 1,
         confirmedAt: new Date(),
         vetApprovedAt: new Date()
+      },
+      {
+        horseId: horseB._id,
+        jockeyId: jockey2._id,
+        ownerId: owner._id,
+        laneNumber: 2,
+        clothNumber: 2,
+        confirmedAt: new Date(),
+        vetApprovedAt: new Date()
+      },
+      {
+        horseId: horseC._id,
+        jockeyId: jockey3._id,
+        ownerId: owner._id,
+        laneNumber: 3,
+        clothNumber: 3,
+        confirmedAt: new Date(),
+        vetApprovedAt: new Date()
       }
     ],
   });
@@ -570,6 +623,24 @@ async function seed(): Promise<void> {
         finishTime: 98.42,
         marginBehind: 0,
         prize: 30_000_000,
+      },
+      {
+        rank: 2,
+        horseId: horseB._id,
+        jockeyId: jockey2._id,
+        ownerId: owner._id,
+        finishTime: 99.21,
+        marginBehind: 0.79,
+        prize: 15_000_000,
+      },
+      {
+        rank: 3,
+        horseId: horseC._id,
+        jockeyId: jockey3._id,
+        ownerId: owner._id,
+        finishTime: 100.04,
+        marginBehind: 1.62,
+        prize: 5_000_000,
       },
     ],
     violations: [],
@@ -601,20 +672,6 @@ async function seed(): Promise<void> {
     `Seed demo pool entry: ${raceCompleted.name}`,
   );
 
-  await PredictionPool.create({
-    raceId: raceCompleted._id,
-    tournamentId: tournamentSpring._id,
-    status: 'open',
-    ticketPrice: 50_000,
-    minRiskMultiplier: 1,
-    maxRiskMultiplier: 10,
-    quickRiskMultipliers: [1, 2, 3, 6],
-    totalTickets: 2,
-    totalBountyPool: 100_000,
-    winPool: 0,
-    contributorCount: 2,
-  });
-
   const predictionPending2 = await Prediction.create({
     spectatorId: spectator2._id,
     raceId: raceCompleted._id,
@@ -636,6 +693,52 @@ async function seed(): Promise<void> {
     predictionPending2._id,
     `Seed demo pool entry: ${raceCompleted.name}`,
   );
+
+  const predictionPending3 = await Prediction.create({
+    spectatorId: spectator3._id,
+    raceId: raceCompleted._id,
+    tournamentId: tournamentSpring._id,
+    predictedRanks: [
+      { rank: 1, horseId: horseA._id },
+    ],
+    status: 'pending',
+    riskMultiplier: 2,
+    contribution: 100_000,
+    pointsEarned: 0,
+    bonusPoints: 0,
+    totalPoints: 0,
+  });
+  await spectator3Profile.spendPoints(
+    100_000,
+    'spent_pool_entry',
+    'Prediction',
+    predictionPending3._id,
+    `Seed demo pool entry 2x: ${raceCompleted.name}`,
+  );
+
+  await PredictionPool.create({
+    raceId: raceCompleted._id,
+    tournamentId: tournamentSpring._id,
+    status: 'open',
+    ticketPrice: 50_000,
+    minRiskMultiplier: 1,
+    maxRiskMultiplier: 10,
+    quickRiskMultipliers: [1, 2, 3, 6],
+    totalTickets: 3,
+    totalBountyPool: 200_000,
+    winPool: 0,
+    contributorCount: 3,
+  });
+
+  /*
+   * Scenario C has:
+   * - spectator@demo.local: correct winner, 1x, contribution 50,000.
+   * - spectator2@demo.local: incorrect winner, 1x, contribution 50,000.
+   * - spectator3@demo.local: correct winner, 2x, contribution 100,000.
+   *
+   * Publishing the result lets you test weighted pool sharing:
+   * predictionScore = contribution * riskMultiplier.
+   */
 
   // --- 🚀 SCENARIO D: BẢN NHÁP CHO REFEREE TEST PHẠT ---
   console.log('Scenario D — Referee Draft Result for Testing Penalties…');
@@ -736,17 +839,28 @@ async function seed(): Promise<void> {
     waiverAcceptedAt: new Date(),
   });
 
-  const product = await Product.create({
-    name: 'Voucher xem giải VIP',
-    description: 'Đổi 500 điểm — vé xem Chung kết Vòng 1 (sự kiện hiếm).',
-    category: 'voucher',
-    pointsCost: 500,
-    stock: 10,
-    isActive: true,
-    linkedRaceId: raceOpen._id,
-    voucherKind: 'race_viewing_pass',
-    createdBy: admin._id,
-  });
+  await Product.create([
+    {
+      name: 'Voucher xem giải VIP',
+      description: 'Đổi 500 điểm — vé xem Chung kết Vòng 1 (sự kiện hiếm).',
+      category: 'voucher',
+      pointsCost: 500,
+      stock: 10,
+      isActive: true,
+      linkedRaceId: raceOpen._id,
+      voucherKind: 'race_viewing_pass',
+      createdBy: admin._id,
+    },
+    {
+      name: 'Hộp quà lưu niệm trường đua',
+      description: 'Quà demo để test đổi điểm không gắn với vé xem.',
+      category: 'merchandise',
+      pointsCost: 1_000,
+      stock: 25,
+      isActive: true,
+      createdBy: admin._id,
+    },
+  ]);
 
   const viewingPass = await RaceViewingPass.create({
     spectatorId: spectator._id,
@@ -783,16 +897,25 @@ async function seed(): Promise<void> {
       refModel: 'RaceViewingPass',
       refId: viewingPass._id,
     },
+    {
+      userId: spectator3._id,
+      type: 'prediction_reward',
+      title: 'Dự đoán 2x đã ghi nhận',
+      message: `Bạn đã tham gia dự đoán ${raceCompleted.name} với hệ số 2x để test chia thưởng theo trọng số.`,
+      refModel: 'Prediction',
+      refId: predictionPending3._id,
+    },
   ]);
 
   console.log('\n=== Seed completed ===\n');
   console.log('A — Jockey:   pending invite on', raceUpcoming.name);
   console.log('B — Spectator: open prediction on', raceOpen.name);
   console.log('C — Scoring:  result confirmed, awaiting publish on', raceCompleted.name);
+  console.log('   -> spectator@demo.local correct 1x, spectator2 incorrect 1x, spectator3 correct 2x');
   console.log('D — Referee:  result DRAFT created on', raceDraft.name);
   console.log('E — Independent: Horse registered, NO Jockey on', raceIndependent.name);
   console.log('   -> Free Jockey available: jockey3@demo.local');
-  console.log('   -> Extra spectator account: spectator2@demo.local');
+  console.log('   -> Extra spectator accounts: spectator2@demo.local, spectator3@demo.local');
 
   // 🚀 IN RA CÁC MẪU JSON ĐỂ TEST TRỰC TIẾP TRÊN POSTMAN
   console.log('\n======================================================');
@@ -819,7 +942,7 @@ async function seed(): Promise<void> {
     target: "horse",
     notes: "Ngựa C xuất phát sớm theo lỗi ERR-001, tước quyền thi đấu."
   }, null, 2));
-  
+
   console.log('\n======================================================');
   console.log(' 🏇 DỮ LIỆU ĐỂ TEST LUỒNG MỜI KỴ SĨ (SCENARIO E)');
   console.log('======================================================');
