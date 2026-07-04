@@ -52,6 +52,7 @@ jockey3@demo.local
 referee@demo.local
 spectator@demo.local
 spectator2@demo.local
+spectator3@demo.local
 ```
 
 ## Seeded Scenarios
@@ -59,9 +60,52 @@ spectator2@demo.local
 - Jockey flow: pending invitation and assigned race data.
 - Horse owner flow: horses, approved registrations, and one independent race without a jockey yet.
 - Spectator flow: tournaments, races, points wallet, top-up payments, prediction data, products, and a viewing pass.
-- Prediction settlement flow: a completed race with confirmed result waiting for admin publish, including one correct prediction and one incorrect prediction.
+- Prediction settlement flow: a completed race with confirmed result waiting for admin publish, including one correct 1x prediction, one incorrect 1x prediction, and one correct 2x prediction.
 - Referee flow: draft result race for testing time penalty, disqualification-style penalty through `penalize`, revoke penalty, and result confirmation.
 - Horse PDF data: demo horses point to a local copy of the NJ 4-H Horse Registration Form PDF.
+
+## Spectator Point Test Data
+
+The seed creates three spectator accounts:
+
+```text
+spectator@demo.local   / Demo@123 — correct winner prediction, 1x risk
+spectator2@demo.local  / Demo@123 — incorrect winner prediction, 1x risk
+spectator3@demo.local  / Demo@123 — correct winner prediction, 2x risk
+```
+
+Initial point wallets after seed:
+
+```text
+spectator@demo.local  — earned 250,000, spent 50,000, balance 200,000
+spectator2@demo.local — earned 150,000, spent 80,000, balance 70,000
+spectator3@demo.local — earned 300,000, spent 100,000, balance 200,000
+```
+
+The completed race `Vòng loại — Heat 1` is seeded with:
+
+```text
+3 pending predictions
+totalBountyPool = 200,000 points
+entryFee = 50,000 points
+allowed risk multipliers = 1, 2, 3, 6
+```
+
+When admin publishes this result, the pool settlement can be tested with weighted scoring:
+
+```text
+predictionScore = contribution * riskMultiplier
+spectator@demo.local  score = 50,000 * 1 = 50,000
+spectator3@demo.local score = 100,000 * 2 = 200,000
+spectator2@demo.local loses and funds the winPool
+```
+
+The seed also creates two redeemable products:
+
+```text
+Voucher xem giải VIP — 500 points, grants a race viewing pass
+Hộp quà lưu niệm trường đua — 1,000 points, merchandise demo
+```
 
 ## Demo PDF
 
@@ -108,4 +152,26 @@ PAYOS_API_URL=https://api-merchant.payos.vn
 PAYOS_RETURN_URL=http://localhost:3000/api/payments/payos/return
 PAYOS_CANCEL_URL=http://localhost:3000/api/payments/payos/cancel
 PAYOS_FRONTEND_RETURN_URL=http://localhost:5173
+```
+
+For local demo, use the mock top-up endpoint/button first:
+
+```text
+POST /api/spectator/top-ups
+body: { "points": 100 }
+```
+
+Expected result:
+
+```text
+amountVnd = 100,000
+exchangeRateVndPerPoint = 1000
+status = paid
+spectator balance increases by 100 points
+```
+
+PayOS is intentionally not usable with placeholder credentials. If `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, or `PAYOS_CHECKSUM_KEY` are missing, the backend returns a configuration error for:
+
+```text
+POST /api/spectator/top-ups/payos
 ```
