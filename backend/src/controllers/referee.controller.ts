@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import * as refereeService from '../services/referee.service.js';
-import type { ApplyTimePenaltyInput } from '../services/referee.service.js';
 import * as resultService from '../services/result.service.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -80,10 +79,11 @@ export class RefereeController {
   });
 
   penalize = asyncHandler(async (req: Request, res: Response) => {
-    const { ruleId, horseId, jockeyId, target, notes } = req.body as {
+    const { ruleId, horseId, jockeyId, affectedHorseId, target, notes } = req.body as {
       ruleId?: string;
       horseId?: string;
       jockeyId?: string;
+      affectedHorseId?: string;
       target?: 'horse' | 'jockey' | 'both';
       notes?: string;
     };
@@ -97,7 +97,7 @@ export class RefereeController {
     await refereeService.applyRacePenalty(
       req.user!.id,
       req.params.id as string,
-      { ruleId, horseId, jockeyId, target, notes } 
+      { ruleId, horseId, jockeyId, affectedHorseId, target, notes } 
     );
 
     res.json({ 
@@ -121,27 +121,6 @@ export class RefereeController {
     res.json({ 
       success: true, 
       message: 'Đã hoàn tác án phạt và khôi phục trạng thái thành công.' 
-    });
-  });
-
-  applyTimePenalty = asyncHandler(async (req: Request, res: Response) => {
-    const raceId = req.params.id;
-    const input = req.body as ApplyTimePenaltyInput;
-
-    if (!input.horseId || !input.jockeyId || typeof input.addedTimeSeconds !== 'number' || !input.type || !input.description) {
-      throw new HttpError(400, 'Thiếu thông tin bắt buộc để phạt thời gian (horseId, jockeyId, addedTimeSeconds, type, description)');
-    }
-
-    if (input.addedTimeSeconds <= 0) {
-      throw new HttpError(400, 'Thời gian phạt cộng thêm phải lớn hơn 0');
-    }
-
-    const updatedResult = await refereeService.applyViolationAndTimePenalty(raceId as string, input);
-
-    res.status(200).json({
-      success: true,
-      message: `Đã áp dụng hình phạt cộng ${input.addedTimeSeconds} giây và cập nhật bảng xếp hạng.`,
-      data: updatedResult
     });
   });
 
