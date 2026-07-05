@@ -79,12 +79,18 @@ const swaggerDefinition = {
             description: 'MVP prediction accepts one horse only: rank 1 winner prediction.',
             items: { $ref: '#/components/schemas/PredictedRankRequest' },
           },
-          riskMultiplier: {
+          ticketCount: {
             type: 'integer',
             minimum: 1,
             example: 2,
-            description:
-              'Prediction risk multiplier. Must be one of tournament predictionConfig.quickRiskMultipliers.',
+            description: 'Number of prediction tickets to buy. Total cost = entryFee * ticketCount.',
+          },
+          riskMultiplier: {
+            type: 'integer',
+            minimum: 1,
+            deprecated: true,
+            example: 2,
+            description: 'Deprecated compatibility alias for ticketCount.',
           },
         },
       },
@@ -102,12 +108,18 @@ const swaggerDefinition = {
           contribution: {
             type: 'number',
             example: 100000,
-            description: 'Prediction entry points paid into the bounty pool: entryFee * riskMultiplier.',
+            description: 'Prediction entry points paid into the bounty pool: entryFee * ticketCount.',
+          },
+          ticketCount: {
+            type: 'integer',
+            example: 2,
+            description: 'Number of prediction tickets bought for this prediction.',
           },
           riskMultiplier: {
             type: 'integer',
             example: 2,
-            description: 'Whole-number risk multiplier used for this prediction.',
+            deprecated: true,
+            description: 'Deprecated compatibility alias. Use ticketCount.',
           },
           predictionScore: {
             type: 'number',
@@ -152,11 +164,11 @@ const swaggerDefinition = {
         properties: {
           totalBountyPool: {
             type: 'string',
-            example: 'sum(entryFee * riskMultiplier) across all predictions',
+            example: 'sum(entryFee * ticketCount) across all predictions',
           },
           winPool: {
             type: 'string',
-            example: 'sum(entryFee * riskMultiplier) from incorrect winner predictions',
+            example: 'sum(entryFee * ticketCount) from incorrect winner predictions',
           },
           organizerFee: {
             type: 'string',
@@ -185,7 +197,7 @@ const swaggerDefinition = {
           userReward: {
             type: 'string',
             example:
-              'Correct spectator receives returned contribution + spectatorRewardPool * (predictionScore / totalWinnerScore), where predictionScore = contribution * riskMultiplier.',
+              'Correct spectator receives returned contribution + spectatorRewardPool * (predictionScore / totalWinnerScore), where predictionScore = contribution.',
           },
           noWinnerPolicy: {
             type: 'string',
@@ -201,15 +213,19 @@ const swaggerDefinition = {
           pointsPerCorrect: { type: 'number', example: 100 },
           bonusPointsTop3: { type: 'number', example: 50 },
           poolEnabled: { type: 'boolean', example: true },
-          entryFee: { type: 'number', example: 50000 },
+          entryFee: {
+            type: 'number',
+            example: 50000,
+            description: 'Price of one prediction ticket in points.',
+          },
           minRiskMultiplier: { type: 'integer', minimum: 1, example: 1 },
           maxRiskMultiplier: { type: 'integer', minimum: 1, example: 10 },
           quickRiskMultipliers: {
             type: 'array',
             items: { type: 'integer', minimum: 1 },
-            example: [1, 2, 3, 6],
-            description:
-              'Allowed risk multipliers for bounty-pool predictions. The backend rejects riskMultiplier values outside this list.',
+            example: [1],
+            deprecated: true,
+            description: 'Deprecated compatibility field. Ticket-based predictions should send ticketCount.',
           },
           organizerFeeRate: { type: 'number', example: 10 },
           racingRewardRate: { type: 'number', example: 15 },
@@ -306,13 +322,20 @@ const swaggerDefinition = {
             type: 'integer',
             minimum: 100,
             example: 50000,
-            description: 'Base entry points. Final cost is entryFee * riskMultiplier.',
+            description: 'Price of one prediction ticket. Final cost is entryFee * ticketCount.',
+          },
+          ticketPrice: {
+            type: 'integer',
+            minimum: 100,
+            example: 50000,
+            description: 'Alias for entryFee, exposed for clearer FE/mobile labels.',
           },
           quickRiskMultipliers: {
             type: 'array',
             items: { type: 'integer', minimum: 1 },
-            example: [1, 2, 3, 6],
-            description: 'Allowed risk multipliers for this race tournament.',
+            example: [1],
+            deprecated: true,
+            description: 'Deprecated compatibility field. FE/mobile should use ticketCount input instead.',
           },
         },
       },
@@ -357,6 +380,11 @@ const swaggerDefinition = {
                 id: { type: 'string' },
                 name: { type: 'string' },
                 laneNumber: { type: 'integer', example: 1 },
+                ticketCount: {
+                  type: 'integer',
+                  example: 12,
+                  description: 'Current number of prediction tickets placed on this horse for the race.',
+                },
               },
             },
           },
@@ -816,7 +844,7 @@ const swaggerDefinition = {
         tags: ['Tournaments'],
         summary: 'Update prediction bounty pool configuration',
         description:
-          'Admin-only endpoint. Allows changing entry fee, allowed risk multipliers, pool distribution, owner/jockey split, rank reward split, rolloverPolicy, and minScoreToShare while the tournament is draft or published. Pool distribution and rank reward rates must each sum to 100.',
+          'Admin-only endpoint. Allows changing ticket price, pool distribution, owner/jockey split, rank reward split, rolloverPolicy, and minScoreToShare while the tournament is draft or published. Pool distribution and rank reward rates must each sum to 100.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
@@ -1230,7 +1258,7 @@ const swaggerDefinition = {
         tags: ['Spectator'],
         summary: 'List spectator-visible races',
         description:
-          'Returns races visible to the spectator. FE/mobile should use canPredict plus predictionConfig.entryFee and predictionConfig.quickRiskMultipliers to calculate point betting cost before calling create prediction.',
+          'Returns races visible to the spectator. FE/mobile should use canPredict plus predictionConfig.ticketPrice/entryFee to calculate point betting cost as ticketPrice * ticketCount before calling create prediction.',
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: 'filter', in: 'query', schema: { type: 'string', enum: ['open', 'upcoming', 'completed'] } },
@@ -1261,7 +1289,7 @@ const swaggerDefinition = {
                           status: 'scheduled',
                           tournament: { id: '665f1e000000000000000100', name: 'Giải Đua Mùa Xuân 2026' },
                           participants: [
-                            { id: '665f1e000000000000000001', name: 'Sóng Gió', laneNumber: 1 },
+                            { id: '665f1e000000000000000001', name: 'Sóng Gió', laneNumber: 1, ticketCount: 12 },
                           ],
                           canPredict: true,
                           hasPrediction: false,
@@ -1271,7 +1299,8 @@ const swaggerDefinition = {
                             isEnabled: true,
                             poolEnabled: true,
                             entryFee: 50000,
-                            quickRiskMultipliers: [1, 2, 3, 6],
+                            ticketPrice: 50000,
+                            quickRiskMultipliers: [1],
                           },
                           viewingTicket: {
                             requiresTicket: false,
@@ -1402,9 +1431,9 @@ const swaggerDefinition = {
       },
       post: {
         tags: ['Spectator'],
-        summary: 'Create a race prediction with optional risk multiplier',
+        summary: 'Create a race prediction with ticket count',
         description:
-          'Creates one winner prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee * riskMultiplier points from the spectator profile and records a spent_pool_entry ledger transaction. If saving the prediction fails after spending points, the backend attempts to refund the entry points.',
+          'Creates one winner prediction for the race. If tournament predictionConfig.poolEnabled is true, the backend spends entryFee * ticketCount points from the spectator profile and records a spent_pool_entry ledger transaction. If saving the prediction fails after spending points, the backend attempts to refund the entry points.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1425,7 +1454,7 @@ const swaggerDefinition = {
                   value: {
                     raceId: '665f1e000000000000000010',
                     predictedRanks: [{ rank: 1, horseId: '665f1e000000000000000001' }],
-                    riskMultiplier: 2,
+                    ticketCount: 2,
                   },
                 },
               },
@@ -1446,7 +1475,7 @@ const swaggerDefinition = {
               },
             },
           },
-          400: { description: 'Invalid race id, horse id, rank payload, or unsupported risk multiplier' },
+          400: { description: 'Invalid race id, horse id, rank payload, or ticketCount' },
           409: {
             description: 'Prediction window closed, duplicate prediction, pool closed, or insufficient points',
           },

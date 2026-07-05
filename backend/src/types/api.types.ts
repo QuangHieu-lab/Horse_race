@@ -78,6 +78,7 @@ export interface SpectatorHorseDto {
   id: string;
   name: string;
   laneNumber: number;
+  ticketCount: number;
 }
 
 export interface ViewingTicketInfoDto {
@@ -120,6 +121,7 @@ export interface SpectatorRaceDto {
     isEnabled: boolean;
     poolEnabled: boolean;
     entryFee: number;
+    ticketPrice: number;
     quickRiskMultipliers: number[];
   };
   result?: RaceResultDto | null;
@@ -150,6 +152,7 @@ export interface PredictionDto {
   tournamentName: string;
   predictedRanks: PredictedRankDto[];
   status: PredictionStatus;
+  ticketCount: number;
   riskMultiplier: number;
   contribution: number;
   predictionScore: number;

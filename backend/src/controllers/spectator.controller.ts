@@ -34,9 +34,10 @@ export class SpectatorController {
   });
 
   createPrediction = asyncHandler(async (req: Request, res: Response) => {
-    const { raceId, predictedRanks, riskMultiplier } = req.body as {
+    const { raceId, predictedRanks, ticketCount, riskMultiplier } = req.body as {
       raceId?: string;
       predictedRanks?: Array<{ rank: number; horseId: string }>;
+      ticketCount?: number;
       riskMultiplier?: number;
     };
     if (!raceId || !predictedRanks) {
@@ -45,6 +46,7 @@ export class SpectatorController {
     const prediction = await createPrediction(req.user!.id, {
       raceId,
       predictedRanks,
+      ticketCount,
       riskMultiplier,
     });
     res.status(201).json({ prediction });

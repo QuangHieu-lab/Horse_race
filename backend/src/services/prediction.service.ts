@@ -11,6 +11,7 @@ import { getOrCreateProfile, listPredictions } from './spectator.service.js';
 export interface CreatePredictionInput {
   raceId: string;
   predictedRanks: Array<{ rank: number; horseId: string }>;
+  ticketCount?: number;
   riskMultiplier?: number;
 }
 
@@ -18,7 +19,7 @@ export async function createPrediction(
   spectatorId: string,
   input: CreatePredictionInput,
 ): Promise<PredictionDto> {
-  const { raceId, predictedRanks, riskMultiplier } = input;
+  const { raceId, predictedRanks, ticketCount, riskMultiplier } = input;
 
   if (!mongoose.isValidObjectId(raceId)) {
     throw new HttpError(400, 'ID cuộc đua không hợp lệ');
@@ -78,13 +79,14 @@ export async function createPrediction(
   }
 
   let contribution = 0;
-  let finalRiskMultiplier = 1;
+  let finalTicketCount = 1;
   if (tournament.predictionConfig.poolEnabled) {
     const charged = await chargePredictionTicket(spectatorId, {
       _id: race._id,
       tournamentId: race.tournamentId,
       name: race.name,
       ticketPrice: tournament.predictionConfig.entryFee || undefined,
+      ticketCount,
       riskMultiplier,
       minRiskMultiplier: tournament.predictionConfig.minRiskMultiplier,
       maxRiskMultiplier: tournament.predictionConfig.maxRiskMultiplier,
@@ -96,7 +98,7 @@ export async function createPrediction(
       jockeyShareRate: tournament.predictionConfig.jockeyShareRate,
     });
     contribution = charged.contribution;
-    finalRiskMultiplier = charged.riskMultiplier;
+    finalTicketCount = charged.ticketCount;
   }
 
   const predictionPayload = {
@@ -108,7 +110,8 @@ export async function createPrediction(
       horseId: new mongoose.Types.ObjectId(r.horseId),
     })),
     status: 'pending' as const,
-    riskMultiplier: finalRiskMultiplier,
+    ticketCount: finalTicketCount,
+    riskMultiplier: finalTicketCount,
     contribution,
     poolShare: 0,
     scoringWeight: 0,

@@ -78,6 +78,20 @@ async function buildSpectatorRaceDto(
   if (!tournament) throw new HttpError(500, 'Không tìm thấy giải đấu');
 
   const horseMap = new Map(horses.map((h) => [h._id.toString(), h.name]));
+  const activePredictions = await Prediction.find({
+    raceId: race._id,
+    status: { $ne: 'cancelled' },
+  })
+    .select('predictedRanks ticketCount riskMultiplier')
+    .lean();
+  const ticketCountByHorse = new Map<string, number>();
+  for (const prediction of activePredictions) {
+    const predictedWinner = prediction.predictedRanks.find((rank) => rank.rank === 1);
+    if (!predictedWinner) continue;
+    const horseId = predictedWinner.horseId.toString();
+    const count = prediction.ticketCount ?? prediction.riskMultiplier ?? 1;
+    ticketCountByHorse.set(horseId, (ticketCountByHorse.get(horseId) ?? 0) + count);
+  }
   const canPredict =
     !!spectatorId &&
     isPredictionWindowOpen(race, tournament) &&
@@ -159,6 +173,7 @@ async function buildSpectatorRaceDto(
       id: p.horseId.toString(),
       name: horseMap.get(p.horseId.toString()) ?? 'Unknown',
       laneNumber: p.laneNumber,
+      ticketCount: ticketCountByHorse.get(p.horseId.toString()) ?? 0,
     })),
     canPredict,
     hasPrediction: !!existingPrediction,
@@ -168,6 +183,7 @@ async function buildSpectatorRaceDto(
       isEnabled: tournament.predictionConfig.isEnabled,
       poolEnabled: tournament.predictionConfig.poolEnabled,
       entryFee: tournament.predictionConfig.entryFee,
+      ticketPrice: tournament.predictionConfig.entryFee,
       quickRiskMultipliers: tournament.predictionConfig.quickRiskMultipliers,
     },
     result: resultDto,
@@ -415,6 +431,7 @@ export async function listPredictions(spectatorId: string): Promise<PredictionDt
         horseName: horseMap.get(r.horseId.toString()),
       })),
       status: p.status,
+      ticketCount: p.ticketCount ?? p.riskMultiplier ?? 1,
       riskMultiplier: p.riskMultiplier,
       contribution: p.contribution,
       predictionScore: p.scoringWeight,
