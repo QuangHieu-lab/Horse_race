@@ -71,4 +71,4 @@ export function disqualifiedHorseIdsFromViolations(
   return ids;
 }
 
-export const PENALTY_AFFECTS_RANKING: PenaltyApplied[] = ['disqualify', 'disqualification'];
+export const PENALTY_AFFECTS_RANKING: PenaltyApplied[] = ['demote', 'disqualify', 'disqualification'];

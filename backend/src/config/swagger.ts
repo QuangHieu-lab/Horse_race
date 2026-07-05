@@ -464,18 +464,6 @@ const swaggerDefinition = {
           },
         },
       },
-      ApplyTimePenaltyRequest: {
-        type: 'object',
-        required: ['horseId', 'jockeyId', 'addedTimeSeconds', 'type', 'description'],
-        properties: {
-          horseId: { type: 'string' },
-          jockeyId: { type: 'string' },
-          addedTimeSeconds: { type: 'number', minimum: 0.001, example: 5.5 },
-          ruleId: { type: 'string' },
-          type: { type: 'string', example: 'race_conduct' },
-          description: { type: 'string', example: 'Obstruction in the final turn.' },
-        },
-      },
       RedeemProductRequest: {
         type: 'object',
         required: ['productId'],
@@ -525,6 +513,7 @@ const swaggerDefinition = {
           ruleId: { type: 'string', description: 'ID của luật vi phạm' },
           horseId: { type: 'string', description: 'ID ngựa bị phạt nếu áp dụng cho horse hoặc both' },
           jockeyId: { type: 'string', description: 'ID jockey bị phạt nếu áp dụng cho jockey hoặc both' },
+          affectedHorseId: { type: 'string', description: 'Required for demote: horse that was affected by the violation' },
           target: {
             type: 'string',
             enum: ['horse', 'jockey', 'both'],
@@ -1202,24 +1191,6 @@ const swaggerDefinition = {
           },
         },
         responses: { 200: { description: 'Updated result' } },
-      },
-    },
-    '/api/referee/races/{id}/penalties/time': {
-      post: {
-        tags: ['Referee'],
-        summary: 'Apply a time penalty and reorder draft result',
-        security: [{ bearerAuth: [] }],
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': { schema: { $ref: '#/components/schemas/ApplyTimePenaltyRequest' } },
-          },
-        },
-        responses: {
-          200: { description: 'Time penalty applied and rankings recalculated' },
-          400: { description: 'Invalid penalty payload' },
-        },
       },
     },
     '/api/referee/races/{id}/penalties/{violationId}': {

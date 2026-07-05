@@ -23,6 +23,7 @@ export interface IViolation {
   ruleId?: mongoose.Types.ObjectId; // Trỏ về bảng Master Data ViolationRule
   horseId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt kỵ sĩ
   jockeyId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt ngựa
+  affectedHorseId?: mongoose.Types.ObjectId | null;
   target: 'horse' | 'jockey' | 'both';
   type: string;
   description: string;
@@ -75,6 +76,7 @@ const ViolationSchema = new Schema<IViolation>(
     ruleId: { type: Schema.Types.ObjectId, ref: 'ViolationRule', default: null },
     horseId: { type: Schema.Types.ObjectId, ref: 'Horse', default: null },
     jockeyId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    affectedHorseId: { type: Schema.Types.ObjectId, ref: 'Horse', default: null },
     type: { type: String, required: true },
     description: { type: String, required: true, trim: true },
     penaltyApplied: { type: String, enum: PENALTY_APPLIED, default: null },

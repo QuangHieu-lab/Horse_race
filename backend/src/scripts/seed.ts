@@ -340,7 +340,7 @@ async function seed(): Promise<void> {
       description: 'Kỵ sĩ điều khiển ngựa tạt đầu, chèn ép sai luật gây nguy hiểm.',
       category: 'race_conduct',
       severity: 'high',
-      penaltyApplied: 'time_penalty',
+      penaltyApplied: 'demote',
       banDurationDays: 0,
       isActive: true,
       createdBy: admin._id,
@@ -922,15 +922,15 @@ async function seed(): Promise<void> {
   console.log(' 🚀 DỮ LIỆU ĐỂ TEST API TRỌNG TÀI (REFEREE) TRÊN POSTMAN');
   console.log('======================================================');
   
-  console.log(`\n🔴 1. TEST PHẠT CỘNG THỜI GIAN (Ngựa B đang hạng 1 -> Phạt 5.5s để rớt hạng 2)`);
-  console.log(`POST /api/referee/races/${raceDraft._id}/penalties/time`);
+  console.log(`\n🔴 1. TEST TỤT HẠNG TRỰC TIẾP (Ngựa B đang hạng 1 -> hạ xuống sau ngựa A bị ảnh hưởng)`);
+  console.log(`POST /api/referee/races/${raceDraft._id}/penalize`);
   console.log(JSON.stringify({
     horseId: horseB._id.toString(),
     jockeyId: jockey2._id.toString(),
-    addedTimeSeconds: 5.5,
     ruleId: ruleObstruction._id.toString(),
-    type: ruleObstruction.category,
-    description: "Chèn ép ở khúc cua cuối, phạt 5.5 giây theo lỗi ERR-002"
+    target: "horse",
+    affectedHorseId: horseA._id.toString(),
+    notes: "Chèn ép ở khúc cua cuối, hạ ngựa B xuống sau ngựa A theo lỗi ERR-002"
   }, null, 2));
 
   console.log(`\n🔴 2. TEST TƯỚC QUYỀN THI ĐẤU (ghi nhận lỗi disqualify bằng endpoint penalize)`);
