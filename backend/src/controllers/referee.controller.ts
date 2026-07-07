@@ -79,25 +79,25 @@ export class RefereeController {
   });
 
   penalize = asyncHandler(async (req: Request, res: Response) => {
-    const { ruleId, horseId, jockeyId, affectedHorseId, target, notes } = req.body as {
+    const { ruleId, horseId, jockeyId, target, notes } = req.body as {
       ruleId?: string;
       horseId?: string;
       jockeyId?: string;
-      affectedHorseId?: string;
-      target?: 'horse' | 'jockey' | 'both';
+      target?: 'horse' | 'jockey';
       notes?: string;
     };
 
     if (!ruleId) throw new HttpError(400, 'Vui lòng cung cấp mã luật vi phạm (ruleId)');
     if (!horseId && !jockeyId) throw new HttpError(400, 'Phải chỉ định ít nhất Ngựa hoặc Kỵ sĩ');
-    if (!target || !['horse', 'jockey', 'both'].includes(target)) {
-      throw new HttpError(400, 'Vui lòng chỉ định đối tượng chịu án phạt (target: horse, jockey, both)');
+    // Biên bản chỉ lập cho MỘT đối tượng: ngựa hoặc nài ngựa.
+    if (!target || !['horse', 'jockey'].includes(target)) {
+      throw new HttpError(400, 'Vui lòng chỉ định đối tượng chịu án phạt (target: horse hoặc jockey)');
     }
 
     await refereeService.applyRacePenalty(
       req.user!.id,
       req.params.id as string,
-      { ruleId, horseId, jockeyId, affectedHorseId, target, notes } 
+      { ruleId, horseId, jockeyId, target, notes }
     );
 
     res.json({ 

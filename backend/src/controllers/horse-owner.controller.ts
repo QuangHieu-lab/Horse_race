@@ -10,6 +10,7 @@ import type {
 } from '../services/horse-owner.service.js';
 import { listTournaments } from '../services/tournament.service.js';
 import { getRacesByTournament } from '../services/race.service.js';
+import { listNotificationsForUser } from '../services/notification.service.js';
 
 const horseOwnerService = new HorseOwnerService();
 
@@ -145,6 +146,12 @@ export class HorseOwnerController {
     const races = await getRacesByTournament(String(req.params.tournamentId));
     res.json({ races });
   });
+  // Thông báo của chủ ngựa (vd: ngựa bị lập biên bản vi phạm)
+  listNotifications = asyncHandler(async (req: Request, res: Response) => {
+    const notifications = await listNotificationsForUser(req.user!.id);
+    res.json({ notifications });
+  });
+
   deleteHorse = asyncHandler(async (req: Request, res: Response) => {
     // Gọi xuống service để xóa ngựa, truyền vào ID chủ ngựa (để bảo mật) và ID của ngựa
     await horseOwnerService.deleteHorse(req.user!.id, req.params.id as string);

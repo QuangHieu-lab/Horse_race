@@ -10,6 +10,7 @@
  */
 import mongoose from 'mongoose';
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
+import { VIOLATION_RULES } from '../data/violation-rules.data.js';
 import {
   User,
   Horse,
@@ -322,43 +323,12 @@ async function seed(): Promise<void> {
   const horseD = horses[3]!; 
 
   console.log('Creating Violation Rules…');
-  const rules = await ViolationRule.create([
-    {
-      code: 'ERR-001',
-      name: 'Xuất phát sớm (False Start)',
-      description: 'Ngựa hoặc kỵ sĩ vượt rào trước hiệu lệnh bắt đầu.',
-      category: 'race_conduct',
-      severity: 'high',
-      penaltyApplied: 'disqualify',
-      banDurationDays: 0,
-      isActive: true,
-      createdBy: admin._id,
-    },
-    {
-      code: 'ERR-002',
-      name: 'Chèn ép làn đối thủ (Obstruction)',
-      description: 'Kỵ sĩ điều khiển ngựa tạt đầu, chèn ép sai luật gây nguy hiểm.',
-      category: 'race_conduct',
-      severity: 'high',
-      penaltyApplied: 'demote',
-      banDurationDays: 0,
-      isActive: true,
-      createdBy: admin._id,
-    },
-    {
-      code: 'ERR-003',
-      name: 'Sử dụng roi quá mức',
-      description: 'Kỵ sĩ quất roi vượt quá số lần quy định ở đoạn nước rút.',
-      category: 'equipment',
-      severity: 'medium',
-      penaltyApplied: 'warning',
-      banDurationDays: 0,
-      isActive: true,
-      createdBy: admin._id,
-    }
-  ]);
-  const ruleFalseStart = rules[0]!;
-  const ruleObstruction = rules[1]!;
+  const rules = await ViolationRule.create(
+    VIOLATION_RULES.map((r) => ({ ...r, isActive: true, createdBy: admin._id })),
+  );
+  const rulesByCode = new Map(rules.map((r) => [r.code, r]));
+  const ruleFalseStart = rulesByCode.get('JCK-06')!; // xuất phát sớm (nài)
+  const ruleObstruction = rulesByCode.get('JCK-01')!; // chèn ép/tụt hạng (nài)
 
   console.log('Creating tracks & tournaments…');
   const track = await Track.create({
@@ -987,9 +957,9 @@ async function seed(): Promise<void> {
     horseId: horseB._id.toString(),
     jockeyId: jockey2._id.toString(),
     ruleId: ruleObstruction._id.toString(),
-    target: "horse",
+    target: "jockey",
     affectedHorseId: horseA._id.toString(),
-    notes: "Chèn ép ở khúc cua cuối, hạ ngựa B xuống sau ngựa A theo lỗi ERR-002"
+    notes: "Nài ngựa B chèn ép ở khúc cua cuối, hạ ngựa B xuống sau ngựa A theo lỗi JCK-01"
   }, null, 2));
 
   console.log(`\n🔴 2. TEST TƯỚC QUYỀN THI ĐẤU (ghi nhận lỗi disqualify bằng endpoint penalize)`);
@@ -998,8 +968,8 @@ async function seed(): Promise<void> {
     horseId: horseC._id.toString(),
     jockeyId: jockey1._id.toString(),
     ruleId: ruleFalseStart._id.toString(),
-    target: "horse",
-    notes: "Ngựa C xuất phát sớm theo lỗi ERR-001, tước quyền thi đấu."
+    target: "jockey",
+    notes: "Nài ngựa C xuất phát sớm theo lỗi JCK-06."
   }, null, 2));
 
   console.log('\n======================================================');

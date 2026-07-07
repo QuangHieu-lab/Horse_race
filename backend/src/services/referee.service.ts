@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
-import { User } from '../models/User.model.js';
 import { Horse } from '../models/Horse.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
+import { Notification } from '../models/Notification.model.js';
 import { activeParticipants } from '../utils/race-participants.js';
 import type { RaceSimTimeline } from './race-simulation.service.js';
 
@@ -67,40 +67,60 @@ function mapResultSaveError(err: unknown): HttpError {
   return new HttpError(500, message);
 }
 
-function applyRelegationToRankings(
-  result: { rankings: Array<{ horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean }> },
-  penalizedHorseId: mongoose.Types.ObjectId,
-  affectedHorseId: mongoose.Types.ObjectId,
-): void {
-  const penalizedIndex = result.rankings.findIndex((r) => r.horseId.toString() === penalizedHorseId.toString());
-  const affectedIndex = result.rankings.findIndex((r) => r.horseId.toString() === affectedHorseId.toString());
-
-  if (penalizedIndex === -1) {
-    throw new HttpError(400, 'Ngựa vi phạm chưa có trong bảng xếp hạng để hạ bậc');
-  }
-  if (affectedIndex === -1) {
-    throw new HttpError(400, 'Ngựa bị ảnh hưởng chưa có trong bảng xếp hạng');
-  }
-  if (penalizedIndex > affectedIndex) {
-    throw new HttpError(409, 'Ngựa vi phạm đã đứng sau ngựa bị ảnh hưởng, không cần hạ bậc');
-  }
-
-  const [penalized] = result.rankings.splice(penalizedIndex, 1);
-  if (!penalized) throw new HttpError(500, 'Không thể hạ bậc ngựa vi phạm');
-
-  const nextAffectedIndex = result.rankings.findIndex((r) => r.horseId.toString() === affectedHorseId.toString());
-  result.rankings.splice(nextAffectedIndex + 1, 0, penalized);
-  refreshRankingOrder(result);
+// Mức độ vi phạm → số bậc bị tụt (nhẹ 1 · trung bình 2 · nặng 3 · rất nặng 5).
+const SEVERITY_DEMOTE_RANKS: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 5 };
+function demoteRanksForSeverity(severity: string): number {
+  return SEVERITY_DEMOTE_RANKS[severity] ?? 2;
 }
 
-function applyDisqualificationToRankings(
-  result: { rankings: Array<{ horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean }> },
-  disqualifiedHorseId: mongoose.Types.ObjectId,
-): void {
-  const before = result.rankings.length;
-  result.rankings = result.rankings.filter((r) => r.horseId.toString() !== disqualifiedHorseId.toString());
-  if (result.rankings.length !== before) {
-    refreshRankingOrder(result);
+type RankingRow = { horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean };
+
+// Tụt ngựa vi phạm xuống `drop` bậc trong bảng xếp hạng (tràn khỏi bảng thì xếp cuối).
+// Trả về hạng mới (1-based) của ngựa.
+function applyDemoteBySeverity(
+  result: { rankings: RankingRow[] },
+  penalizedHorseId: mongoose.Types.ObjectId,
+  drop: number,
+): number {
+  const idx = result.rankings.findIndex((r) => r.horseId.toString() === penalizedHorseId.toString());
+  if (idx === -1) {
+    throw new HttpError(400, 'Ngựa vi phạm không có trong bảng xếp hạng để tụt bậc');
+  }
+  const [penalized] = result.rankings.splice(idx, 1);
+  if (!penalized) throw new HttpError(500, 'Không thể tụt hạng ngựa vi phạm');
+  const target = Math.min(idx + Math.max(1, drop), result.rankings.length);
+  result.rankings.splice(target, 0, penalized);
+  refreshRankingOrder(result);
+  return target + 1;
+}
+
+// Dựng lại bảng xếp hạng thuần từ (thời gian về đích + tập án tụt bậc hiện có):
+// sắp theo finishTime rồi áp lần lượt các án tụt bậc theo thứ tự lập biên bản.
+// Nhờ vậy việc HOÀN TÁC một án chỉ cần xoá án đó rồi gọi lại hàm này.
+async function recomputeRankingsWithDemotions(result: {
+  rankings: RankingRow[];
+  violations: Array<{ penaltyApplied?: string | null; horseId?: mongoose.Types.ObjectId | null; ruleId?: mongoose.Types.ObjectId | null; recordedAt: Date }>;
+}): Promise<void> {
+  result.rankings.sort((a, b) => (a.finishTime ?? Number.POSITIVE_INFINITY) - (b.finishTime ?? Number.POSITIVE_INFINITY));
+  refreshRankingOrder(result);
+
+  const demotes = result.violations
+    .filter((v) => v.penaltyApplied === 'demote' && v.horseId)
+    .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime());
+  if (demotes.length === 0) return;
+
+  const ruleIds = [...new Set(demotes.map((v) => v.ruleId?.toString()).filter(Boolean))];
+  const rules = await ViolationRule.find({ _id: { $in: ruleIds } }).select('severity').lean();
+  const sevById = new Map(rules.map((r) => [r._id.toString(), r.severity]));
+
+  for (const v of demotes) {
+    const sev = v.ruleId ? sevById.get(v.ruleId.toString()) : undefined;
+    const drop = demoteRanksForSeverity(sev ?? 'medium');
+    try {
+      applyDemoteBySeverity(result, v.horseId!, drop);
+    } catch {
+      // Ngựa không còn trong bảng (đã bị xoá) thì bỏ qua án này.
+    }
   }
 }
 
@@ -332,7 +352,7 @@ export async function buildResultFromRace(raceId: string, refereeId: string) {
 export async function applyRacePenalty(
   refereeId: string,
   raceId: string,
-  payload: { ruleId: string; target: 'horse' | 'jockey' | 'both'; horseId?: string; jockeyId?: string; affectedHorseId?: string; notes?: string; }
+  payload: { ruleId: string; target: 'horse' | 'jockey'; horseId?: string; jockeyId?: string; notes?: string; }
 ): Promise<void> {
   const race = await Race.findById(raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
@@ -350,52 +370,33 @@ export async function applyRacePenalty(
   const rule = await ViolationRule.findById(payload.ruleId);
   if (!rule || !rule.isActive) throw new HttpError(404, 'Luật vi phạm không hợp lệ');
 
+  // Luật phải áp dụng đúng đối tượng (ngựa/nài) đang bị lập biên bản.
+  const appliesTo = rule.appliesTo ?? 'both';
+  if (appliesTo !== 'both' && appliesTo !== payload.target) {
+    const forWhom = appliesTo === 'horse' ? 'ngựa' : 'nài ngựa';
+    throw new HttpError(400, `Luật "${rule.name}" chỉ áp dụng cho ${forWhom}.`);
+  }
+
   const participant = race.participants.find((p) =>
     (payload.horseId && p.horseId.toString() === payload.horseId) ||
     (payload.jockeyId && p.jockeyId.toString() === payload.jockeyId)
   );
   if (!participant) throw new HttpError(404, 'Không tìm thấy đối tượng trong trận');
 
-  const isDQ = ['disqualify', 'disqualification'].includes(rule.penaltyApplied);
-  const isDemote = rule.penaltyApplied === 'demote';
-  if (payload.affectedHorseId && !mongoose.isValidObjectId(payload.affectedHorseId)) {
-    throw new HttpError(400, 'affectedHorseId không hợp lệ');
-  }
-  if (payload.affectedHorseId && payload.affectedHorseId === participant.horseId.toString()) {
-    throw new HttpError(400, 'Ngựa vi phạm và ngựa bị ảnh hưởng không được trùng nhau');
-  }
-  const affectedHorseId = payload.affectedHorseId ? new mongoose.Types.ObjectId(payload.affectedHorseId) : null;
+  // Hình phạt đơn giản & thống nhất: tụt bậc theo mức độ vi phạm
+  // (nhẹ 1 · trung bình 2 · nặng 3 · rất nặng 5). Tràn khỏi bảng thì xếp cuối.
+  const drop = demoteRanksForSeverity(rule.severity);
 
-  if (isDemote && !affectedHorseId) {
-    throw new HttpError(400, 'affectedHorseId là bắt buộc khi áp dụng hình phạt tụt hạng');
+  const resultDoc = await Result.findOne({ raceId: race._id });
+  if (!resultDoc || resultDoc.rankings.length === 0) {
+    throw new HttpError(400, 'Chưa có kết quả để phạt — hãy chạy đua tạo bảng xếp hạng trước khi lập biên bản.');
   }
 
-  if (isDQ) {
-    (participant as any).isDisqualified = true;
-    const faultOf = payload.target === 'horse' ? 'Ngựa' : payload.target === 'jockey' ? 'Kỵ sĩ' : 'Cả hai';
-    (participant as any).disqualifiedReason = `${rule.name} (Lỗi từ: ${faultOf})`;
-    (participant as any).disqualifiedAt = new Date();
-    participant.scratchedAt = new Date();
-    await race.save();
-  }
-
-  let resultDoc = await Result.findOne({ raceId: race._id });
-  if (!resultDoc) {
-    resultDoc = new Result({ raceId: race._id, tournamentId: race.tournamentId, rankings: [], violations: [], protests: [] });
-  }
-
-  if (isDemote && affectedHorseId) {
-    applyRelegationToRankings(resultDoc, participant.horseId, affectedHorseId);
-  }
-
-  if (isDQ) {
-    applyDisqualificationToRankings(resultDoc, participant.horseId);
-  }
-
-  let bannedUntil: Date | null = null;
-  if (rule.penaltyApplied === 'time_ban' && rule.banDurationDays > 0) {
-    bannedUntil = new Date();
-    bannedUntil.setDate(bannedUntil.getDate() + rule.banDurationDays);
+  const oldRank = resultDoc.rankings.find(
+    (r) => r.horseId.toString() === participant.horseId.toString(),
+  )?.rank ?? null;
+  if (oldRank === null) {
+    throw new HttpError(400, 'Ngựa/nài này không có trong bảng xếp hạng cuộc đua.');
   }
 
   resultDoc.violations.push({
@@ -403,13 +404,22 @@ export async function applyRacePenalty(
     target: payload.target,
     horseId: participant.horseId,
     jockeyId: participant.jockeyId,
-    affectedHorseId,
+    affectedHorseId: null,
     type: rule.category,
-    description: payload.notes ? `${rule.name} - Ghi chú: ${payload.notes}` : rule.description,
-    penaltyApplied: rule.penaltyApplied,
-    bannedUntil,
+    description: `${rule.name} — tụt ${drop} bậc${payload.notes ? ` · ${payload.notes}` : ''}`,
+    penaltyApplied: 'demote',
+    bannedUntil: null,
     recordedAt: new Date(),
-  });
+  } as any);
+
+  // Dựng lại bảng xếp hạng từ tập án hiện có (gồm cả án vừa thêm).
+  await recomputeRankingsWithDemotions(resultDoc);
+  const newRank = resultDoc.rankings.find(
+    (r) => r.horseId.toString() === participant.horseId.toString(),
+  )?.rank ?? oldRank;
+  // Ghi hạng cũ→mới vào mô tả biên bản vừa lập.
+  const lastViolation = resultDoc.violations[resultDoc.violations.length - 1] as any;
+  lastViolation.description = `${rule.name} — tụt ${drop} bậc (hạng ${oldRank}→${newRank})${payload.notes ? ` · ${payload.notes}` : ''}`;
 
   let savedResult;
   try {
@@ -418,37 +428,53 @@ export async function applyRacePenalty(
     throw mapResultSaveError(err);
   }
 
-  const isBannedPenalty = ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
+  // Thông báo cho người bị lập biên bản:
+  // - phạt nài  → thông báo cho chính nài ngựa;
+  // - phạt ngựa → thông báo cho chủ ngựa (người quản lý ngựa).
+  await notifyPenaltyParties({
+    race,
+    target: payload.target,
+    jockeyId: participant.jockeyId,
+    ownerId: participant.ownerId,
+    horseId: participant.horseId,
+    title: 'Bạn có biên bản vi phạm mới',
+    detail: `Luật: ${rule.name} — tụt ${drop} bậc (còn hạng ${newRank})${payload.notes ? ` — Ghi chú: ${payload.notes}` : ''}`,
+    type: 'penalty_issued',
+    resultId: savedResult._id,
+  });
+}
 
-  if (isBannedPenalty) {
-    const latestViolationId = savedResult.violations[savedResult.violations.length - 1]?._id;
-    const banReason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.name;
+async function notifyPenaltyParties(input: {
+  race: { _id: mongoose.Types.ObjectId; name: string };
+  target: 'horse' | 'jockey';
+  jockeyId: mongoose.Types.ObjectId;
+  ownerId: mongoose.Types.ObjectId;
+  horseId: mongoose.Types.ObjectId;
+  title: string;
+  detail: string;
+  type: 'penalty_issued' | 'penalty_revoked';
+  resultId: mongoose.Types.ObjectId;
+}): Promise<void> {
+  try {
+    const horse = await Horse.findById(input.horseId).select('name').lean();
+    const horseName = horse?.name ?? 'ngựa của bạn';
+    const recipientId = input.target === 'jockey' ? input.jockeyId : input.ownerId;
+    const message =
+      input.target === 'jockey'
+        ? `Cuộc đua "${input.race.name}": ${input.detail}`
+        : `Cuộc đua "${input.race.name}" — ngựa ${horseName}: ${input.detail}`;
 
-    if (['horse', 'both'].includes(payload.target) && participant.horseId) {
-      await Horse.findByIdAndUpdate(participant.horseId, {
-        $set: {
-          penaltyStatus: {
-            isBanned: true,
-            bannedUntil: bannedUntil,
-            currentViolationId: latestViolationId,
-            reason: banReason
-          }
-        }
-      });
-    }
-
-    if (['jockey', 'both'].includes(payload.target) && participant.jockeyId) {
-      await User.findByIdAndUpdate(participant.jockeyId, {
-        $set: {
-          'jockeyProfile.penaltyStatus': {
-            isBanned: true,
-            bannedUntil: bannedUntil,
-            currentViolationId: latestViolationId,
-            reason: banReason
-          }
-        }
-      });
-    }
+    await Notification.create({
+      userId: recipientId,
+      type: input.type,
+      title: input.title,
+      message,
+      refModel: 'Result',
+      refId: input.resultId,
+    });
+  } catch (err) {
+    // Thông báo là phụ trợ — không làm hỏng nghiệp vụ xử phạt nếu tạo thất bại.
+    console.error('notifyPenaltyParties failed:', err);
   }
 }
 
@@ -474,46 +500,30 @@ export async function revokeRacePenalty(
 
   const violation = resultDoc.violations[violationIndex]!;
 
-  const isDQ = ['disqualify', 'disqualification'].includes(violation.penaltyApplied || '');
-  if (isDQ) {
-    const participant = race.participants.find(p =>
-      (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
-      (violation.jockeyId && p.jockeyId.toString() === violation.jockeyId.toString())
-    );
-
-    if (participant) {
-      participant.isDisqualified = false;
-      participant.disqualifiedReason = undefined;
-      participant.disqualifiedAt = null;
-      participant.scratchedAt = null;
-      await race.save();
-    }
-  }
-
-  const isBannedPenalty = ['time_ban', 'permanent_ban'].includes(violation.penaltyApplied || '');
-  if (isBannedPenalty) {
-    const resetStatus = {
-      isBanned: false,
-      bannedUntil: null,
-      currentViolationId: null,
-      reason: null
-    };
-
-    if (['horse', 'both'].includes(violation.target) && violation.horseId) {
-      await Horse.findByIdAndUpdate(violation.horseId, {
-        $set: { penaltyStatus: resetStatus }
-      });
-    }
-
-    if (['jockey', 'both'].includes(violation.target) && violation.jockeyId) {
-      await User.findByIdAndUpdate(violation.jockeyId, {
-        $set: { 'jockeyProfile.penaltyStatus': resetStatus }
-      });
-    }
-  }
-
+  // Xoá án rồi dựng lại bảng xếp hạng từ các án còn lại → tự khôi phục thứ hạng.
   resultDoc.violations.splice(violationIndex, 1);
+  await recomputeRankingsWithDemotions(resultDoc);
   await resultDoc.save();
+
+  // Báo cho người từng bị phạt biết án phạt đã được gỡ.
+  const revokedParticipant = race.participants.find(p =>
+    (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
+    (violation.jockeyId && p.jockeyId.toString() === violation.jockeyId.toString())
+  );
+  if (revokedParticipant) {
+    const target: 'horse' | 'jockey' = violation.target === 'jockey' ? 'jockey' : 'horse';
+    await notifyPenaltyParties({
+      race,
+      target,
+      jockeyId: revokedParticipant.jockeyId,
+      ownerId: revokedParticipant.ownerId,
+      horseId: revokedParticipant.horseId,
+      title: 'Án phạt đã được hoàn tác',
+      detail: `Biên bản "${violation.description}" đã được trọng tài gỡ bỏ.`,
+      type: 'penalty_revoked',
+      resultId: resultDoc._id,
+    });
+  }
 }
 
 // ─── Luồng trọng tài điều khiển + xử phạt ────────────────────────────────────
@@ -527,6 +537,7 @@ export interface ViolationRuleDto {
   severity: string;
   penaltyApplied: string;
   banDurationDays: number;
+  appliesTo: 'horse' | 'jockey' | 'both';
 }
 
 export interface RaceViolationDto {
@@ -579,6 +590,7 @@ export async function listActiveViolationRules(): Promise<ViolationRuleDto[]> {
     severity: r.severity,
     penaltyApplied: r.penaltyApplied,
     banDurationDays: r.banDurationDays,
+    appliesTo: r.appliesTo ?? 'both',
   }));
 }
 

@@ -35,6 +35,8 @@ const NotificationSchema = new Schema<INotification>(
         'viewing_ticket_sale_open',
         'viewing_ticket_daily_reminder',
         'viewing_ticket_purchased',
+        'penalty_issued',
+        'penalty_revoked',
       ],
       required: true,
     },

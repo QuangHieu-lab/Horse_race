@@ -6,7 +6,10 @@ export interface IViolationRule extends Document {
   description: string;
   category: 'race_conduct' | 'medical' | 'equipment' | 'administrative';
   severity: 'low' | 'medium' | 'high' | 'critical';
-  
+
+  // Đối tượng mà luật này áp dụng: ngựa, nài ngựa, hoặc cả hai.
+  appliesTo: 'horse' | 'jockey' | 'both';
+
   // 🚀 CHỈ GIỮ LẠI CÁC HÌNH THỨC CẤM THI ĐẤU VÀ XỬ LÝ TẠI TRẬN (Đã xóa 'fine')
   penaltyApplied: 'warning' | 'demote' | 'disqualify' | 'disqualification' | 'restart' | 'time_ban' | 'permanent_ban';
   
@@ -29,6 +32,12 @@ const ViolationRuleSchema = new Schema<IViolationRule>(
       type: String,
       enum: ['low', 'medium', 'high', 'critical'],
       default: 'medium',
+    },
+    appliesTo: {
+      type: String,
+      enum: ['horse', 'jockey', 'both'],
+      default: 'both',
+      required: true,
     },
     penaltyApplied: {
       type: String,
@@ -56,5 +65,6 @@ const ViolationRuleSchema = new Schema<IViolationRule>(
 ViolationRuleSchema.index({ penaltyApplied: 1 });
 ViolationRuleSchema.index({ category: 1 });
 ViolationRuleSchema.index({ isActive: 1 });
+ViolationRuleSchema.index({ appliesTo: 1 });
 
 export const ViolationRule = mongoose.model<IViolationRule>('ViolationRule', ViolationRuleSchema);

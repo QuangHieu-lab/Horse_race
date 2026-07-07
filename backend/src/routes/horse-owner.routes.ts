@@ -22,6 +22,9 @@ horseOwnerRouter.post('/invitations', controller.inviteJockey);
 // --- API Tìm kiếm Jockey theo tên ---
 horseOwnerRouter.get('/jockeys/search', controller.searchJockeys);
 
+// --- API Thông báo (biên bản vi phạm, v.v.) ---
+horseOwnerRouter.get('/notifications', controller.listNotifications);
+
 // --- API Danh sách Giải đấu & Trận đua (để chọn khi đăng ký) ---
 horseOwnerRouter.get('/tournaments', controller.listTournaments);
 horseOwnerRouter.get('/tournaments/:tournamentId/races', controller.listRacesForTournament);

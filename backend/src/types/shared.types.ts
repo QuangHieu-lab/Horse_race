@@ -119,7 +119,9 @@ export type NotificationType =
   | 'result_protest_filed'
   | 'viewing_ticket_sale_open'
   | 'viewing_ticket_daily_reminder'
-  | 'viewing_ticket_purchased';
+  | 'viewing_ticket_purchased'
+  | 'penalty_issued'
+  | 'penalty_revoked';
 
 export type NotificationRefModel =
   | 'Race'
