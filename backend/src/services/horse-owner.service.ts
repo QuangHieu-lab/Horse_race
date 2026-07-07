@@ -7,6 +7,7 @@ import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 // Giả định bạn đã khai báo các DTO này trong thư mục types
 import type { HorseDto, RegistrationDto, InvitationDto } from '../types/api.types.js';
+import { isPenaltyActive, toPenaltyStatusDto } from '../utils/penalty-status.util.js';
 
 // ============================================================================
 // 1. INPUT INTERFACES (Định nghĩa dữ liệu đầu vào rõ ràng)
@@ -33,12 +34,6 @@ export interface InviteJockeyInput {
   horseId: string;
   jockeyId: string;
   message?: string;
-}
-
-function isPenaltyActive(status?: { isBanned?: boolean; bannedUntil?: Date | string | null } | null): boolean {
-  if (!status?.isBanned) return false;
-  if (!status.bannedUntil) return true;
-  return new Date(status.bannedUntil) > new Date();
 }
 
 async function assertOwnerCanCompete(ownerId: string): Promise<void> {
@@ -127,6 +122,7 @@ function toInvitationDto(inv: any): InvitationDto {
     horse: {
       id: inv.horseId._id.toString(),
       name: inv.horseId.name,
+      penaltyStatus: toPenaltyStatusDto(inv.horseId.penaltyStatus),
     },
     race: {
       id: inv.raceId._id.toString(),
@@ -362,7 +358,7 @@ async deleteHorse(ownerId: string, horseId: string) {
 
     // 4. Query lại để lấy đủ thông tin (populate) cho DTO
     const populatedInvitation = await JockeyInvitation.findById(invitation._id)
-      .populate('horseId', 'name')
+      .populate('horseId', 'name penaltyStatus')
       .populate('raceId', 'name scheduledAt status')
       .populate('horseOwnerId', 'fullName')
       .lean();

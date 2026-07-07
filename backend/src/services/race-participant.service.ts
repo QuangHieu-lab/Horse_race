@@ -8,12 +8,7 @@ import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { activeParticipants, randomizeActiveParticipantLanes, validateParticipants } from '../utils/race-participants.js';
-
-function isPenaltyActive(status?: { isBanned?: boolean; bannedUntil?: Date | string | null } | null): boolean {
-  if (!status?.isBanned) return false;
-  if (!status.bannedUntil) return true;
-  return new Date(status.bannedUntil) > new Date();
-}
+import { isPenaltyActive } from '../utils/penalty-status.util.js';
 
 export async function assertUserRole(
   userId: mongoose.Types.ObjectId,

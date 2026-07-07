@@ -3,6 +3,7 @@ import { Horse } from './Horse.model.js';
 import { Race } from './Race.model.js';
 import { User } from './User.model.js';
 import type { RegistrationStatus } from '../types/shared.types.js';
+import { isPenaltyActive } from '../utils/penalty-status.util.js';
 
 /**
  * Đơn đăng ký ngựa vào cuộc đua — admin duyệt trước khi thêm vào Race.participants.
@@ -46,12 +47,6 @@ const RaceRegistrationSchema = new Schema<IRaceRegistration>(
 RaceRegistrationSchema.index({ raceId: 1, horseId: 1 }, { unique: true });
 RaceRegistrationSchema.index({ ownerId: 1, status: 1 });
 RaceRegistrationSchema.index({ raceId: 1, status: 1 });
-
-function isPenaltyActive(status?: { isBanned?: boolean; bannedUntil?: Date | string | null } | null): boolean {
-  if (!status?.isBanned) return false;
-  if (!status.bannedUntil) return true;
-  return new Date(status.bannedUntil) > new Date();
-}
 
 RaceRegistrationSchema.pre('save', async function (next) {
   const horse = await Horse.findById(this.horseId);
