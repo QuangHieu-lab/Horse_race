@@ -2,10 +2,7 @@ import mongoose, { Schema } from 'mongoose';
 import type { PenaltyApplied, ProtestStatus, ViolationType } from '../types/shared.types.js';
 import { PENALTY_APPLIED } from '../types/shared.types.js';
 import { Race } from './Race.model.js';
-import {
-  disqualifiedHorseIdsFromViolations,
-  validateRankings,
-} from '../utils/result-rankings.js';
+import { validateRankings } from '../utils/result-rankings.js';
 
 export interface IRanking {
   rank: number;
@@ -23,6 +20,7 @@ export interface IViolation {
   ruleId?: mongoose.Types.ObjectId; // Trỏ về bảng Master Data ViolationRule
   horseId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt kỵ sĩ
   jockeyId?: mongoose.Types.ObjectId | null; // Tùy chọn: Có thể chỉ phạt ngựa
+  ownerId?: mongoose.Types.ObjectId | null;
   affectedHorseId?: mongoose.Types.ObjectId | null;
   target: 'horse' | 'jockey' | 'both';
   type: string;
@@ -76,6 +74,7 @@ const ViolationSchema = new Schema<IViolation>(
     ruleId: { type: Schema.Types.ObjectId, ref: 'ViolationRule', default: null },
     horseId: { type: Schema.Types.ObjectId, ref: 'Horse', default: null },
     jockeyId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    ownerId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     affectedHorseId: { type: Schema.Types.ObjectId, ref: 'Horse', default: null },
     type: { type: String, required: true },
     description: { type: String, required: true, trim: true },
@@ -175,8 +174,7 @@ ResultSchema.pre('save', async function (next) {
     }
   }
 
-  const dq = disqualifiedHorseIdsFromViolations(this.violations);
-  const rankingErr = validateRankings(this.rankings, race.participants, dq);
+  const rankingErr = validateRankings(this.rankings, race.participants, new Set());
   if (rankingErr) return next(new Error(rankingErr));
 
   next();

@@ -51,8 +51,6 @@ export class RaceController {
       horseId: input.horseId,
       jockeyId: input.jockeyId,
       ownerId: input.ownerId,
-      laneNumber: input.laneNumber,
-      clothNumber: input.clothNumber
     });
 
     res.json({ race });

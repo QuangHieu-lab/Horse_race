@@ -47,11 +47,27 @@ RaceRegistrationSchema.index({ raceId: 1, horseId: 1 }, { unique: true });
 RaceRegistrationSchema.index({ ownerId: 1, status: 1 });
 RaceRegistrationSchema.index({ raceId: 1, status: 1 });
 
+function isPenaltyActive(status?: { isBanned?: boolean; bannedUntil?: Date | string | null } | null): boolean {
+  if (!status?.isBanned) return false;
+  if (!status.bannedUntil) return true;
+  return new Date(status.bannedUntil) > new Date();
+}
+
 RaceRegistrationSchema.pre('save', async function (next) {
   const horse = await Horse.findById(this.horseId);
   if (!horse) return next(new Error('Horse not found'));
   if (horse.ownerId.toString() !== this.ownerId.toString()) {
     return next(new Error('ownerId must match horse owner'));
+  }
+  if (['pending', 'approved'].includes(this.status) && isPenaltyActive(horse.penaltyStatus)) {
+    return next(new Error('Horse is banned from competition'));
+  }
+  const owner = await User.findById(this.ownerId).select('role isActive penaltyStatus').lean();
+  if (!owner?.isActive || owner.role !== 'horse_owner') {
+    return next(new Error('ownerId must be an active horse_owner user'));
+  }
+  if (['pending', 'approved'].includes(this.status) && isPenaltyActive(owner.penaltyStatus)) {
+    return next(new Error('Horse owner is banned from competition'));
   }
   if (this.isNew || this.isModified('status')) {
     if (['pending', 'approved'].includes(this.status) && horse.healthStatus !== 'fit') {
@@ -60,9 +76,12 @@ RaceRegistrationSchema.pre('save', async function (next) {
   }
 
   if (this.jockeyId) {
-    const jockey = await User.findById(this.jockeyId).select('role isActive').lean();
+    const jockey = await User.findById(this.jockeyId).select('role isActive jockeyProfile.penaltyStatus').lean();
     if (!jockey?.isActive || jockey.role !== 'jockey') {
       return next(new Error('jockeyId must be an active jockey user'));
+    }
+    if (['pending', 'approved'].includes(this.status) && isPenaltyActive(jockey.jockeyProfile?.penaltyStatus)) {
+      return next(new Error('Jockey is banned from competition'));
     }
   }
 

@@ -355,6 +355,17 @@ async function seed(): Promise<void> {
       banDurationDays: 0,
       isActive: true,
       createdBy: admin._id,
+    },
+    {
+      code: 'ERR-004',
+      name: 'Su dung doping',
+      description: 'Ngua co ket qua kiem tra doping duong tinh, huy ket qua va cam thi dau cac ben lien quan.',
+      category: 'medical',
+      severity: 'critical',
+      penaltyApplied: 'disqualification',
+      banDurationDays: 365,
+      isActive: true,
+      createdBy: admin._id,
     }
   ]);
   const ruleFalseStart = rules[0]!;

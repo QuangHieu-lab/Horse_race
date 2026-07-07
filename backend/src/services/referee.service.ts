@@ -3,6 +3,7 @@ import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { User } from '../models/User.model.js';
 import { Horse } from '../models/Horse.model.js';
+import { Notification } from '../models/Notification.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
 import { activeParticipants } from '../utils/race-participants.js';
@@ -94,14 +95,90 @@ function applyRelegationToRankings(
 }
 
 function applyDisqualificationToRankings(
-  result: { rankings: Array<{ horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean }> },
+  result: { rankings: Array<{ horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean; prize?: number }> },
   disqualifiedHorseId: mongoose.Types.ObjectId,
 ): void {
-  const before = result.rankings.length;
-  result.rankings = result.rankings.filter((r) => r.horseId.toString() !== disqualifiedHorseId.toString());
-  if (result.rankings.length !== before) {
-    refreshRankingOrder(result);
+  const index = result.rankings.findIndex((r) => r.horseId.toString() === disqualifiedHorseId.toString());
+  if (index === -1) return;
+
+  const [disqualified] = result.rankings.splice(index, 1);
+  if (!disqualified) return;
+
+  disqualified.prize = 0;
+  result.rankings.push(disqualified);
+  refreshRankingOrder(result);
+}
+
+function isDopingRule(rule: { code?: string; name?: string; description?: string; category?: string }): boolean {
+  const haystack = `${rule.code ?? ''} ${rule.name ?? ''} ${rule.description ?? ''} ${rule.category ?? ''}`.toLowerCase();
+  return haystack.includes('doping');
+}
+
+function resolvePenaltyBanUntil(rule: { banDurationDays: number; penaltyApplied: string }, forceBan: boolean): Date | null {
+  if (rule.banDurationDays > 0) {
+    const bannedUntil = new Date();
+    bannedUntil.setDate(bannedUntil.getDate() + rule.banDurationDays);
+    return bannedUntil;
   }
+  if (forceBan || rule.penaltyApplied === 'permanent_ban') {
+    return null;
+  }
+  return null;
+}
+
+function raceDayKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function endOfRaceDay(date: Date): Date {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+function describeBanDuration(
+  rule: { banDurationDays: number },
+  bannedUntil: Date | null,
+  hasBan: boolean,
+): string {
+  if (!hasBan) {
+    return 'Án tước quyền chỉ áp dụng cho kết quả cuộc đua này, không có số ngày cấm thi đấu bổ sung';
+  }
+  if (rule.banDurationDays > 0) {
+    return `Án phạt ${rule.banDurationDays} ngày thi đấu thực tế${bannedUntil ? `, hiệu lực đến hết ${bannedUntil.toISOString()}` : ', chờ cập nhật thêm lịch đua để xác định ngày kết thúc'}`;
+  }
+  return 'Án phạt cấm thi đấu không có thời hạn kết thúc tự động';
+}
+
+async function resolveCompetitionDayBanUntil(
+  banRaceDays: number,
+  fromDate: Date,
+): Promise<Date | null> {
+  if (banRaceDays <= 0) return null;
+
+  const races = await Race.find({
+    scheduledAt: { $gt: fromDate },
+    status: { $ne: 'cancelled' },
+  })
+    .select('scheduledAt')
+    .sort({ scheduledAt: 1 })
+    .lean();
+
+  const raceDays: Date[] = [];
+  const seen = new Set<string>();
+  for (const race of races) {
+    const key = raceDayKey(race.scheduledAt);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    raceDays.push(race.scheduledAt);
+    if (raceDays.length >= banRaceDays) break;
+  }
+
+  const targetDay = raceDays[banRaceDays - 1];
+  return targetDay ? endOfRaceDay(targetDay) : null;
 }
 
 export async function getRefereeDashboard(refereeId: string) {
@@ -356,7 +433,8 @@ export async function applyRacePenalty(
   );
   if (!participant) throw new HttpError(404, 'Không tìm thấy đối tượng trong trận');
 
-  const isDQ = ['disqualify', 'disqualification'].includes(rule.penaltyApplied);
+  const isDoping = isDopingRule(rule);
+  const isDQ = isDoping || ['disqualify', 'disqualification'].includes(rule.penaltyApplied);
   const isDemote = rule.penaltyApplied === 'demote';
   if (payload.affectedHorseId && !mongoose.isValidObjectId(payload.affectedHorseId)) {
     throw new HttpError(400, 'affectedHorseId không hợp lệ');
@@ -392,19 +470,19 @@ export async function applyRacePenalty(
     applyDisqualificationToRankings(resultDoc, participant.horseId);
   }
 
-  let bannedUntil: Date | null = null;
-  if (rule.penaltyApplied === 'time_ban' && rule.banDurationDays > 0) {
-    bannedUntil = new Date();
-    bannedUntil.setDate(bannedUntil.getDate() + rule.banDurationDays);
-  }
+  const isJockeyPenalty = isDoping || ['jockey', 'both'].includes(payload.target);
+  const bannedUntil = isJockeyPenalty && rule.banDurationDays > 0
+    ? await resolveCompetitionDayBanUntil(rule.banDurationDays, race.scheduledAt)
+    : resolvePenaltyBanUntil(rule, isDoping);
 
   resultDoc.violations.push({
     ruleId: rule._id,
     target: payload.target,
     horseId: participant.horseId,
     jockeyId: participant.jockeyId,
+    ownerId: participant.ownerId,
     affectedHorseId,
-    type: rule.category,
+    type: isDoping ? 'doping' : rule.category,
     description: payload.notes ? `${rule.name} - Ghi chú: ${payload.notes}` : rule.description,
     penaltyApplied: rule.penaltyApplied,
     bannedUntil,
@@ -418,13 +496,13 @@ export async function applyRacePenalty(
     throw mapResultSaveError(err);
   }
 
-  const isBannedPenalty = ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
+  const isBannedPenalty = isDoping || ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
 
   if (isBannedPenalty) {
     const latestViolationId = savedResult.violations[savedResult.violations.length - 1]?._id;
     const banReason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.name;
 
-    if (['horse', 'both'].includes(payload.target) && participant.horseId) {
+    if ((isDoping || ['horse', 'both'].includes(payload.target)) && participant.horseId) {
       await Horse.findByIdAndUpdate(participant.horseId, {
         $set: {
           penaltyStatus: {
@@ -437,7 +515,7 @@ export async function applyRacePenalty(
       });
     }
 
-    if (['jockey', 'both'].includes(payload.target) && participant.jockeyId) {
+    if ((isDoping || ['jockey', 'both'].includes(payload.target)) && participant.jockeyId) {
       await User.findByIdAndUpdate(participant.jockeyId, {
         $set: {
           'jockeyProfile.penaltyStatus': {
@@ -449,6 +527,68 @@ export async function applyRacePenalty(
         }
       });
     }
+
+    if (isDoping && participant.ownerId) {
+      await User.findByIdAndUpdate(participant.ownerId, {
+        $set: {
+          penaltyStatus: {
+            isBanned: true,
+            bannedUntil,
+            currentViolationId: latestViolationId,
+            reason: banReason
+          }
+        }
+      });
+    }
+  }
+
+  if (isDQ) {
+    const reason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.description;
+    const banLine = describeBanDuration(rule, bannedUntil, isBannedPenalty);
+    const notices = [];
+
+    if (participant.jockeyId) {
+      notices.push({
+        userId: participant.jockeyId,
+        type: 'disqualification_notice',
+        title: 'Thông báo tước quyền thi đấu',
+        message: `Bạn bị tước quyền thi đấu vì: ${reason}. ${banLine}.`,
+        refModel: 'Result',
+        refId: savedResult._id,
+      });
+    }
+
+    if (participant.ownerId) {
+      notices.push({
+        userId: participant.ownerId,
+        type: 'disqualification_notice',
+        title: 'Thông báo tước quyền thi đấu',
+        message: `Ngựa của bạn bị tước quyền thi đấu vì: ${reason}. ${banLine}.`,
+        refModel: 'Result',
+        refId: savedResult._id,
+      });
+    }
+
+    if (notices.length > 0) {
+      await Notification.insertMany(notices);
+    }
+  }
+
+  if (isJockeyPenalty && !isDQ && participant.jockeyId) {
+    const banLine = isBannedPenalty
+      ? (rule.banDurationDays > 0
+          ? `Án phạt ${rule.banDurationDays} ngày thi đấu thực tế${bannedUntil ? `, hiệu lực đến hết ${bannedUntil.toISOString()}` : ', chờ cập nhật thêm lịch đua để xác định ngày kết thúc'}`
+          : 'Án phạt cấm thi đấu không có thời hạn kết thúc tự động')
+      : 'Án phạt được ghi nhận vào biên bản, không áp dụng cấm thi đấu.';
+
+    await Notification.create({
+      userId: participant.jockeyId,
+      type: 'jockey_penalty',
+      title: 'Biên bản xử phạt jockey',
+      message: `Bạn bị xử phạt vì: ${payload.notes ? `${rule.name} - ${payload.notes}` : rule.description}. ${banLine}.`,
+      refModel: 'Result',
+      refId: savedResult._id,
+    });
   }
 }
 
@@ -474,7 +614,8 @@ export async function revokeRacePenalty(
 
   const violation = resultDoc.violations[violationIndex]!;
 
-  const isDQ = ['disqualify', 'disqualification'].includes(violation.penaltyApplied || '');
+  const isDoping = violation.type === 'doping';
+  const isDQ = isDoping || ['disqualify', 'disqualification'].includes(violation.penaltyApplied || '');
   if (isDQ) {
     const participant = race.participants.find(p =>
       (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
@@ -490,7 +631,7 @@ export async function revokeRacePenalty(
     }
   }
 
-  const isBannedPenalty = ['time_ban', 'permanent_ban'].includes(violation.penaltyApplied || '');
+  const isBannedPenalty = isDoping || ['time_ban', 'permanent_ban'].includes(violation.penaltyApplied || '');
   if (isBannedPenalty) {
     const resetStatus = {
       isBanned: false,
@@ -499,15 +640,21 @@ export async function revokeRacePenalty(
       reason: null
     };
 
-    if (['horse', 'both'].includes(violation.target) && violation.horseId) {
+    if ((isDoping || ['horse', 'both'].includes(violation.target)) && violation.horseId) {
       await Horse.findByIdAndUpdate(violation.horseId, {
         $set: { penaltyStatus: resetStatus }
       });
     }
 
-    if (['jockey', 'both'].includes(violation.target) && violation.jockeyId) {
+    if ((isDoping || ['jockey', 'both'].includes(violation.target)) && violation.jockeyId) {
       await User.findByIdAndUpdate(violation.jockeyId, {
         $set: { 'jockeyProfile.penaltyStatus': resetStatus }
+      });
+    }
+
+    if (isDoping && violation.ownerId) {
+      await User.findByIdAndUpdate(violation.ownerId, {
+        $set: { penaltyStatus: resetStatus }
       });
     }
   }
@@ -538,6 +685,7 @@ export interface RaceViolationDto {
   target: 'horse' | 'jockey' | 'both';
   horseId: string | null;
   horseName: string | null;
+  ownerId: string | null;
   affectedHorseId: string | null;
   affectedHorseName: string | null;
   jockeyId: string | null;
@@ -612,6 +760,7 @@ export async function listRaceViolations(
 
   return result.violations.map((v) => {
     const horseId = v.horseId?.toString() ?? null;
+    const ownerId = v.ownerId?.toString() ?? null;
     const affectedHorseId = v.affectedHorseId?.toString() ?? null;
     const jockeyId = v.jockeyId?.toString() ?? null;
     return {
@@ -623,6 +772,7 @@ export async function listRaceViolations(
       target: v.target,
       horseId,
       horseName: horseId ? horseNames.get(horseId) ?? null : null,
+      ownerId,
       affectedHorseId,
       affectedHorseName: affectedHorseId ? horseNames.get(affectedHorseId) ?? null : null,
       jockeyId,
