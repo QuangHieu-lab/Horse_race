@@ -471,7 +471,7 @@ export async function applyRacePenalty(
   }
 
   const isJockeyPenalty = isDoping || ['jockey', 'both'].includes(payload.target);
-  const bannedUntil = isJockeyPenalty && rule.banDurationDays > 0
+  const bannedUntil = rule.banDurationDays > 0
     ? await resolveCompetitionDayBanUntil(rule.banDurationDays, race.scheduledAt)
     : resolvePenaltyBanUntil(rule, isDoping);
 

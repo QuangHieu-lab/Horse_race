@@ -13,6 +13,7 @@ import type {
 } from '../types/api.types.js';
 import type { InvitationStatus } from '../types/shared.types.js';
 import { HttpError } from '../utils/http-error.js';
+import { toPenaltyStatusDto, type RawPenaltyStatus } from '../utils/penalty-status.util.js';
 
 function toInvitationDto(
   inv: {
@@ -21,7 +22,13 @@ function toInvitationDto(
     message?: string;
     respondedAt?: Date | null;
     createdAt: Date;
-    horseId: { _id: mongoose.Types.ObjectId; name: string } | mongoose.Types.ObjectId;
+    horseId:
+      | {
+          _id: mongoose.Types.ObjectId;
+          name: string;
+          penaltyStatus?: RawPenaltyStatus;
+        }
+      | mongoose.Types.ObjectId;
     raceId:
       | {
           _id: mongoose.Types.ObjectId;
@@ -33,7 +40,11 @@ function toInvitationDto(
     horseOwnerId: { _id: mongoose.Types.ObjectId; fullName: string } | mongoose.Types.ObjectId;
   },
 ): InvitationDto {
-  const horse = inv.horseId as { _id: mongoose.Types.ObjectId; name: string };
+  const horse = inv.horseId as {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+    penaltyStatus?: RawPenaltyStatus;
+  };
   const race = inv.raceId as {
     _id: mongoose.Types.ObjectId;
     name: string;
@@ -48,7 +59,11 @@ function toInvitationDto(
     message: inv.message,
     respondedAt: inv.respondedAt?.toISOString() ?? null,
     createdAt: inv.createdAt.toISOString(),
-    horse: { id: horse._id.toString(), name: horse.name },
+    horse: {
+      id: horse._id.toString(),
+      name: horse.name,
+      penaltyStatus: toPenaltyStatusDto(horse.penaltyStatus),
+    },
     race: {
       id: race._id.toString(),
       name: race.name,
@@ -69,7 +84,7 @@ export async function listInvitations(
   if (status) filter.status = status;
 
   const invitations = await JockeyInvitation.find(filter)
-    .populate('horseId', 'name')
+    .populate('horseId', 'name penaltyStatus')
     .populate('raceId', 'name scheduledAt status')
     .populate('horseOwnerId', 'fullName')
     .sort({ createdAt: -1 })
@@ -140,7 +155,7 @@ export async function respondToInvitation(
   }
 
   const updated = await JockeyInvitation.findById(invitation._id)
-    .populate('horseId', 'name')
+    .populate('horseId', 'name penaltyStatus')
     .populate('raceId', 'name scheduledAt status')
     .populate('horseOwnerId', 'fullName')
     .lean();
@@ -174,7 +189,7 @@ async function buildJockeyRaceDto(
   if (!participant) return null;
 
   const [horse, owner, tournament, result] = await Promise.all([
-    Horse.findById(participant.horseId).select('name').lean(),
+    Horse.findById(participant.horseId).select('name penaltyStatus').lean(),
     User.findById(participant.ownerId).select('fullName').lean(),
     Tournament.findById(race.tournamentId).select('name').lean(),
     Result.findOne({ raceId: race._id, publishedAt: { $ne: null } }).lean(),
@@ -221,7 +236,11 @@ async function buildJockeyRaceDto(
     distance: race.distance,
     tournament: { id: tournament._id.toString(), name: tournament.name },
     participant: {
-      horse: { id: horse._id.toString(), name: horse.name },
+      horse: {
+        id: horse._id.toString(),
+        name: horse.name,
+        penaltyStatus: toPenaltyStatusDto(horse.penaltyStatus),
+      },
       owner: { id: owner._id.toString(), fullName: owner.fullName },
       laneNumber: participant.laneNumber,
       confirmedAt: participant.confirmedAt?.toISOString() ?? null,

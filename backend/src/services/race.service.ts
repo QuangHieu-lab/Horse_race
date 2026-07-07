@@ -9,6 +9,7 @@ import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceStatus } from '../types/shared.types.js';
 import { activeParticipants, randomizeActiveParticipantLanes, validateParticipants } from '../utils/race-participants.js';
+import { isPenaltyActive } from '../utils/penalty-status.util.js';
 import {
   normalizeViewingTicket,
   type ViewingTicketInput,
@@ -41,12 +42,6 @@ export interface AddParticipantInput {
   ownerId: string;
   laneNumber?: number;
   clothNumber?: number;
-}
-
-function isPenaltyActive(status?: { isBanned?: boolean; bannedUntil?: Date | string | null } | null): boolean {
-  if (!status?.isBanned) return false;
-  if (!status.bannedUntil) return true;
-  return new Date(status.bannedUntil) > new Date();
 }
 
 export async function createRace(input: CreateRaceInput) {

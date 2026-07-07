@@ -18,13 +18,23 @@ export interface UserSummaryDto {
   fullName: string;
 }
 
+export interface PenaltyStatusDto {
+  isBanned: boolean;
+  bannedUntil: string | null;
+  reason: string | null;
+}
+
+export interface HorseWithPenaltyDto extends NamedEntityDto {
+  penaltyStatus: PenaltyStatusDto;
+}
+
 export interface InvitationDto {
   id: string;
   status: InvitationStatus;
   message?: string;
   respondedAt?: string | null;
   createdAt: string;
-  horse: NamedEntityDto;
+  horse: HorseWithPenaltyDto;
   race: {
     id: string;
     name: string;
@@ -36,7 +46,7 @@ export interface InvitationDto {
 }
 
 export interface JockeyRaceParticipantDto {
-  horse: NamedEntityDto;
+  horse: HorseWithPenaltyDto;
   owner: UserSummaryDto;
   laneNumber: number;
   confirmedAt?: string | null;
