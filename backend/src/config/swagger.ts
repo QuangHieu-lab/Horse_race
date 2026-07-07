@@ -1160,7 +1160,7 @@ const swaggerDefinition = {
     '/api/races/{id}/participants': {
       post: {
         tags: ['Races'],
-        summary: 'Add a participant to the race (Xếp làn chạy/Áo số)',
+        summary: 'Add a participant to the race (barrier is assigned randomly)',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {

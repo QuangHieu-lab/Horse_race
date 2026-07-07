@@ -35,6 +35,33 @@ export interface InviteJockeyInput {
   message?: string;
 }
 
+function isPenaltyActive(status?: { isBanned?: boolean; bannedUntil?: Date | string | null } | null): boolean {
+  if (!status?.isBanned) return false;
+  if (!status.bannedUntil) return true;
+  return new Date(status.bannedUntil) > new Date();
+}
+
+async function assertOwnerCanCompete(ownerId: string): Promise<void> {
+  const owner = await User.findById(ownerId).select('penaltyStatus').lean();
+  if (isPenaltyActive(owner?.penaltyStatus)) {
+    throw new HttpError(403, 'Chủ ngựa đang bị tước quyền thi đấu, không thể đăng ký ngựa hoặc mời nài ngựa');
+  }
+}
+
+async function assertHorseCanCompete(horseId: string): Promise<void> {
+  const horse = await Horse.findById(horseId).select('penaltyStatus').lean();
+  if (isPenaltyActive(horse?.penaltyStatus)) {
+    throw new HttpError(403, 'Ngựa đang bị tước quyền thi đấu, không thể đăng ký tham gia cuộc đua');
+  }
+}
+
+async function assertJockeyCanCompete(jockeyId: string): Promise<void> {
+  const jockey = await User.findById(jockeyId).select('jockeyProfile.penaltyStatus').lean();
+  if (isPenaltyActive(jockey?.jockeyProfile?.penaltyStatus)) {
+    throw new HttpError(403, 'Nài ngựa đang bị tước quyền thi đấu, không thể được mời tham gia cuộc đua');
+  }
+}
+
 // ============================================================================
 // 2. DTO MAPPERS (Hàm chuẩn hóa dữ liệu trả về)
 // ============================================================================
@@ -206,6 +233,9 @@ async deleteHorse(ownerId: string, horseId: string) {
     }
 
     // Chặn đăng ký trùng sớm để báo lỗi rõ ràng (unique index vẫn là chốt chặn cuối)
+    await assertOwnerCanCompete(ownerId);
+    await assertHorseCanCompete(horseId);
+
     const existing = await RaceRegistration.findOne({
       raceId: new mongoose.Types.ObjectId(raceId),
       horseId: new mongoose.Types.ObjectId(horseId),
@@ -296,6 +326,10 @@ async deleteHorse(ownerId: string, horseId: string) {
     const { raceId, horseId, jockeyId, message } = input;
 
     // 1. Validation Logic — chỉ mời Nài ngựa khi ngựa ĐÃ được ban tổ chức duyệt
+    await assertOwnerCanCompete(ownerId);
+    await assertHorseCanCompete(horseId);
+    await assertJockeyCanCompete(jockeyId);
+
     const registration = await RaceRegistration.findOne({
       raceId: new mongoose.Types.ObjectId(raceId),
       horseId: new mongoose.Types.ObjectId(horseId),

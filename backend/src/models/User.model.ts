@@ -20,6 +20,13 @@ export interface IRefereeProfile {
   certificationId?: string;
 }
 
+export interface IPenaltyStatus {
+  isBanned: boolean;
+  bannedUntil: Date | null;
+  currentViolationId: mongoose.Types.ObjectId | null;
+  reason: string | null;
+}
+
 export interface IUser {
   email: string;
   passwordHash: string;
@@ -28,6 +35,7 @@ export interface IUser {
   phone?: string;
   avatarUrl?: string;
   isActive: boolean;
+  penaltyStatus: IPenaltyStatus;
   jockeyProfile?: IJockeyProfile;
   refereeProfile?: IRefereeProfile;
   createdAt: Date;
@@ -71,6 +79,12 @@ const UserSchema = new Schema<IUser, UserModel, IUserMethods>(
     phone: { type: String, trim: true },
     avatarUrl: { type: String },
     isActive: { type: Boolean, default: true },
+    penaltyStatus: {
+      isBanned: { type: Boolean, default: false },
+      bannedUntil: { type: Date, default: null },
+      currentViolationId: { type: Schema.Types.ObjectId, ref: 'Result', default: null },
+      reason: { type: String, default: null },
+    },
     jockeyProfile: { type: JockeyProfileSchema, default: undefined },
     refereeProfile: { type: RefereeProfileSchema, default: undefined },
   },

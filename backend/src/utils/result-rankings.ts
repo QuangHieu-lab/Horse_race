@@ -1,5 +1,4 @@
 import type { IParticipant } from '../models/Race.model.js';
-import { activeParticipants } from './race-participants.js';
 import type { IRanking } from '../models/Result.model.js';
 import type { PenaltyApplied } from '../types/shared.types.js';
 
@@ -8,9 +7,7 @@ export function validateRankings(
   participants: IParticipant[],
   disqualifiedHorseIds: Set<string>,
 ): string | null {
-  const eligible = activeParticipants(participants).filter(
-    (p) => !disqualifiedHorseIds.has(p.horseId.toString()),
-  );
+  const eligible = participants.filter((p) => !p.scratchedAt || p.isDisqualified);
 
   if (rankings.length === 0) return null;
   if (rankings.length > eligible.length) {

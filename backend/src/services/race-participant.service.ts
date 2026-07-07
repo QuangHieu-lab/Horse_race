@@ -7,15 +7,27 @@ import type { IParticipant } from '../models/Race.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
-import { activeParticipants, nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
+import { activeParticipants, randomizeActiveParticipantLanes, validateParticipants } from '../utils/race-participants.js';
+
+function isPenaltyActive(status?: { isBanned?: boolean; bannedUntil?: Date | string | null } | null): boolean {
+  if (!status?.isBanned) return false;
+  if (!status.bannedUntil) return true;
+  return new Date(status.bannedUntil) > new Date();
+}
 
 export async function assertUserRole(
   userId: mongoose.Types.ObjectId,
   role: 'jockey' | 'referee' | 'horse_owner',
 ): Promise<void> {
-  const user = await User.findById(userId).select('role isActive').lean();
+  const user = await User.findById(userId).select('role isActive penaltyStatus jockeyProfile.penaltyStatus').lean();
   if (!user?.isActive || user.role !== role) {
     throw new HttpError(409, `Người dùng ${userId} phải là ${role} đang hoạt động`);
+  }
+  if (role === 'jockey' && isPenaltyActive(user.jockeyProfile?.penaltyStatus)) {
+    throw new HttpError(403, 'Nai ngua dang bi tuoc quyen thi dau');
+  }
+  if (role === 'horse_owner' && isPenaltyActive(user.penaltyStatus)) {
+    throw new HttpError(403, 'Chu ngua dang bi tuoc quyen thi dau');
   }
 }
 
@@ -45,7 +57,12 @@ export async function addParticipantFromInvitation(
     throw new HttpError(409, 'Ngựa phải tồn tại và đủ sức khỏe để đua');
   }
 
+  if (isPenaltyActive(horse.penaltyStatus)) {
+    throw new HttpError(403, 'Ngua dang bi tuoc quyen thi dau');
+  }
+
   await assertUserRole(invitation.jockeyId, 'jockey');
+  await assertUserRole(invitation.horseOwnerId, 'horse_owner');
 
   const race = await Race.findById(invitation.raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
@@ -64,7 +81,7 @@ export async function addParticipantFromInvitation(
     throw new HttpError(409, 'Nài ngựa đã được xếp trong cuộc đua này');
   }
 
-  const lane = nextLaneNumber(race.participants);
+  const lane = activeParticipants(race.participants).length + 1;
   const participant: IParticipant = {
     horseId: invitation.horseId,
     jockeyId: invitation.jockeyId,
@@ -76,7 +93,7 @@ export async function addParticipantFromInvitation(
     scratchedAt: null,
   };
 
-  const next = [...race.participants, participant];
+  const next = randomizeActiveParticipantLanes([...race.participants, participant]);
   const err = validateParticipants(next, race.maxParticipants);
   if (err) throw new HttpError(409, err);
 
@@ -142,6 +159,10 @@ export async function addParticipant(
     throw new HttpError(409, 'Ngựa phải tồn tại và đủ sức khỏe để đua');
   }
 
+  if (isPenaltyActive(horse.penaltyStatus)) {
+    throw new HttpError(403, 'Ngua dang bi tuoc quyen thi dau');
+  }
+
   await assertUserRole(jockeyId, 'jockey');
   await assertUserRole(ownerId, 'horse_owner');
 
@@ -154,7 +175,7 @@ export async function addParticipant(
     throw new HttpError(409, 'Nài ngựa đã được xếp trong cuộc đua này');
   }
 
-  const lane = input.laneNumber ?? nextLaneNumber(race.participants);
+  const lane = activeParticipants(race.participants).length + 1;
   const participant: IParticipant = {
     horseId,
     jockeyId,
@@ -167,7 +188,7 @@ export async function addParticipant(
     scratchedAt: null,
   };
 
-  const next = [...race.participants, participant];
+  const next = randomizeActiveParticipantLanes([...race.participants, participant]);
   const err = validateParticipants(next, race.maxParticipants);
   if (err) throw new HttpError(409, err);
 
