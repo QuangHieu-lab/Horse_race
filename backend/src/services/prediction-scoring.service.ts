@@ -87,7 +87,7 @@ export async function scorePredictionsFromResult(
       prediction.status = isWinner ? 'correct' : 'incorrect';
       // Điểm có trọng số rủi ro (settle sẽ tính lại & chia thưởng dựa trên điểm này)
       prediction.scoringWeight = isWinner
-        ? prediction.contribution * Math.max(1, prediction.riskMultiplier)
+        ? prediction.contribution
         : 0;
       prediction.pointsEarned = 0;
       prediction.bonusPoints = 0;

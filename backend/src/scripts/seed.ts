@@ -200,11 +200,11 @@ async function seed(): Promise<void> {
   spectator2Profile.transactions = [];
   await spectator2Profile.save();
   await spectator2Profile.addPoints(
-    150_000,
+    250_000,
     'topup',
     undefined,
     undefined,
-    'Seed demo top-up: 150,000 points',
+    'Seed demo top-up: 250,000 points',
   );
   await spectator2Profile.spendPoints(
     30_000,
@@ -244,8 +244,8 @@ async function seed(): Promise<void> {
     {
       userId: spectator2._id,
       provider: 'mock',
-      amountVnd: 150_000_000,
-      points: 150_000,
+      amountVnd: 250_000_000,
+      points: 250_000,
       exchangeRateVndPerPoint: 1000,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator2',
@@ -398,7 +398,7 @@ async function seed(): Promise<void> {
       entryFee: 50_000,
       minRiskMultiplier: 1,
       maxRiskMultiplier: 10,
-      quickRiskMultipliers: [1, 2, 3, 6],
+      quickRiskMultipliers: [1],
       feePercent: 10,
       organizerFeeRate: 10,
       racingRewardRate: 15,
@@ -429,7 +429,7 @@ async function seed(): Promise<void> {
       entryFee: 50_000,
       minRiskMultiplier: 1,
       maxRiskMultiplier: 10,
-      quickRiskMultipliers: [1, 2, 3],
+      quickRiskMultipliers: [1],
       feePercent: 10,
       organizerFeeRate: 10,
       racingRewardRate: 15,
@@ -572,6 +572,62 @@ async function seed(): Promise<void> {
   await acceptInvitation(owner._id, jockey1._id, horseA._id, raceOpen._id, 'Mời bạn điều khiển Sóng Gió tại chung kết.');
   await acceptInvitation(owner._id, jockey2._id, horseB._id, raceOpen._id, 'Mời bạn điều khiển Bóng Mây tại chung kết.');
 
+  const openPrediction1 = await Prediction.create({
+    spectatorId: spectator2._id,
+    raceId: raceOpen._id,
+    tournamentId: tournamentSpring._id,
+    predictedRanks: [{ rank: 1, horseId: horseA._id }],
+    status: 'pending',
+    ticketCount: 2,
+    riskMultiplier: 2,
+    contribution: 100_000,
+    pointsEarned: 0,
+    bonusPoints: 0,
+    totalPoints: 0,
+  });
+  await spectator2Profile.spendPoints(
+    100_000,
+    'spent_pool_entry',
+    'Prediction',
+    openPrediction1._id,
+    `Seed demo open prediction: 2 tickets — ${raceOpen.name}`,
+  );
+
+  const openPrediction2 = await Prediction.create({
+    spectatorId: spectator3._id,
+    raceId: raceOpen._id,
+    tournamentId: tournamentSpring._id,
+    predictedRanks: [{ rank: 1, horseId: horseB._id }],
+    status: 'pending',
+    ticketCount: 1,
+    riskMultiplier: 1,
+    contribution: 50_000,
+    pointsEarned: 0,
+    bonusPoints: 0,
+    totalPoints: 0,
+  });
+  await spectator3Profile.spendPoints(
+    50_000,
+    'spent_pool_entry',
+    'Prediction',
+    openPrediction2._id,
+    `Seed demo open prediction: 1 ticket — ${raceOpen.name}`,
+  );
+
+  await PredictionPool.create({
+    raceId: raceOpen._id,
+    tournamentId: tournamentSpring._id,
+    status: 'open',
+    ticketPrice: 50_000,
+    minRiskMultiplier: 1,
+    maxRiskMultiplier: 10,
+    quickRiskMultipliers: [1],
+    totalTickets: 3,
+    totalBountyPool: 150_000,
+    winPool: 0,
+    contributorCount: 2,
+  });
+
   // --- Scenario C: Scoring after publish ---
   console.log('Scenario C — Result confirmed, awaiting publish…');
   const raceCompleted = await Race.create({
@@ -669,6 +725,7 @@ async function seed(): Promise<void> {
       { rank: 1, horseId: horseA._id },
     ],
     status: 'pending',
+    ticketCount: 1,
     riskMultiplier: 1,
     contribution: 50_000,
     pointsEarned: 0,
@@ -691,6 +748,7 @@ async function seed(): Promise<void> {
       { rank: 1, horseId: horseB._id },
     ],
     status: 'pending',
+    ticketCount: 1,
     riskMultiplier: 1,
     contribution: 50_000,
     pointsEarned: 0,
@@ -713,6 +771,7 @@ async function seed(): Promise<void> {
       { rank: 1, horseId: horseA._id },
     ],
     status: 'pending',
+    ticketCount: 2,
     riskMultiplier: 2,
     contribution: 100_000,
     pointsEarned: 0,
@@ -724,7 +783,7 @@ async function seed(): Promise<void> {
     'spent_pool_entry',
     'Prediction',
     predictionPending3._id,
-    `Seed demo pool entry 2x: ${raceCompleted.name}`,
+    `Seed demo pool entry: 2 tickets — ${raceCompleted.name}`,
   );
 
   await PredictionPool.create({
@@ -734,8 +793,8 @@ async function seed(): Promise<void> {
     ticketPrice: 50_000,
     minRiskMultiplier: 1,
     maxRiskMultiplier: 10,
-    quickRiskMultipliers: [1, 2, 3, 6],
-    totalTickets: 3,
+    quickRiskMultipliers: [1],
+    totalTickets: 4,
     totalBountyPool: 200_000,
     winPool: 0,
     contributorCount: 3,
@@ -743,12 +802,12 @@ async function seed(): Promise<void> {
 
   /*
    * Scenario C has:
-   * - spectator@demo.local: correct winner, 1x, contribution 50,000.
-   * - spectator2@demo.local: incorrect winner, 1x, contribution 50,000.
-   * - spectator3@demo.local: correct winner, 2x, contribution 100,000.
+   * - spectator@demo.local: correct winner, 1 ticket, contribution 50,000.
+   * - spectator2@demo.local: incorrect winner, 1 ticket, contribution 50,000.
+   * - spectator3@demo.local: correct winner, 2 tickets, contribution 100,000.
    *
-   * Publishing the result lets you test weighted pool sharing:
-   * predictionScore = contribution * riskMultiplier.
+   * Publishing the result lets you test ticket-based pool sharing:
+   * predictionScore = contribution = entryFee * ticketCount.
    */
 
   // --- 🚀 SCENARIO D: BẢN NHÁP CHO REFEREE TEST PHẠT ---
@@ -922,7 +981,7 @@ async function seed(): Promise<void> {
   console.log('A — Jockey:   pending invite on', raceUpcoming.name);
   console.log('B — Spectator: open prediction on', raceOpen.name);
   console.log('C — Scoring:  result confirmed, awaiting publish on', raceCompleted.name);
-  console.log('   -> spectator@demo.local correct 1x, spectator2 incorrect 1x, spectator3 correct 2x');
+  console.log('   -> spectator@demo.local correct 1 ticket, spectator2 incorrect 1 ticket, spectator3 correct 2 tickets');
   console.log('D — Referee:  result DRAFT created on', raceDraft.name);
   console.log('E — Independent: Horse registered, NO Jockey on', raceIndependent.name);
   console.log('   -> Free Jockey available: jockey3@demo.local');

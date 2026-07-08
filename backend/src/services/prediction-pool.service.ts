@@ -34,15 +34,10 @@ function pct(amount: number, rate: number): number {
 
 /**
  * Điểm dự đoán dùng để chia PrizePool giữa những người đoán ĐÚNG.
- * Có trọng số rủi ro: chọn risk cao mà đoán đúng thì phần thưởng tăng theo risk²,
- * không chỉ tuyến tính theo số điểm đã góp.
- *
- *   predictionScore = contribution × riskMultiplier
- *                   = (entryFee × riskMultiplier) × riskMultiplier
- *                   = entryFee × riskMultiplier²
+ * Mỗi phiếu có cùng trọng số, nên điểm chia thưởng chính là tổng điểm đã góp.
  */
-function predictionScoreOf(p: { contribution: number; riskMultiplier: number }): number {
-  return p.contribution * Math.max(1, p.riskMultiplier);
+function predictionScoreOf(p: { contribution: number }): number {
+  return p.contribution;
 }
 
 function sumRates(rates: number[]): number {
@@ -95,6 +90,7 @@ export async function getOrCreatePredictionPool(race: {
   _id: mongoose.Types.ObjectId;
   tournamentId: mongoose.Types.ObjectId;
   ticketPrice?: number;
+  ticketCount?: number;
   minRiskMultiplier?: number;
   maxRiskMultiplier?: number;
   quickRiskMultipliers?: number[];
@@ -135,6 +131,7 @@ export async function chargePredictionTicket(
     tournamentId: mongoose.Types.ObjectId;
     name: string;
     ticketPrice?: number;
+    ticketCount?: number;
     riskMultiplier?: number;
     minRiskMultiplier?: number;
     maxRiskMultiplier?: number;
@@ -145,31 +142,19 @@ export async function chargePredictionTicket(
     ownerShareRate?: number;
     jockeyShareRate?: number;
   },
-): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId; riskMultiplier: number }> {
+): Promise<{ contribution: number; poolId: mongoose.Types.ObjectId; ticketCount: number }> {
   const pool = await getOrCreatePredictionPool(race);
   if (pool.status !== 'open') {
     throw new HttpError(409, 'Bounty pool đã đóng');
   }
-  const riskMultiplier = race.riskMultiplier ?? 1;
-  if (!Number.isInteger(riskMultiplier)) {
-    throw new HttpError(400, 'Mức rủi ro phải là số nguyên');
-  }
-  if (riskMultiplier < pool.minRiskMultiplier || riskMultiplier > pool.maxRiskMultiplier) {
-    throw new HttpError(
-      400,
-      `Mức rủi ro phải nằm trong khoảng ${pool.minRiskMultiplier}x đến ${pool.maxRiskMultiplier}x`,
-    );
-  }
-  if (!pool.quickRiskMultipliers.includes(riskMultiplier)) {
-    throw new HttpError(
-      400,
-      `Mức rủi ro chỉ được chọn trong danh sách: ${pool.quickRiskMultipliers.join('x, ')}x`,
-    );
+  const ticketCount = race.ticketCount ?? race.riskMultiplier ?? 1;
+  if (!Number.isInteger(ticketCount) || ticketCount < 1) {
+    throw new HttpError(400, 'Số phiếu phải là số nguyên dương');
   }
   if (pool.ticketPrice < MIN_ENTRY_POINTS) {
-    throw new HttpError(400, `Entry points tối thiểu là ${MIN_ENTRY_POINTS}`);
+    throw new HttpError(400, `Giá 1 phiếu tối thiểu là ${MIN_ENTRY_POINTS} điểm`);
   }
-  const contribution = pool.ticketPrice * riskMultiplier;
+  const contribution = pool.ticketPrice * ticketCount;
 
   const spectatorObjectId = new mongoose.Types.ObjectId(spectatorId);
   const profile = await getOrCreateProfile(spectatorObjectId);
@@ -179,7 +164,7 @@ export async function chargePredictionTicket(
       'spent_pool_entry',
       'PredictionPool',
       pool._id,
-      `Tham gia dự đoán ${riskMultiplier}x cuộc đua ${race.name}`,
+      `Mua ${ticketCount} phiếu dự đoán cuộc đua ${race.name}`,
     );
   } catch {
     throw new HttpError(409, 'Không đủ điểm để tham gia dự đoán');
@@ -190,7 +175,7 @@ export async function chargePredictionTicket(
   pool.totalBountyPool += contribution;
   await pool.save();
 
-  return { contribution, poolId: pool._id, riskMultiplier };
+  return { contribution, poolId: pool._id, ticketCount };
 }
 
 export async function refundPredictionTicket(

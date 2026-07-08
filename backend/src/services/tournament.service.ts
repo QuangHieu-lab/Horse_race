@@ -32,9 +32,9 @@ function validatePredictionConfigRates(config: ITournament['predictionConfig']):
   if (rankTotal !== 100) {
     throw new HttpError(400, 'Tổng tỷ lệ chia theo thứ hạng phải bằng 100');
   }
-  const quickRiskMultipliers = config.quickRiskMultipliers ?? [1, 2, 3, 6];
+  const quickRiskMultipliers = config.quickRiskMultipliers ?? [1];
   if (
-    quickRiskMultipliers.length === 0 ||
+    quickRiskMultipliers.length > 0 &&
     quickRiskMultipliers.some((multiplier) => !Number.isInteger(multiplier) || multiplier < 1)
   ) {
     throw new HttpError(400, 'Allowed risk multipliers must contain positive integers');
