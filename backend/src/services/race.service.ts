@@ -8,7 +8,8 @@ import { Horse } from '../models/Horse.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceStatus } from '../types/shared.types.js';
-import { activeParticipants, nextLaneNumber, validateParticipants } from '../utils/race-participants.js';
+import { activeParticipants, randomizeActiveParticipantLanes, validateParticipants } from '../utils/race-participants.js';
+import { isPenaltyActive } from '../utils/penalty-status.util.js';
 import {
   normalizeViewingTicket,
   type ViewingTicketInput,
@@ -155,26 +156,35 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
 
   const [horse, jockey, owner, race] = await Promise.all([
     Horse.findById(payload.horseId).lean(),
-    User.findById(payload.jockeyId).select('role isActive').lean(),
-    User.findById(payload.ownerId).select('role isActive').lean(),
+    User.findById(payload.jockeyId).select('role isActive jockeyProfile.penaltyStatus').lean(),
+    User.findById(payload.ownerId).select('role isActive penaltyStatus').lean(),
     Race.findById(raceId),
   ]);
 
   if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
   if (!horse) throw new HttpError(404, 'Không tìm thấy ngựa');
   if (horse.healthStatus !== 'fit') throw new HttpError(409, 'Ngựa không đủ điều kiện thi đấu');
+  if (isPenaltyActive(horse.penaltyStatus)) {
+    throw new HttpError(403, 'Ngua dang bi tuoc quyen thi dau');
+  }
   if (!jockey?.isActive || jockey.role !== 'jockey') {
     throw new HttpError(400, 'jockeyId phải là tài khoản jockey đang hoạt động');
   }
+  if (isPenaltyActive(jockey.jockeyProfile?.penaltyStatus)) {
+    throw new HttpError(403, 'Nai ngua dang bi tuoc quyen thi dau');
+  }
   if (!owner?.isActive || owner.role !== 'horse_owner') {
     throw new HttpError(400, 'ownerId phải là tài khoản horse_owner đang hoạt động');
+  }
+  if (isPenaltyActive(owner.penaltyStatus)) {
+    throw new HttpError(403, 'Chu ngua dang bi tuoc quyen thi dau');
   }
 
   if (race.status === 'cancelled' || race.status === 'completed') {
     throw new HttpError(409, 'Không thể thêm participant vào trận đua đã kết thúc hoặc hủy');
   }
 
-  const laneNumber = payload.laneNumber ?? nextLaneNumber(race.participants);
+  const laneNumber = activeParticipants(race.participants).length + 1;
   const clothNumber = payload.clothNumber ?? laneNumber;
 
   const participant: IParticipant = {
@@ -188,7 +198,7 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
     scratchedAt: null,
   };
 
-  const nextParticipants = [...race.participants, participant];
+  const nextParticipants = randomizeActiveParticipantLanes([...race.participants, participant]);
   const participantErr = validateParticipants(nextParticipants, race.maxParticipants);
   if (participantErr) {
     throw new HttpError(409, participantErr);

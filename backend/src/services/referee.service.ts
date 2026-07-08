@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { Horse } from '../models/Horse.model.js';
+import { Notification } from '../models/Notification.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
 import { Notification } from '../models/Notification.model.js';
@@ -91,37 +92,93 @@ function applyDemoteBySeverity(
   const target = Math.min(idx + Math.max(1, drop), result.rankings.length);
   result.rankings.splice(target, 0, penalized);
   refreshRankingOrder(result);
-  return target + 1;
 }
 
-// Dựng lại bảng xếp hạng thuần từ (thời gian về đích + tập án tụt bậc hiện có):
-// sắp theo finishTime rồi áp lần lượt các án tụt bậc theo thứ tự lập biên bản.
-// Nhờ vậy việc HOÀN TÁC một án chỉ cần xoá án đó rồi gọi lại hàm này.
-async function recomputeRankingsWithDemotions(result: {
-  rankings: RankingRow[];
-  violations: Array<{ penaltyApplied?: string | null; horseId?: mongoose.Types.ObjectId | null; ruleId?: mongoose.Types.ObjectId | null; recordedAt: Date }>;
-}): Promise<void> {
-  result.rankings.sort((a, b) => (a.finishTime ?? Number.POSITIVE_INFINITY) - (b.finishTime ?? Number.POSITIVE_INFINITY));
+function applyDisqualificationToRankings(
+  result: { rankings: Array<{ horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean; prize?: number }> },
+  disqualifiedHorseId: mongoose.Types.ObjectId,
+): void {
+  const index = result.rankings.findIndex((r) => r.horseId.toString() === disqualifiedHorseId.toString());
+  if (index === -1) return;
+
+  const [disqualified] = result.rankings.splice(index, 1);
+  if (!disqualified) return;
+
+  disqualified.prize = 0;
+  result.rankings.push(disqualified);
   refreshRankingOrder(result);
+}
 
-  const demotes = result.violations
-    .filter((v) => v.penaltyApplied === 'demote' && v.horseId)
-    .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime());
-  if (demotes.length === 0) return;
+function isDopingRule(rule: { code?: string; name?: string; description?: string; category?: string }): boolean {
+  const haystack = `${rule.code ?? ''} ${rule.name ?? ''} ${rule.description ?? ''} ${rule.category ?? ''}`.toLowerCase();
+  return haystack.includes('doping');
+}
 
-  const ruleIds = [...new Set(demotes.map((v) => v.ruleId?.toString()).filter(Boolean))];
-  const rules = await ViolationRule.find({ _id: { $in: ruleIds } }).select('severity').lean();
-  const sevById = new Map(rules.map((r) => [r._id.toString(), r.severity]));
-
-  for (const v of demotes) {
-    const sev = v.ruleId ? sevById.get(v.ruleId.toString()) : undefined;
-    const drop = demoteRanksForSeverity(sev ?? 'medium');
-    try {
-      applyDemoteBySeverity(result, v.horseId!, drop);
-    } catch {
-      // Ngựa không còn trong bảng (đã bị xoá) thì bỏ qua án này.
-    }
+function resolvePenaltyBanUntil(rule: { banDurationDays: number; penaltyApplied: string }, forceBan: boolean): Date | null {
+  if (rule.banDurationDays > 0) {
+    const bannedUntil = new Date();
+    bannedUntil.setDate(bannedUntil.getDate() + rule.banDurationDays);
+    return bannedUntil;
   }
+  if (forceBan || rule.penaltyApplied === 'permanent_ban') {
+    return null;
+  }
+  return null;
+}
+
+function raceDayKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function endOfRaceDay(date: Date): Date {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+function describeBanDuration(
+  rule: { banDurationDays: number },
+  bannedUntil: Date | null,
+  hasBan: boolean,
+): string {
+  if (!hasBan) {
+    return 'Án tước quyền chỉ áp dụng cho kết quả cuộc đua này, không có số ngày cấm thi đấu bổ sung';
+  }
+  if (rule.banDurationDays > 0) {
+    return `Án phạt ${rule.banDurationDays} ngày thi đấu thực tế${bannedUntil ? `, hiệu lực đến hết ${bannedUntil.toISOString()}` : ', chờ cập nhật thêm lịch đua để xác định ngày kết thúc'}`;
+  }
+  return 'Án phạt cấm thi đấu không có thời hạn kết thúc tự động';
+}
+
+async function resolveCompetitionDayBanUntil(
+  banRaceDays: number,
+  fromDate: Date,
+): Promise<Date | null> {
+  if (banRaceDays <= 0) return null;
+
+  const races = await Race.find({
+    scheduledAt: { $gt: fromDate },
+    status: { $ne: 'cancelled' },
+  })
+    .select('scheduledAt')
+    .sort({ scheduledAt: 1 })
+    .lean();
+
+  const raceDays: Date[] = [];
+  const seen = new Set<string>();
+  for (const race of races) {
+    const key = raceDayKey(race.scheduledAt);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    raceDays.push(race.scheduledAt);
+    if (raceDays.length >= banRaceDays) break;
+  }
+
+  const targetDay = raceDays[banRaceDays - 1];
+  return targetDay ? endOfRaceDay(targetDay) : null;
 }
 
 export async function getRefereeDashboard(refereeId: string) {
@@ -383,32 +440,59 @@ export async function applyRacePenalty(
   );
   if (!participant) throw new HttpError(404, 'Không tìm thấy đối tượng trong trận');
 
-  // Hình phạt đơn giản & thống nhất: tụt bậc theo mức độ vi phạm
-  // (nhẹ 1 · trung bình 2 · nặng 3 · rất nặng 5). Tràn khỏi bảng thì xếp cuối.
-  const drop = demoteRanksForSeverity(rule.severity);
+  const isDoping = isDopingRule(rule);
+  const isDQ = isDoping || ['disqualify', 'disqualification'].includes(rule.penaltyApplied);
+  const isDemote = rule.penaltyApplied === 'demote';
+  if (payload.affectedHorseId && !mongoose.isValidObjectId(payload.affectedHorseId)) {
+    throw new HttpError(400, 'affectedHorseId không hợp lệ');
+  }
+  if (payload.affectedHorseId && payload.affectedHorseId === participant.horseId.toString()) {
+    throw new HttpError(400, 'Ngựa vi phạm và ngựa bị ảnh hưởng không được trùng nhau');
+  }
+  const affectedHorseId = payload.affectedHorseId ? new mongoose.Types.ObjectId(payload.affectedHorseId) : null;
 
-  const resultDoc = await Result.findOne({ raceId: race._id });
-  if (!resultDoc || resultDoc.rankings.length === 0) {
-    throw new HttpError(400, 'Chưa có kết quả để phạt — hãy chạy đua tạo bảng xếp hạng trước khi lập biên bản.');
+  if (isDemote && !affectedHorseId) {
+    throw new HttpError(400, 'affectedHorseId là bắt buộc khi áp dụng hình phạt tụt hạng');
   }
 
-  const oldRank = resultDoc.rankings.find(
-    (r) => r.horseId.toString() === participant.horseId.toString(),
-  )?.rank ?? null;
-  if (oldRank === null) {
-    throw new HttpError(400, 'Ngựa/nài này không có trong bảng xếp hạng cuộc đua.');
+  if (isDQ) {
+    (participant as any).isDisqualified = true;
+    const faultOf = payload.target === 'horse' ? 'Ngựa' : payload.target === 'jockey' ? 'Kỵ sĩ' : 'Cả hai';
+    (participant as any).disqualifiedReason = `${rule.name} (Lỗi từ: ${faultOf})`;
+    (participant as any).disqualifiedAt = new Date();
+    participant.scratchedAt = new Date();
+    await race.save();
   }
+
+  let resultDoc = await Result.findOne({ raceId: race._id });
+  if (!resultDoc) {
+    resultDoc = new Result({ raceId: race._id, tournamentId: race.tournamentId, rankings: [], violations: [], protests: [] });
+  }
+
+  if (isDemote && affectedHorseId) {
+    applyRelegationToRankings(resultDoc, participant.horseId, affectedHorseId);
+  }
+
+  if (isDQ) {
+    applyDisqualificationToRankings(resultDoc, participant.horseId);
+  }
+
+  const isJockeyPenalty = isDoping || ['jockey', 'both'].includes(payload.target);
+  const bannedUntil = rule.banDurationDays > 0
+    ? await resolveCompetitionDayBanUntil(rule.banDurationDays, race.scheduledAt)
+    : resolvePenaltyBanUntil(rule, isDoping);
 
   resultDoc.violations.push({
     ruleId: rule._id,
     target: payload.target,
     horseId: participant.horseId,
     jockeyId: participant.jockeyId,
-    affectedHorseId: null,
-    type: rule.category,
-    description: `${rule.name} — tụt ${drop} bậc${payload.notes ? ` · ${payload.notes}` : ''}`,
-    penaltyApplied: 'demote',
-    bannedUntil: null,
+    ownerId: participant.ownerId,
+    affectedHorseId,
+    type: isDoping ? 'doping' : rule.category,
+    description: payload.notes ? `${rule.name} - Ghi chú: ${payload.notes}` : rule.description,
+    penaltyApplied: rule.penaltyApplied,
+    bannedUntil,
     recordedAt: new Date(),
   } as any);
 
@@ -428,53 +512,99 @@ export async function applyRacePenalty(
     throw mapResultSaveError(err);
   }
 
-  // Thông báo cho người bị lập biên bản:
-  // - phạt nài  → thông báo cho chính nài ngựa;
-  // - phạt ngựa → thông báo cho chủ ngựa (người quản lý ngựa).
-  await notifyPenaltyParties({
-    race,
-    target: payload.target,
-    jockeyId: participant.jockeyId,
-    ownerId: participant.ownerId,
-    horseId: participant.horseId,
-    title: 'Bạn có biên bản vi phạm mới',
-    detail: `Luật: ${rule.name} — tụt ${drop} bậc (còn hạng ${newRank})${payload.notes ? ` — Ghi chú: ${payload.notes}` : ''}`,
-    type: 'penalty_issued',
-    resultId: savedResult._id,
-  });
-}
+  const isBannedPenalty = isDoping || ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
 
-async function notifyPenaltyParties(input: {
-  race: { _id: mongoose.Types.ObjectId; name: string };
-  target: 'horse' | 'jockey';
-  jockeyId: mongoose.Types.ObjectId;
-  ownerId: mongoose.Types.ObjectId;
-  horseId: mongoose.Types.ObjectId;
-  title: string;
-  detail: string;
-  type: 'penalty_issued' | 'penalty_revoked';
-  resultId: mongoose.Types.ObjectId;
-}): Promise<void> {
-  try {
-    const horse = await Horse.findById(input.horseId).select('name').lean();
-    const horseName = horse?.name ?? 'ngựa của bạn';
-    const recipientId = input.target === 'jockey' ? input.jockeyId : input.ownerId;
-    const message =
-      input.target === 'jockey'
-        ? `Cuộc đua "${input.race.name}": ${input.detail}`
-        : `Cuộc đua "${input.race.name}" — ngựa ${horseName}: ${input.detail}`;
+  if (isBannedPenalty) {
+    const latestViolationId = savedResult.violations[savedResult.violations.length - 1]?._id;
+    const banReason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.name;
+
+    if ((isDoping || ['horse', 'both'].includes(payload.target)) && participant.horseId) {
+      await Horse.findByIdAndUpdate(participant.horseId, {
+        $set: {
+          penaltyStatus: {
+            isBanned: true,
+            bannedUntil: bannedUntil,
+            currentViolationId: latestViolationId,
+            reason: banReason
+          }
+        }
+      });
+    }
+
+    if ((isDoping || ['jockey', 'both'].includes(payload.target)) && participant.jockeyId) {
+      await User.findByIdAndUpdate(participant.jockeyId, {
+        $set: {
+          'jockeyProfile.penaltyStatus': {
+            isBanned: true,
+            bannedUntil: bannedUntil,
+            currentViolationId: latestViolationId,
+            reason: banReason
+          }
+        }
+      });
+    }
+
+    if (isDoping && participant.ownerId) {
+      await User.findByIdAndUpdate(participant.ownerId, {
+        $set: {
+          penaltyStatus: {
+            isBanned: true,
+            bannedUntil,
+            currentViolationId: latestViolationId,
+            reason: banReason
+          }
+        }
+      });
+    }
+  }
+
+  if (isDQ) {
+    const reason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.description;
+    const banLine = describeBanDuration(rule, bannedUntil, isBannedPenalty);
+    const notices = [];
+
+    if (participant.jockeyId) {
+      notices.push({
+        userId: participant.jockeyId,
+        type: 'disqualification_notice',
+        title: 'Thông báo tước quyền thi đấu',
+        message: `Bạn bị tước quyền thi đấu vì: ${reason}. ${banLine}.`,
+        refModel: 'Result',
+        refId: savedResult._id,
+      });
+    }
+
+    if (participant.ownerId) {
+      notices.push({
+        userId: participant.ownerId,
+        type: 'disqualification_notice',
+        title: 'Thông báo tước quyền thi đấu',
+        message: `Ngựa của bạn bị tước quyền thi đấu vì: ${reason}. ${banLine}.`,
+        refModel: 'Result',
+        refId: savedResult._id,
+      });
+    }
+
+    if (notices.length > 0) {
+      await Notification.insertMany(notices);
+    }
+  }
+
+  if (isJockeyPenalty && !isDQ && participant.jockeyId) {
+    const banLine = isBannedPenalty
+      ? (rule.banDurationDays > 0
+        ? `Án phạt ${rule.banDurationDays} ngày thi đấu thực tế${bannedUntil ? `, hiệu lực đến hết ${bannedUntil.toISOString()}` : ', chờ cập nhật thêm lịch đua để xác định ngày kết thúc'}`
+        : 'Án phạt cấm thi đấu không có thời hạn kết thúc tự động')
+      : 'Án phạt được ghi nhận vào biên bản, không áp dụng cấm thi đấu.';
 
     await Notification.create({
-      userId: recipientId,
-      type: input.type,
-      title: input.title,
-      message,
+      userId: participant.jockeyId,
+      type: 'jockey_penalty',
+      title: 'Biên bản xử phạt jockey',
+      message: `Bạn bị xử phạt vì: ${payload.notes ? `${rule.name} - ${payload.notes}` : rule.description}. ${banLine}.`,
       refModel: 'Result',
-      refId: input.resultId,
+      refId: savedResult._id,
     });
-  } catch (err) {
-    // Thông báo là phụ trợ — không làm hỏng nghiệp vụ xử phạt nếu tạo thất bại.
-    console.error('notifyPenaltyParties failed:', err);
   }
 }
 
@@ -500,30 +630,53 @@ export async function revokeRacePenalty(
 
   const violation = resultDoc.violations[violationIndex]!;
 
-  // Xoá án rồi dựng lại bảng xếp hạng từ các án còn lại → tự khôi phục thứ hạng.
-  resultDoc.violations.splice(violationIndex, 1);
-  await recomputeRankingsWithDemotions(resultDoc);
-  await resultDoc.save();
+  const isDoping = violation.type === 'doping';
+  const isDQ = isDoping || ['disqualify', 'disqualification'].includes(violation.penaltyApplied || '');
+  if (isDQ) {
+    const participant = race.participants.find(p =>
+      (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
+      (violation.jockeyId && p.jockeyId.toString() === violation.jockeyId.toString())
+    );
 
-  // Báo cho người từng bị phạt biết án phạt đã được gỡ.
-  const revokedParticipant = race.participants.find(p =>
-    (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
-    (violation.jockeyId && p.jockeyId.toString() === violation.jockeyId.toString())
-  );
-  if (revokedParticipant) {
-    const target: 'horse' | 'jockey' = violation.target === 'jockey' ? 'jockey' : 'horse';
-    await notifyPenaltyParties({
-      race,
-      target,
-      jockeyId: revokedParticipant.jockeyId,
-      ownerId: revokedParticipant.ownerId,
-      horseId: revokedParticipant.horseId,
-      title: 'Án phạt đã được hoàn tác',
-      detail: `Biên bản "${violation.description}" đã được trọng tài gỡ bỏ.`,
-      type: 'penalty_revoked',
-      resultId: resultDoc._id,
-    });
+    if (participant) {
+      participant.isDisqualified = false;
+      participant.disqualifiedReason = undefined;
+      participant.disqualifiedAt = null;
+      participant.scratchedAt = null;
+      await race.save();
+    }
   }
+
+  const isBannedPenalty = isDoping || ['time_ban', 'permanent_ban'].includes(violation.penaltyApplied || '');
+  if (isBannedPenalty) {
+    const resetStatus = {
+      isBanned: false,
+      bannedUntil: null,
+      currentViolationId: null,
+      reason: null
+    };
+
+    if ((isDoping || ['horse', 'both'].includes(violation.target)) && violation.horseId) {
+      await Horse.findByIdAndUpdate(violation.horseId, {
+        $set: { penaltyStatus: resetStatus }
+      });
+    }
+
+    if ((isDoping || ['jockey', 'both'].includes(violation.target)) && violation.jockeyId) {
+      await User.findByIdAndUpdate(violation.jockeyId, {
+        $set: { 'jockeyProfile.penaltyStatus': resetStatus }
+      });
+    }
+
+    if (isDoping && violation.ownerId) {
+      await User.findByIdAndUpdate(violation.ownerId, {
+        $set: { penaltyStatus: resetStatus }
+      });
+    }
+  }
+
+  resultDoc.violations.splice(violationIndex, 1);
+  await resultDoc.save();
 }
 
 // ─── Luồng trọng tài điều khiển + xử phạt ────────────────────────────────────
@@ -549,6 +702,7 @@ export interface RaceViolationDto {
   target: 'horse' | 'jockey' | 'both';
   horseId: string | null;
   horseName: string | null;
+  ownerId: string | null;
   affectedHorseId: string | null;
   affectedHorseName: string | null;
   jockeyId: string | null;
@@ -624,6 +778,7 @@ export async function listRaceViolations(
 
   return result.violations.map((v) => {
     const horseId = v.horseId?.toString() ?? null;
+    const ownerId = v.ownerId?.toString() ?? null;
     const affectedHorseId = v.affectedHorseId?.toString() ?? null;
     const jockeyId = v.jockeyId?.toString() ?? null;
     return {
@@ -635,6 +790,7 @@ export async function listRaceViolations(
       target: v.target,
       horseId,
       horseName: horseId ? horseNames.get(horseId) ?? null : null,
+      ownerId,
       affectedHorseId,
       affectedHorseName: affectedHorseId ? horseNames.get(affectedHorseId) ?? null : null,
       jockeyId,

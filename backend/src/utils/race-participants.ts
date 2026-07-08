@@ -47,3 +47,37 @@ export function nextLaneNumber(participants: IParticipant[]): number {
   if (active.length === 0) return 1;
   return Math.max(...active.map((p) => p.laneNumber)) + 1;
 }
+
+export function randomLaneNumber(participants: IParticipant[], maxParticipants: number): number {
+  const usedLanes = new Set(activeParticipants(participants).map((p) => p.laneNumber));
+  const availableLanes: number[] = [];
+
+  for (let lane = 1; lane <= maxParticipants; lane++) {
+    if (!usedLanes.has(lane)) availableLanes.push(lane);
+  }
+
+  if (availableLanes.length === 0) {
+    return nextLaneNumber(participants);
+  }
+
+  const index = Math.floor(Math.random() * availableLanes.length);
+  return availableLanes[index]!;
+}
+
+export function randomizeActiveParticipantLanes(participants: IParticipant[]): IParticipant[] {
+  const active = activeParticipants(participants);
+  const lanes = Array.from({ length: active.length }, (_, index) => index + 1);
+
+  for (let index = lanes.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [lanes[index], lanes[randomIndex]] = [lanes[randomIndex]!, lanes[index]!];
+  }
+
+  active.forEach((participant, index) => {
+    const lane = lanes[index]!;
+    participant.laneNumber = lane;
+    participant.clothNumber = lane;
+  });
+
+  return participants;
+}

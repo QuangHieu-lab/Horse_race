@@ -28,7 +28,7 @@ import {
   PaymentTransaction,
   RaceViewingPass,
   SpectatorProfile,
-  ViolationRule, 
+  ViolationRule,
 } from '../models/index.js';
 
 const DEMO_PASSWORD = 'Demo@123';
@@ -54,7 +54,7 @@ const COLLECTIONS_TO_CLEAR = [
   'tracks',
   'horses',
   'users',
-  'violationrules', 
+  'violationrules',
 ];
 
 function daysFromNow(days: number): Date {
@@ -170,7 +170,7 @@ async function seed(): Promise<void> {
   const owner = users[1]!;
   const jockey1 = users[2]!;
   const jockey2 = users[3]!;
-  const jockey3 = users[4]!; 
+  const jockey3 = users[4]!;
   const referee = users[5]!;
   const spectator = users[6]!;
   const spectator2 = users[7]!;
@@ -305,7 +305,7 @@ async function seed(): Promise<void> {
       weight: 460,
       healthStatus: 'fit',
     },
-    { 
+    {
       ownerId: owner._id,
       name: 'Sấm Sét',
       registrationId: 'VN-HORSE-004',
@@ -320,15 +320,57 @@ async function seed(): Promise<void> {
   const horseA = horses[0]!;
   const horseB = horses[1]!;
   const horseC = horses[2]!;
-  const horseD = horses[3]!; 
+  const horseD = horses[3]!;
 
   console.log('Creating Violation Rules…');
-  const rules = await ViolationRule.create(
-    VIOLATION_RULES.map((r) => ({ ...r, isActive: true, createdBy: admin._id })),
-  );
-  const rulesByCode = new Map(rules.map((r) => [r.code, r]));
-  const ruleFalseStart = rulesByCode.get('JCK-06')!; // xuất phát sớm (nài)
-  const ruleObstruction = rulesByCode.get('JCK-01')!; // chèn ép/tụt hạng (nài)
+  const rules = await ViolationRule.create([
+    {
+      code: 'ERR-001',
+      name: 'Xuất phát sớm (False Start)',
+      description: 'Ngựa hoặc kỵ sĩ vượt rào trước hiệu lệnh bắt đầu.',
+      category: 'race_conduct',
+      severity: 'high',
+      penaltyApplied: 'disqualify',
+      banDurationDays: 0,
+      isActive: true,
+      createdBy: admin._id,
+    },
+    {
+      code: 'ERR-002',
+      name: 'Chèn ép làn đối thủ (Obstruction)',
+      description: 'Kỵ sĩ điều khiển ngựa tạt đầu, chèn ép sai luật gây nguy hiểm.',
+      category: 'race_conduct',
+      severity: 'high',
+      penaltyApplied: 'demote',
+      banDurationDays: 0,
+      isActive: true,
+      createdBy: admin._id,
+    },
+    {
+      code: 'ERR-003',
+      name: 'Sử dụng roi quá mức',
+      description: 'Kỵ sĩ quất roi vượt quá số lần quy định ở đoạn nước rút.',
+      category: 'equipment',
+      severity: 'medium',
+      penaltyApplied: 'warning',
+      banDurationDays: 0,
+      isActive: true,
+      createdBy: admin._id,
+    },
+    {
+      code: 'ERR-004',
+      name: 'Su dung doping',
+      description: 'Ngua co ket qua kiem tra doping duong tinh, huy ket qua va cam thi dau cac ben lien quan.',
+      category: 'medical',
+      severity: 'critical',
+      penaltyApplied: 'disqualification',
+      banDurationDays: 365,
+      isActive: true,
+      createdBy: admin._id,
+    }
+  ]);
+  const ruleFalseStart = rules[0]!;
+  const ruleObstruction = rules[1]!;
 
   console.log('Creating tracks & tournaments…');
   const track = await Track.create({
@@ -671,7 +713,7 @@ async function seed(): Promise<void> {
     ],
     violations: [],
     confirmedBy: referee._id,
-    confirmedAt: new Date(), 
+    confirmedAt: new Date(),
     publishedBy: null,
     publishedAt: null,
   });
@@ -784,7 +826,7 @@ async function seed(): Promise<void> {
     going: 'good',
     weather: 'Mát mẻ',
     maxParticipants: 8,
-    status: 'completed', 
+    status: 'completed',
     refereeId: referee._id,
     participants: [
       {
@@ -834,7 +876,7 @@ async function seed(): Promise<void> {
     violations: [],
     isPhotoFinish: false,
     confirmedBy: null,
-    confirmedAt: null, 
+    confirmedAt: null,
   });
 
   // --- Scenario E: Độc lập - Test quy trình mời Kỵ sĩ ---
@@ -855,7 +897,7 @@ async function seed(): Promise<void> {
     predictionCloseAt: daysFromNow(14),
     maxParticipants: 8,
     status: 'scheduled',
-    participants: [], 
+    participants: [],
   });
 
   await RaceRegistration.create({
@@ -950,7 +992,7 @@ async function seed(): Promise<void> {
   console.log('\n======================================================');
   console.log(' 🚀 DỮ LIỆU ĐỂ TEST API TRỌNG TÀI (REFEREE) TRÊN POSTMAN');
   console.log('======================================================');
-  
+
   console.log(`\n🔴 1. TEST TỤT HẠNG TRỰC TIẾP (Ngựa B đang hạng 1 -> hạ xuống sau ngựa A bị ảnh hưởng)`);
   console.log(`POST /api/referee/races/${raceDraft._id}/penalize`);
   console.log(JSON.stringify({

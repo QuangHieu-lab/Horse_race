@@ -117,6 +117,8 @@ export type NotificationType =
   | 'registration_approved'
   | 'participant_scratched'
   | 'result_protest_filed'
+  | 'jockey_penalty'
+  | 'disqualification_notice'
   | 'viewing_ticket_sale_open'
   | 'viewing_ticket_daily_reminder'
   | 'viewing_ticket_purchased'

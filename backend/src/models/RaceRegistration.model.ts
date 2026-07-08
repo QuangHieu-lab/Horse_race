@@ -3,6 +3,7 @@ import { Horse } from './Horse.model.js';
 import { Race } from './Race.model.js';
 import { User } from './User.model.js';
 import type { RegistrationStatus } from '../types/shared.types.js';
+import { isPenaltyActive } from '../utils/penalty-status.util.js';
 
 /**
  * Đơn đăng ký ngựa vào cuộc đua — admin duyệt trước khi thêm vào Race.participants.
@@ -53,6 +54,16 @@ RaceRegistrationSchema.pre('save', async function (next) {
   if (horse.ownerId.toString() !== this.ownerId.toString()) {
     return next(new Error('ownerId must match horse owner'));
   }
+  if (['pending', 'approved'].includes(this.status) && isPenaltyActive(horse.penaltyStatus)) {
+    return next(new Error('Horse is banned from competition'));
+  }
+  const owner = await User.findById(this.ownerId).select('role isActive penaltyStatus').lean();
+  if (!owner?.isActive || owner.role !== 'horse_owner') {
+    return next(new Error('ownerId must be an active horse_owner user'));
+  }
+  if (['pending', 'approved'].includes(this.status) && isPenaltyActive(owner.penaltyStatus)) {
+    return next(new Error('Horse owner is banned from competition'));
+  }
   if (this.isNew || this.isModified('status')) {
     if (['pending', 'approved'].includes(this.status) && horse.healthStatus !== 'fit') {
       return next(new Error('Only fit horses can register for a race'));
@@ -60,9 +71,12 @@ RaceRegistrationSchema.pre('save', async function (next) {
   }
 
   if (this.jockeyId) {
-    const jockey = await User.findById(this.jockeyId).select('role isActive').lean();
+    const jockey = await User.findById(this.jockeyId).select('role isActive jockeyProfile.penaltyStatus').lean();
     if (!jockey?.isActive || jockey.role !== 'jockey') {
       return next(new Error('jockeyId must be an active jockey user'));
+    }
+    if (['pending', 'approved'].includes(this.status) && isPenaltyActive(jockey.jockeyProfile?.penaltyStatus)) {
+      return next(new Error('Jockey is banned from competition'));
     }
   }
 
