@@ -77,6 +77,8 @@ export type PointsTxType =
   | 'refunded_redemption'
   | 'spent_pool_entry'
   | 'earned_pool_share'
+  | 'earned_race_prize_owner'
+  | 'earned_race_prize_jockey'
   | 'refunded_pool'
   | 'spent_viewing_ticket'
   | 'refunded_viewing_ticket';
@@ -114,6 +116,7 @@ export type NotificationType =
   | 'result_confirmed'
   | 'result_published'
   | 'prediction_reward'
+  | 'race_prize_reward'
   | 'registration_approved'
   | 'participant_scratched'
   | 'result_protest_filed'
@@ -135,7 +138,7 @@ export type NotificationRefModel =
   | 'Track'
   | 'RaceViewingPass';
 
-export type PointsRefModel = 'Prediction' | 'Redemption' | 'PredictionPool' | 'RaceViewingPass';
+export type PointsRefModel = 'Prediction' | 'Redemption' | 'PredictionPool' | 'RaceViewingPass' | 'Result';
 
 export const PENALTY_APPLIED: readonly PenaltyApplied[] = [
   'warning',

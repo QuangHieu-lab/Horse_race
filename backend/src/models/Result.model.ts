@@ -168,7 +168,9 @@ ResultSchema.pre('save', async function (next) {
       const { scorePredictionsFromResult } = await import(
         '../services/prediction-scoring.service.js'
       );
+      const { settleRacePrizesFromResult } = await import('../services/race-prize.service.js');
       await scorePredictionsFromResult(this);
+      await settleRacePrizesFromResult(this as IResult & { _id: mongoose.Types.ObjectId });
     } catch (err) {
       return next(err instanceof Error ? err : new Error(String(err)));
     }

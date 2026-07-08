@@ -44,7 +44,7 @@ type SpectatorProfileModel = Model<
   ISpectatorProfileMethods
 >;
 
-const POINTS_REF_MODELS = ['Prediction', 'Redemption', 'PredictionPool', 'RaceViewingPass'] as const;
+const POINTS_REF_MODELS = ['Prediction', 'Redemption', 'PredictionPool', 'RaceViewingPass', 'Result'] as const;
 
 const PointsTransactionSchema = new Schema<IPointsTransaction>(
   {
@@ -58,6 +58,8 @@ const PointsTransactionSchema = new Schema<IPointsTransaction>(
         'refunded_redemption',
         'spent_pool_entry',
         'earned_pool_share',
+        'earned_race_prize_owner',
+        'earned_race_prize_jockey',
         'refunded_pool',
         'spent_viewing_ticket',
         'refunded_viewing_ticket',

@@ -970,8 +970,8 @@ async function seed(): Promise<void> {
     {
       userId: spectator3._id,
       type: 'prediction_reward',
-      title: 'Dự đoán 2x đã ghi nhận',
-      message: `Bạn đã tham gia dự đoán ${raceCompleted.name} với hệ số 2x để test chia thưởng theo trọng số.`,
+      title: 'Dự đoán 2 phiếu đã ghi nhận',
+      message: `Bạn đã tham gia dự đoán ${raceCompleted.name} với 2 phiếu để test chia thưởng theo ticket count.`,
       refModel: 'Prediction',
       refId: predictionPending3._id,
     },
@@ -982,6 +982,7 @@ async function seed(): Promise<void> {
   console.log('B — Spectator: open prediction on', raceOpen.name);
   console.log('C — Scoring:  result confirmed, awaiting publish on', raceCompleted.name);
   console.log('   -> spectator@demo.local correct 1 ticket, spectator2 incorrect 1 ticket, spectator3 correct 2 tickets');
+  console.log('   -> fixed race prizes: rank 1/2/3 = 30M/15M/5M points, split 80% owner / 20% jockey on publish');
   console.log('D — Referee:  result DRAFT created on', raceDraft.name);
   console.log('E — Independent: Horse registered, NO Jockey on', raceIndependent.name);
   console.log('   -> Free Jockey available: jockey3@demo.local');

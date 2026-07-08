@@ -197,7 +197,7 @@ const swaggerDefinition = {
           userReward: {
             type: 'string',
             example:
-              'Correct spectator receives returned contribution + spectatorRewardPool * (predictionScore / totalWinnerScore), where predictionScore = contribution.',
+              'Correct spectator receives returned contribution + spectatorRewardPool * (predictionScore / totalWinnerScore), where predictionScore = ticketCount.',
           },
           noWinnerPolicy: {
             type: 'string',
@@ -230,8 +230,16 @@ const swaggerDefinition = {
           organizerFeeRate: { type: 'number', example: 10 },
           racingRewardRate: { type: 'number', example: 15 },
           spectatorRewardRate: { type: 'number', example: 75 },
-          ownerShareRate: { type: 'number', example: 80 },
-          jockeyShareRate: { type: 'number', example: 20 },
+          ownerShareRate: {
+            type: 'number',
+            example: 80,
+            description: 'Owner share for both fixed race prizes and bounty racing rewards.',
+          },
+          jockeyShareRate: {
+            type: 'number',
+            example: 20,
+            description: 'Jockey share for both fixed race prizes and bounty racing rewards.',
+          },
           rankRewardRates: {
             type: 'array',
             items: { type: 'number' },
@@ -300,7 +308,7 @@ const swaggerDefinition = {
                   type: 'string',
                   example: 'spent_pool_entry',
                   description:
-                    'Point ledger type. Betting flow uses topup, spent_pool_entry, refunded_pool, earned_pool_share, spent_viewing_ticket, and spent_redemption.',
+                    'Point ledger type. Betting flow uses topup, spent_pool_entry, refunded_pool, earned_pool_share, earned_race_prize_owner, earned_race_prize_jockey, spent_viewing_ticket, and spent_redemption.',
                 },
                 points: { type: 'number', example: 100 },
                 balanceAfter: { type: 'number', example: 1000 },
@@ -486,7 +494,12 @@ const swaggerDefinition = {
                 jockeyId: { type: 'string' },
                 finishTime: { type: 'number', example: 98.42 },
                 marginBehind: { type: 'number', example: 0 },
-                prize: { type: 'number', example: 30000000 },
+                prize: {
+                  type: 'number',
+                  example: 30000000,
+                  description:
+                    'Fixed race prize in points for this rank. On publish it is split to owner/jockey by ownerShareRate/jockeyShareRate.',
+                },
               },
             },
           },
@@ -709,14 +722,14 @@ const swaggerDefinition = {
     '/api/admin/races/{id}/result/publish': {
       patch: {
         tags: ['Admin'],
-        summary: 'Publish a race result and settle prediction bounty pool',
+        summary: 'Publish a race result and settle prizes',
         description:
-          'Publishes confirmed race results and settles the point betting pool. Correct spectators receive returned contribution plus spectator pool share; owner and jockey rewards are added to their point ledgers from the racing reward pool; organizer fee is recorded in OrganizerLedger. If no prediction qualifies, rolloverPolicy controls refund, jackpot rollover, or transfer to organizer.',
+          'Publishes confirmed race results and settles the point betting pool plus fixed race prizes. Correct spectators receive returned contribution plus spectator pool share; owner and jockey rewards are added to their point ledgers from both the bounty racing reward pool and each ranking.prize using ownerShareRate/jockeyShareRate; organizer fee is recorded in OrganizerLedger. If no prediction qualifies, rolloverPolicy controls refund, jackpot rollover, or transfer to organizer.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: {
           200: {
-            description: 'Result published and bounty pool settlement attempted',
+            description: 'Result published; bounty pool and fixed race prize settlement attempted',
             content: {
               'application/json': {
                 schema: {
