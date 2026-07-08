@@ -339,7 +339,7 @@ const swaggerDefinition = {
           scheduledAt: { type: 'string', format: 'date-time' },
           status: {
             type: 'string',
-            enum: ['scheduled', 'ongoing', 'completed', 'cancelled'],
+            enum: ['scheduled', 'ready', 'ongoing', 'completed', 'cancelled'],
           },
           distance: { type: 'number', example: 1600 },
           tournament: {
@@ -411,7 +411,7 @@ const swaggerDefinition = {
         type: 'object',
         required: ['status'],
         properties: {
-          status: { type: 'string', enum: ['scheduled', 'ongoing', 'completed', 'cancelled'] },
+          status: { type: 'string', enum: ['scheduled', 'ready', 'ongoing', 'completed', 'cancelled'] },
         },
       },
       CreateRaceMeetingRequest: {

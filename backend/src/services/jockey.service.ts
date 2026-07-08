@@ -297,7 +297,7 @@ export async function getJockeyDashboard(jockeyId: string): Promise<JockeyDashbo
   for (const race of races) {
     if (race.status === 'completed' || race.status === 'cancelled') {
       completedRaces++;
-    } else if (race.scheduledAt >= now || race.status === 'ongoing') {
+    } else if (race.scheduledAt >= now || ['ready', 'ongoing'].includes(race.status)) {
       upcomingRaces++;
     }
   }

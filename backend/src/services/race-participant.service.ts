@@ -61,7 +61,7 @@ export async function addParticipantFromInvitation(
 
   const race = await Race.findById(invitation.raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
-  if (race.status === 'cancelled') throw new HttpError(409, 'Không thể xếp vào cuộc đua đã hủy');
+  if (race.status !== 'scheduled') throw new HttpError(409, 'Chi co the xep ngua vao cuoc dua chua duoc trong tai bat dau dieu hanh');
   if (race.participants.length >= race.maxParticipants) {
     throw new HttpError(409, 'Cuộc đua đã đủ số lượng tham gia');
   }
@@ -290,3 +290,4 @@ export async function listEligibleEntries(raceId: string): Promise<RaceEligibleE
 
   return entries;
 }
+

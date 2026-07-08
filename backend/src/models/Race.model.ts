@@ -104,7 +104,7 @@ const RaceSchema = new Schema<IRace>(
     maxParticipants: { type: Number, required: true, min: 2, max: 20 },
     status: {
       type: String,
-      enum: ['scheduled', 'ongoing', 'completed', 'cancelled'],
+      enum: ['scheduled', 'ready', 'ongoing', 'completed', 'cancelled'],
       default: 'scheduled',
     },
     refereeId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -142,12 +142,12 @@ RaceSchema.pre('save', function (next) {
   const participantErr = validateParticipants(
     this.participants,
     this.maxParticipants,
-    this.status !== 'scheduled',
+    !['scheduled', 'cancelled'].includes(this.status),
   );
   if (participantErr) return next(new Error(participantErr));
 
   const activeCount = activeParticipants(this.participants).length;
-  if (this.isModified('status') && this.status === 'ongoing' && activeCount < 2) {
+  if (this.isModified('status') && ['ready', 'ongoing'].includes(this.status) && activeCount < 2) {
     return next(new Error('Race needs at least 2 active participants to start'));
   }
 

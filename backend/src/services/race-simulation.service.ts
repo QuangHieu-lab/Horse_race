@@ -55,9 +55,11 @@ export async function startRaceSimulation(raceId: string): Promise<RaceSimTimeli
   if (race.status === 'completed') throw new HttpError(409, 'Cuộc đua đã kết thúc');
   if (race.status === 'cancelled') throw new HttpError(409, 'Cuộc đua đã bị hủy');
 
-  if (race.status !== 'ongoing') {
+  if (race.status !== 'ready') {
     throw new HttpError(409, 'Trong tai phai boc tham lan va bat dau cuoc dua truoc khi chay mo phong');
   }
+  race.status = 'ongoing';
+  await race.save();
 
   const active = activeParticipants(race.participants);
   if (active.length < 2) {

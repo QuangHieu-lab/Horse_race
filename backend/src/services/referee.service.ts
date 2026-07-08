@@ -184,7 +184,7 @@ async function resolveCompetitionDayBanUntil(
 export async function getRefereeDashboard(refereeId: string) {
   const objectId = new mongoose.Types.ObjectId(refereeId);
   const [upcoming, completed, pendingConfirm] = await Promise.all([
-    Race.countDocuments({ refereeId: objectId, status: { $in: ['scheduled', 'ongoing'] } }),
+    Race.countDocuments({ refereeId: objectId, status: { $in: ['scheduled', 'ready', 'ongoing'] } }),
     Race.countDocuments({ refereeId: objectId, status: 'completed' }),
     Result.countDocuments({
       confirmedAt: null,
@@ -292,9 +292,11 @@ export async function simulateRace(raceId: string) {
     throw new HttpError(409, 'Không thể giả lập trận đua đã kết thúc hoặc bị hủy');
   }
 
-  if (race.status !== 'ongoing') {
+  if (race.status !== 'ready') {
     throw new HttpError(409, 'Can boc tham lan va bat dau cuoc dua truoc khi chay mo phong');
   }
+  race.status = 'ongoing';
+  await race.save();
 
   const activeList = activeParticipants(race.participants);
   if (activeList.length < 2) {
@@ -698,7 +700,7 @@ export interface RaceViolationDto {
   recordedAt: string;
 }
 
-/** Trọng tài bắt đầu điều hành: đưa cuộc đua mình phụ trách sang 'ongoing'. */
+/** Trọng tài bắt đầu điều hành: bốc thăm làn và đưa cuộc đua mình phụ trách sang 'ready'. */
 export async function startRefereeRace(refereeId: string, raceId: string): Promise<void> {
   if (!mongoose.isValidObjectId(raceId)) throw new HttpError(400, 'ID cuộc đua không hợp lệ');
   const race = await Race.findById(raceId);
@@ -706,7 +708,8 @@ export async function startRefereeRace(refereeId: string, raceId: string): Promi
   if (race.refereeId?.toString() !== refereeId) {
     throw new HttpError(403, 'Bạn không phải trọng tài cuộc đua này');
   }
-  if (race.status === 'ongoing') return; // đã chạy rồi thì bỏ qua
+  if (race.status === 'ready') return;
+  if (race.status === 'ongoing') return;
   if (race.status !== 'scheduled') {
     throw new HttpError(409, 'Chỉ có thể bắt đầu cuộc đua đang ở trạng thái chờ');
   }
@@ -714,7 +717,7 @@ export async function startRefereeRace(refereeId: string, raceId: string): Promi
     throw new HttpError(409, 'Cần ít nhất 2 ngựa trong đường đua để bắt đầu cuộc đua');
   }
   race.participants = randomizeActiveParticipantLanes(race.participants);
-  race.status = 'ongoing';
+  race.status = 'ready';
   await race.save(); // model yêu cầu ≥2 ngựa đang thi đấu
 }
 
@@ -787,3 +790,4 @@ export async function listRaceViolations(
     };
   });
 }
+

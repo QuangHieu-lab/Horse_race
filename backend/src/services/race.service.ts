@@ -15,7 +15,7 @@ import {
   type ViewingTicketInput,
 } from '../utils/viewing-ticket.js';
 
-const RACE_STATUSES: RaceStatus[] = ['scheduled', 'ongoing', 'completed', 'cancelled'];
+const RACE_STATUSES: RaceStatus[] = ['scheduled', 'ready', 'ongoing', 'completed', 'cancelled'];
 
 export interface CreateRaceInput {
   tournamentId: string;
@@ -180,7 +180,7 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
     throw new HttpError(403, 'Chu ngua dang bi tuoc quyen thi dau');
   }
 
-  if (race.status === 'cancelled' || race.status === 'completed') {
+  if (race.status !== 'scheduled') {
     throw new HttpError(409, 'Không thể thêm participant vào trận đua đã kết thúc hoặc hủy');
   }
 
@@ -236,7 +236,7 @@ export async function updateRaceStatus(raceId: string, status: IRace['status']) 
   }
 
   const requestedStatus = status as string;
-  if (requestedStatus === 'ongoing') {
+  if (requestedStatus === 'ready' || requestedStatus === 'ongoing') {
     throw new HttpError(403, 'Chi trong tai phu trach moi duoc boc tham lan va bat dau cuoc dua');
   }
 
@@ -264,7 +264,7 @@ export async function deleteRace(raceId: string) {
     throw new HttpError(404, 'Không tìm thấy trận đua để xóa');
   }
 
-  if (race.status === 'ongoing' || race.status === 'completed') {
+  if (['ready', 'ongoing', 'completed'].includes(race.status)) {
     throw new HttpError(400, 'Không thể xóa trận đua đang diễn ra hoặc đã kết thúc.');
   }
 

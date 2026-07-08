@@ -11,7 +11,6 @@ import {
   assignRaceReferee,
 } from '../services/race.service.js';
 import { listEligibleEntries } from '../services/race-participant.service.js';
-import { startRaceSimulation, finishRaceSimulation } from '../services/race-simulation.service.js';
 
 export class RaceController {
   create = asyncHandler(async (req: Request, res: Response) => {
@@ -62,13 +61,11 @@ export class RaceController {
   });
 
   simulate = asyncHandler(async (req: Request, res: Response) => {
-    const timeline = await startRaceSimulation(String(req.params.id));
-    res.json({ timeline });
+    throw new HttpError(403, 'Chi trong tai phu trach moi duoc boc tham lan va bat dau cuoc dua');
   });
 
   finishRace = asyncHandler(async (req: Request, res: Response) => {
-    await finishRaceSimulation(String(req.params.id), req.user!.id);
-    res.json({ ok: true });
+    throw new HttpError(403, 'Chi trong tai phu trach moi duoc hoan tat luong chay dua');
   });
 
   assignReferee = asyncHandler(async (req: Request, res: Response) => {
