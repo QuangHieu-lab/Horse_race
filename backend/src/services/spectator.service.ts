@@ -58,7 +58,7 @@ async function buildSpectatorRaceDto(
       announcementMessage?: string;
       allowVipRedemption?: boolean;
     };
-    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber: number }>;
+    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber?: number }>;
   },
   spectatorId?: mongoose.Types.ObjectId,
 ): Promise<SpectatorRaceDto> {
@@ -233,12 +233,12 @@ export async function listSpectatorRaces(
       .sort({ scheduledAt: -1 })
       .lean();
   } else if (filter === 'upcoming') {
-    races = await Race.find({ status: 'scheduled' })
+    races = await Race.find({ status: { $in: ['scheduled', 'ready'] } })
       .sort({ scheduledAt: 1 })
       .lean();
   } else {
     races = await Race.find({
-      status: { $in: ['scheduled', 'ongoing', 'completed'] },
+      status: { $in: ['scheduled', 'ready', 'ongoing', 'completed'] },
     })
       .sort({ scheduledAt: -1 })
       .lean();

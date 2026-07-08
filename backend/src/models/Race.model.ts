@@ -7,7 +7,7 @@ export interface IParticipant {
   horseId: mongoose.Types.ObjectId;
   jockeyId: mongoose.Types.ObjectId;
   ownerId: mongoose.Types.ObjectId;
-  laneNumber: number;
+  laneNumber?: number;
   clothNumber?: number;
   carriedWeight?: number;
   vetApprovedAt?: Date | null;
@@ -72,7 +72,7 @@ const ParticipantSchema = new Schema<IParticipant>(
     horseId: { type: Schema.Types.ObjectId, ref: 'Horse', required: true },
     jockeyId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    laneNumber: { type: Number, required: true, min: 1 },
+    laneNumber: { type: Number, min: 1 },
     clothNumber: { type: Number, min: 1 },
     carriedWeight: { type: Number, min: 40, max: 80 },
     isDisqualified: { type: Boolean, default: false },
@@ -104,7 +104,7 @@ const RaceSchema = new Schema<IRace>(
     maxParticipants: { type: Number, required: true, min: 2, max: 20 },
     status: {
       type: String,
-      enum: ['scheduled', 'ongoing', 'completed', 'cancelled'],
+      enum: ['scheduled', 'ready', 'ongoing', 'completed', 'cancelled'],
       default: 'scheduled',
     },
     refereeId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
@@ -139,11 +139,15 @@ RaceSchema.pre('save', function (next) {
     return next(new Error('scheduledAt must be in the future'));
   }
 
-  const participantErr = validateParticipants(this.participants, this.maxParticipants);
+  const participantErr = validateParticipants(
+    this.participants,
+    this.maxParticipants,
+    !['scheduled', 'cancelled'].includes(this.status),
+  );
   if (participantErr) return next(new Error(participantErr));
 
   const activeCount = activeParticipants(this.participants).length;
-  if (this.isModified('status') && this.status === 'ongoing' && activeCount < 2) {
+  if (this.isModified('status') && ['ready', 'ongoing'].includes(this.status) && activeCount < 2) {
     return next(new Error('Race needs at least 2 active participants to start'));
   }
 

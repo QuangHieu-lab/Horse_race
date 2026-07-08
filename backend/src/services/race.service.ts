@@ -8,14 +8,14 @@ import { Horse } from '../models/Horse.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceStatus } from '../types/shared.types.js';
-import { activeParticipants, randomizeActiveParticipantLanes, validateParticipants } from '../utils/race-participants.js';
+import { validateParticipants } from '../utils/race-participants.js';
 import { isPenaltyActive } from '../utils/penalty-status.util.js';
 import {
   normalizeViewingTicket,
   type ViewingTicketInput,
 } from '../utils/viewing-ticket.js';
 
-const RACE_STATUSES: RaceStatus[] = ['scheduled', 'ongoing', 'completed', 'cancelled'];
+const RACE_STATUSES: RaceStatus[] = ['scheduled', 'ready', 'ongoing', 'completed', 'cancelled'];
 
 export interface CreateRaceInput {
   tournamentId: string;
@@ -180,25 +180,20 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
     throw new HttpError(403, 'Chu ngua dang bi tuoc quyen thi dau');
   }
 
-  if (race.status === 'cancelled' || race.status === 'completed') {
+  if (race.status !== 'scheduled') {
     throw new HttpError(409, 'Không thể thêm participant vào trận đua đã kết thúc hoặc hủy');
   }
-
-  const laneNumber = activeParticipants(race.participants).length + 1;
-  const clothNumber = payload.clothNumber ?? laneNumber;
 
   const participant: IParticipant = {
     horseId: new mongoose.Types.ObjectId(payload.horseId),
     jockeyId: new mongoose.Types.ObjectId(payload.jockeyId),
     ownerId: new mongoose.Types.ObjectId(payload.ownerId),
-    laneNumber,
-    clothNumber,
     confirmedAt: null,
     vetApprovedAt: null,
     scratchedAt: null,
   };
 
-  const nextParticipants = randomizeActiveParticipantLanes([...race.participants, participant]);
+  const nextParticipants = [...race.participants, participant];
   const participantErr = validateParticipants(nextParticipants, race.maxParticipants);
   if (participantErr) {
     throw new HttpError(409, participantErr);
@@ -240,14 +235,9 @@ export async function updateRaceStatus(raceId: string, status: IRace['status']) 
     throw new HttpError(404, 'Không tìm thấy trận đua');
   }
 
-  if (status === 'ongoing') {
-    const activeCount = activeParticipants(race.participants).length;
-    if (activeCount < 2) {
-      throw new HttpError(
-        409,
-        'Cần ít nhất 2 ngựa thi đấu đang hoạt động trước khi bắt đầu cuộc đua',
-      );
-    }
+  const requestedStatus = status as string;
+  if (requestedStatus === 'ready' || requestedStatus === 'ongoing') {
+    throw new HttpError(403, 'Chi trong tai phu trach moi duoc boc tham lan va bat dau cuoc dua');
   }
 
   if (status === 'completed' && race.status !== 'ongoing' && race.status !== 'completed') {
@@ -274,7 +264,7 @@ export async function deleteRace(raceId: string) {
     throw new HttpError(404, 'Không tìm thấy trận đua để xóa');
   }
 
-  if (race.status === 'ongoing' || race.status === 'completed') {
+  if (['ready', 'ongoing', 'completed'].includes(race.status)) {
     throw new HttpError(400, 'Không thể xóa trận đua đang diễn ra hoặc đã kết thúc.');
   }
 
