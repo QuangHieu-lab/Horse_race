@@ -37,6 +37,7 @@ function toResultDto(result: {
       finishTime: r.finishTime,
       prize: r.prize,
     })),
+    violations: [],
   };
 }
 

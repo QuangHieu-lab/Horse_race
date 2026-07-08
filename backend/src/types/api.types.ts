@@ -60,10 +60,19 @@ export interface RaceRankingDto {
   prize: number;
 }
 
+export interface RaceViolationSummaryDto {
+  horseId: string | null;
+  horseName: string | null;
+  type: string;
+  description: string;
+  penaltyApplied: string | null;
+}
+
 export interface RaceResultDto {
   id: string;
   rankings: RaceRankingDto[];
   publishedAt?: string | null;
+  violations: RaceViolationSummaryDto[];
 }
 
 export interface JockeyRaceDto {

@@ -224,6 +224,7 @@ async function buildJockeyRaceDto(
         finishTime: r.finishTime,
         prize: r.prize,
       })),
+      violations: [],
     };
   }
 
