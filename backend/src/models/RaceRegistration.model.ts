@@ -82,7 +82,7 @@ RaceRegistrationSchema.pre('save', async function (next) {
 
   const race = await Race.findById(this.raceId).select('status maxParticipants').lean();
   if (!race) return next(new Error('Race not found'));
-  if (race.status === 'cancelled') return next(new Error('Cannot register for a cancelled race'));
+  if (race.status !== 'scheduled') return next(new Error('Can only register for a scheduled race'));
 
   next();
 });

@@ -11,7 +11,7 @@ export type HealthStatus = 'fit' | 'injured' | 'retired';
 
 export type TournamentStatus = 'draft' | 'published' | 'ongoing' | 'completed';
 
-export type RaceStatus = 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
+export type RaceStatus = 'scheduled' | 'ready' | 'ongoing' | 'completed' | 'cancelled';
 
 export type MeetingStatus = 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
 
