@@ -183,7 +183,7 @@ async function buildSpectatorRaceDto(
     participants: race.participants.map((p) => ({
       id: p.horseId.toString(),
       name: horseMap.get(p.horseId.toString()) ?? 'Unknown',
-      laneNumber: p.laneNumber,
+      laneNumber: p.laneNumber ?? 0,
       ticketCount: ticketCountByHorse.get(p.horseId.toString()) ?? 0,
     })),
     canPredict,
