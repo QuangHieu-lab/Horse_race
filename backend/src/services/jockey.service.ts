@@ -177,7 +177,7 @@ async function buildJockeyRaceDto(
       horseId: mongoose.Types.ObjectId;
       jockeyId: mongoose.Types.ObjectId;
       ownerId: mongoose.Types.ObjectId;
-      laneNumber: number;
+      laneNumber?: number;
       confirmedAt?: Date | null;
     }>;
   },
@@ -243,7 +243,7 @@ async function buildJockeyRaceDto(
         penaltyStatus: toPenaltyStatusDto(horse.penaltyStatus),
       },
       owner: { id: owner._id.toString(), fullName: owner.fullName },
-      laneNumber: participant.laneNumber,
+      laneNumber: participant.laneNumber ?? null,
       confirmedAt: participant.confirmedAt?.toISOString() ?? null,
     },
     result: resultDto,

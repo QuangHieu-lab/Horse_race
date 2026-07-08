@@ -48,7 +48,7 @@ export interface InvitationDto {
 export interface JockeyRaceParticipantDto {
   horse: HorseWithPenaltyDto;
   owner: UserSummaryDto;
-  laneNumber: number;
+  laneNumber: number | null;
   confirmedAt?: string | null;
 }
 
@@ -96,7 +96,7 @@ export interface JockeyDashboardDto {
 export interface SpectatorHorseDto {
   id: string;
   name: string;
-  laneNumber: number;
+  laneNumber: number | null;
 }
 
 export interface ViewingTicketInfoDto {

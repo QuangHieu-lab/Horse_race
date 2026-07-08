@@ -8,6 +8,7 @@ export function activeParticipants(participants: IParticipant[]): IParticipant[]
 export function validateParticipants(
   participants: IParticipant[],
   maxParticipants: number,
+  requireAssignedLanes = false,
 ): string | null {
   if (participants.length > maxParticipants) {
     return `participants exceed maxParticipants (${maxParticipants})`;
@@ -28,6 +29,11 @@ export function validateParticipants(
     horseIds.add(horseKey);
     jockeyIds.add(jockeyKey);
 
+    if (p.laneNumber === undefined || p.laneNumber === null) {
+      if (requireAssignedLanes) return 'laneNumber is required for active participants';
+      continue;
+    }
+
     if (p.laneNumber < 1 || p.laneNumber > maxParticipants) {
       return `laneNumber must be between 1 and ${maxParticipants}`;
     }
@@ -43,13 +49,19 @@ export function validateParticipants(
 }
 
 export function nextLaneNumber(participants: IParticipant[]): number {
-  const active = activeParticipants(participants);
-  if (active.length === 0) return 1;
-  return Math.max(...active.map((p) => p.laneNumber)) + 1;
+  const assigned = activeParticipants(participants)
+    .map((p) => p.laneNumber)
+    .filter((lane): lane is number => lane !== undefined && lane !== null);
+  if (assigned.length === 0) return 1;
+  return Math.max(...assigned) + 1;
 }
 
 export function randomLaneNumber(participants: IParticipant[], maxParticipants: number): number {
-  const usedLanes = new Set(activeParticipants(participants).map((p) => p.laneNumber));
+  const usedLanes = new Set(
+    activeParticipants(participants)
+      .map((p) => p.laneNumber)
+      .filter((lane): lane is number => lane !== undefined && lane !== null),
+  );
   const availableLanes: number[] = [];
 
   for (let lane = 1; lane <= maxParticipants; lane++) {

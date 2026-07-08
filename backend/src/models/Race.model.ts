@@ -7,7 +7,7 @@ export interface IParticipant {
   horseId: mongoose.Types.ObjectId;
   jockeyId: mongoose.Types.ObjectId;
   ownerId: mongoose.Types.ObjectId;
-  laneNumber: number;
+  laneNumber?: number;
   clothNumber?: number;
   carriedWeight?: number;
   vetApprovedAt?: Date | null;
@@ -72,7 +72,7 @@ const ParticipantSchema = new Schema<IParticipant>(
     horseId: { type: Schema.Types.ObjectId, ref: 'Horse', required: true },
     jockeyId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    laneNumber: { type: Number, required: true, min: 1 },
+    laneNumber: { type: Number, min: 1 },
     clothNumber: { type: Number, min: 1 },
     carriedWeight: { type: Number, min: 40, max: 80 },
     isDisqualified: { type: Boolean, default: false },
@@ -139,7 +139,11 @@ RaceSchema.pre('save', function (next) {
     return next(new Error('scheduledAt must be in the future'));
   }
 
-  const participantErr = validateParticipants(this.participants, this.maxParticipants);
+  const participantErr = validateParticipants(
+    this.participants,
+    this.maxParticipants,
+    this.status !== 'scheduled',
+  );
   if (participantErr) return next(new Error(participantErr));
 
   const activeCount = activeParticipants(this.participants).length;

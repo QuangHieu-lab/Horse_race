@@ -55,6 +55,10 @@ export async function startRaceSimulation(raceId: string): Promise<RaceSimTimeli
   if (race.status === 'completed') throw new HttpError(409, 'Cuộc đua đã kết thúc');
   if (race.status === 'cancelled') throw new HttpError(409, 'Cuộc đua đã bị hủy');
 
+  if (race.status !== 'ongoing') {
+    throw new HttpError(409, 'Trong tai phai boc tham lan va bat dau cuoc dua truoc khi chay mo phong');
+  }
+
   const active = activeParticipants(race.participants);
   if (active.length < 2) {
     throw new HttpError(409, 'Cần ít nhất 2 ngựa để bắt đầu đua');
@@ -63,12 +67,6 @@ export async function startRaceSimulation(raceId: string): Promise<RaceSimTimeli
   const existing = await Result.findOne({ raceId: race._id });
   if (existing?.publishedAt) {
     throw new HttpError(409, 'Kết quả cuộc đua này đã được công bố');
-  }
-
-  // scheduled -> ongoing (hook đồng bộ: giải đấu -> Live)
-  if (race.status === 'scheduled') {
-    race.status = 'ongoing';
-    await race.save();
   }
 
   // Mô phỏng ngẫu nhiên đơn giản: finishTime 90–120s, ai nhỏ hơn về trước
@@ -99,6 +97,9 @@ export async function startRaceSimulation(raceId: string): Promise<RaceSimTimeli
   const horses: RaceSimHorse[] = sims.map((s, i) => {
     const horse = s.p.horseId as unknown as { _id: mongoose.Types.ObjectId; name: string };
     const jockey = s.p.jockeyId as unknown as { _id: mongoose.Types.ObjectId; fullName: string };
+    if (!s.p.laneNumber) {
+      throw new HttpError(409, 'Cuoc dua chua duoc trong tai boc tham lan');
+    }
     return {
       horseId: horse._id.toString(),
       horseName: horse.name,

@@ -58,7 +58,7 @@ async function buildSpectatorRaceDto(
       announcementMessage?: string;
       allowVipRedemption?: boolean;
     };
-    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber: number }>;
+    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber?: number }>;
   },
   spectatorId?: mongoose.Types.ObjectId,
 ): Promise<SpectatorRaceDto> {
@@ -169,7 +169,7 @@ async function buildSpectatorRaceDto(
     participants: race.participants.map((p) => ({
       id: p.horseId.toString(),
       name: horseMap.get(p.horseId.toString()) ?? 'Unknown',
-      laneNumber: p.laneNumber,
+      laneNumber: p.laneNumber ?? null,
     })),
     canPredict,
     hasPrediction: !!existingPrediction,

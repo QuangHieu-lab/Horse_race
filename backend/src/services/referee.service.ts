@@ -6,7 +6,7 @@ import { Horse } from '../models/Horse.model.js';
 import { Notification } from '../models/Notification.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
-import { activeParticipants } from '../utils/race-participants.js';
+import { activeParticipants, randomizeActiveParticipantLanes } from '../utils/race-participants.js';
 import type { RaceSimTimeline } from './race-simulation.service.js';
 
 export interface RefereeRaceDto {
@@ -29,7 +29,7 @@ export interface RefereeCheckDto {
   jockeyId: string;
   jockeyName: string;
   ownerId: string;
-  laneNumber: number;
+  laneNumber: number | null;
   vetApproved: boolean;
   confirmed: boolean;
 }
@@ -246,7 +246,7 @@ export async function listRefereeChecks(refereeId: string, raceId: string): Prom
       jockeyId: jockey._id.toString(),
       jockeyName: jockey.fullName,
       ownerId: p.ownerId.toString(),
-      laneNumber: p.laneNumber,
+      laneNumber: p.laneNumber ?? null,
       vetApproved: !!p.vetApprovedAt,
       confirmed: !!p.confirmedAt,
     };
@@ -290,6 +290,10 @@ export async function simulateRace(raceId: string) {
 
   if (race.status === 'completed' || race.status === 'cancelled') {
     throw new HttpError(409, 'Không thể giả lập trận đua đã kết thúc hoặc bị hủy');
+  }
+
+  if (race.status !== 'ongoing') {
+    throw new HttpError(409, 'Can boc tham lan va bat dau cuoc dua truoc khi chay mo phong');
   }
 
   const activeList = activeParticipants(race.participants);
@@ -709,6 +713,7 @@ export async function startRefereeRace(refereeId: string, raceId: string): Promi
   if (activeParticipants(race.participants).length < 2) {
     throw new HttpError(409, 'Cần ít nhất 2 ngựa trong đường đua để bắt đầu cuộc đua');
   }
+  race.participants = randomizeActiveParticipantLanes(race.participants);
   race.status = 'ongoing';
   await race.save(); // model yêu cầu ≥2 ngựa đang thi đấu
 }
