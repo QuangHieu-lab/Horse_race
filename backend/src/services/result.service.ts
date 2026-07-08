@@ -37,6 +37,7 @@ function toResultDto(result: {
       finishTime: r.finishTime,
       prize: r.prize,
     })),
+    violations: [],
   };
 }
 
@@ -174,5 +175,16 @@ export async function getResultByRaceId(raceId: string) {
     confirmedAt: result.confirmedAt?.toISOString() ?? null,
     publishedAt: result.publishedAt?.toISOString() ?? null,
     rankingsCount: result.rankings.length,
+    rankings: result.rankings
+      .slice()
+      .sort((a, b) => a.rank - b.rank)
+      .map((r) => ({
+        rank: r.rank,
+        horseId: r.horseId.toString(),
+        jockeyId: r.jockeyId.toString(),
+        ownerId: r.ownerId.toString(),
+        finishTime: r.finishTime,
+        prize: r.prize ?? 0,
+      })),
   };
 }

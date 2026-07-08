@@ -33,11 +33,11 @@ function pct(amount: number, rate: number): number {
 }
 
 /**
- * Điểm dự đoán dùng để chia PrizePool giữa những người đoán ĐÚNG.
- * Mỗi phiếu có cùng trọng số, nên điểm chia thưởng chính là tổng điểm đã góp.
+ * Điểm dự đoán dùng để chia PrizePool giữa những người đoán đúng.
+ * Mỗi phiếu có cùng trọng số, nên score chia thưởng là số phiếu.
  */
-function predictionScoreOf(p: { contribution: number }): number {
-  return p.contribution;
+function predictionScoreOf(p: { ticketCount?: number; riskMultiplier?: number; contribution: number }): number {
+  return p.ticketCount ?? p.riskMultiplier ?? p.contribution;
 }
 
 function sumRates(rates: number[]): number {
@@ -170,7 +170,7 @@ export async function chargePredictionTicket(
     throw new HttpError(409, 'Không đủ điểm để tham gia dự đoán');
   }
 
-  pool.totalTickets += 1;
+  pool.totalTickets += ticketCount;
   pool.contributorCount += 1;
   pool.totalBountyPool += contribution;
   await pool.save();
@@ -205,7 +205,8 @@ export async function refundPredictionTicket(
     `Hoàn điểm hủy dự đoán cuộc đua ${raceName}`,
   );
 
-  pool.totalTickets = Math.max(0, pool.totalTickets - 1);
+  const refundedTicketCount = pool.ticketPrice > 0 ? Math.floor(contribution / pool.ticketPrice) : 1;
+  pool.totalTickets = Math.max(0, pool.totalTickets - Math.max(1, refundedTicketCount));
   pool.contributorCount = Math.max(0, pool.contributorCount - 1);
   pool.totalBountyPool = Math.max(0, pool.totalBountyPool - contribution);
   await pool.save();
@@ -243,9 +244,9 @@ export async function settlePredictionPoolFromResult(
   const winPool = losers.reduce((sum, p) => sum + p.contribution, 0);
   const minScoreToShare = tournament?.predictionConfig.minScoreToShare ?? 1;
   const qualifiedWinners = winners.filter((prediction) => predictionScoreOf(prediction) >= minScoreToShare);
-  // Tổng điểm có trọng số rủi ro của những người đoán đúng — dùng để chia PrizePool.
+  // Tổng số phiếu của những người đoán đúng — dùng để chia PrizePool.
   const totalWinnerScore = qualifiedWinners.reduce((sum, p) => sum + predictionScoreOf(p), 0);
-  pool.totalTickets = predictions.length;
+  pool.totalTickets = predictions.reduce((sum, p) => sum + predictionScoreOf(p), 0);
   pool.contributorCount = predictions.length;
   pool.totalBountyPool = totalBountyPool;
   pool.winPool = winPool;

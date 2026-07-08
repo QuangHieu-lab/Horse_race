@@ -58,7 +58,7 @@ async function buildSpectatorRaceDto(
       announcementMessage?: string;
       allowVipRedemption?: boolean;
     };
-    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber: number }>;
+    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber?: number }>;
   },
   spectatorId?: mongoose.Types.ObjectId,
 ): Promise<SpectatorRaceDto> {
@@ -101,8 +101,12 @@ async function buildSpectatorRaceDto(
   let resultDto: SpectatorRaceDto['result'] = null;
   if (result) {
     const jockeyIds = result.rankings.map((r) => r.jockeyId);
+    const resultHorseIds = [
+      ...result.rankings.map((r) => r.horseId),
+      ...result.violations.flatMap((v) => (v.horseId ? [v.horseId] : [])),
+    ];
     const resultHorses = await Horse.find({
-      _id: { $in: result.rankings.map((r) => r.horseId) },
+      _id: { $in: resultHorseIds },
     })
       .select('name')
       .lean();
@@ -125,6 +129,13 @@ async function buildSpectatorRaceDto(
         },
         finishTime: r.finishTime,
         prize: r.prize,
+      })),
+      violations: result.violations.map((v) => ({
+        horseId: v.horseId?.toString() ?? null,
+        horseName: v.horseId ? rHorseMap.get(v.horseId.toString()) ?? null : null,
+        type: v.type,
+        description: v.description,
+        penaltyApplied: v.penaltyApplied ?? null,
       })),
     };
   }
@@ -172,7 +183,7 @@ async function buildSpectatorRaceDto(
     participants: race.participants.map((p) => ({
       id: p.horseId.toString(),
       name: horseMap.get(p.horseId.toString()) ?? 'Unknown',
-      laneNumber: p.laneNumber,
+      laneNumber: p.laneNumber ?? 0,
       ticketCount: ticketCountByHorse.get(p.horseId.toString()) ?? 0,
     })),
     canPredict,
@@ -222,12 +233,12 @@ export async function listSpectatorRaces(
       .sort({ scheduledAt: -1 })
       .lean();
   } else if (filter === 'upcoming') {
-    races = await Race.find({ status: 'scheduled' })
+    races = await Race.find({ status: { $in: ['scheduled', 'ready'] } })
       .sort({ scheduledAt: 1 })
       .lean();
   } else {
     races = await Race.find({
-      status: { $in: ['scheduled', 'ongoing', 'completed'] },
+      status: { $in: ['scheduled', 'ready', 'ongoing', 'completed'] },
     })
       .sort({ scheduledAt: -1 })
       .lean();
@@ -450,7 +461,7 @@ export async function getRaceSimulation(raceId: string) {
   const race = await Race.findById(raceId).lean();
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
   if (race.status !== 'completed') return { available: false as const, rankings: [] };
-  const result = await Result.findOne({ raceId: race._id }).lean();
+  const result = await Result.findOne({ raceId: race._id, publishedAt: { $ne: null } }).lean();
   if (!result) return { available: false as const, rankings: [] };
   return {
     available: true as const,

@@ -29,6 +29,7 @@ const NotificationSchema = new Schema<INotification>(
         'result_confirmed',
         'result_published',
         'prediction_reward',
+        'race_prize_reward',
         'registration_approved',
         'participant_scratched',
         'result_protest_filed',

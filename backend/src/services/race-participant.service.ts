@@ -7,7 +7,7 @@ import type { IParticipant } from '../models/Race.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
-import { activeParticipants, randomizeActiveParticipantLanes, validateParticipants } from '../utils/race-participants.js';
+import { activeParticipants, validateParticipants } from '../utils/race-participants.js';
 import { isPenaltyActive } from '../utils/penalty-status.util.js';
 
 export async function assertUserRole(
@@ -61,7 +61,7 @@ export async function addParticipantFromInvitation(
 
   const race = await Race.findById(invitation.raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
-  if (race.status === 'cancelled') throw new HttpError(409, 'Không thể xếp vào cuộc đua đã hủy');
+  if (race.status !== 'scheduled') throw new HttpError(409, 'Chi co the xep ngua vao cuoc dua chua duoc trong tai bat dau dieu hanh');
   if (race.participants.length >= race.maxParticipants) {
     throw new HttpError(409, 'Cuộc đua đã đủ số lượng tham gia');
   }
@@ -76,19 +76,16 @@ export async function addParticipantFromInvitation(
     throw new HttpError(409, 'Nài ngựa đã được xếp trong cuộc đua này');
   }
 
-  const lane = activeParticipants(race.participants).length + 1;
   const participant: IParticipant = {
     horseId: invitation.horseId,
     jockeyId: invitation.jockeyId,
     ownerId: invitation.horseOwnerId,
-    laneNumber: lane,
-    clothNumber: lane,
     confirmedAt: null,
     vetApprovedAt: null,
     scratchedAt: null,
   };
 
-  const next = randomizeActiveParticipantLanes([...race.participants, participant]);
+  const next = [...race.participants, participant];
   const err = validateParticipants(next, race.maxParticipants);
   if (err) throw new HttpError(409, err);
 
@@ -170,20 +167,17 @@ export async function addParticipant(
     throw new HttpError(409, 'Nài ngựa đã được xếp trong cuộc đua này');
   }
 
-  const lane = activeParticipants(race.participants).length + 1;
   const participant: IParticipant = {
     horseId,
     jockeyId,
     ownerId,
-    laneNumber: lane,
-    clothNumber: input.clothNumber ?? lane,
     carriedWeight: input.carriedWeight,
     confirmedAt: null,
     vetApprovedAt: null,
     scratchedAt: null,
   };
 
-  const next = randomizeActiveParticipantLanes([...race.participants, participant]);
+  const next = [...race.participants, participant];
   const err = validateParticipants(next, race.maxParticipants);
   if (err) throw new HttpError(409, err);
 
@@ -296,3 +290,4 @@ export async function listEligibleEntries(raceId: string): Promise<RaceEligibleE
 
   return entries;
 }
+
