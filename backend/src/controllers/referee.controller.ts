@@ -79,10 +79,11 @@ export class RefereeController {
   });
 
   penalize = asyncHandler(async (req: Request, res: Response) => {
-    const { ruleId, horseId, jockeyId, target, notes } = req.body as {
+    const { ruleId, horseId, jockeyId, affectedHorseId, target, notes } = req.body as {
       ruleId?: string;
       horseId?: string;
       jockeyId?: string;
+      affectedHorseId?: string;
       target?: 'horse' | 'jockey';
       notes?: string;
     };
@@ -97,7 +98,7 @@ export class RefereeController {
     await refereeService.applyRacePenalty(
       req.user!.id,
       req.params.id as string,
-      { ruleId, horseId, jockeyId, target, notes }
+      { ruleId, horseId, jockeyId, affectedHorseId, target, notes }
     );
 
     res.json({ 
@@ -127,13 +128,19 @@ export class RefereeController {
   startSimulation = asyncHandler(async (req: Request, res: Response) => {
     const raceId = req.params.id as string;
 
-    // Trả về timeline phát lại để trọng tài xem đua trực tiếp (giống admin)
+    // Trả về timeline phát lại để trọng tài xem đua trực tiếp (giống admin).
+    // Race đang ở 'ongoing' (Live) trong lúc xem; chỉ 'completed' khi gọi finishRace.
     const timeline = await refereeService.simulateRace(raceId);
 
     res.status(200).json({
       success: true,
-      message: 'Trận đua đã hoàn tất! Bản nháp xếp hạng đã sẵn sàng để kiểm tra VAR và bắt lỗi.',
+      message: 'Ngựa đang chạy (Live). Xem xong sẽ chốt kết quả tạm thời.',
       timeline,
     });
+  });
+
+  finishRace = asyncHandler(async (req: Request, res: Response) => {
+    await refereeService.finishRefereeRace(req.user!.id, req.params.id as string);
+    res.json({ ok: true });
   });
 }

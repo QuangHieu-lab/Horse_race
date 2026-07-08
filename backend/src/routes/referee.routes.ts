@@ -14,6 +14,7 @@ refereeRouter.get('/violation-rules', refereeController.listViolationRules);
 
 refereeRouter.post('/races/:id/start', refereeController.startRace);
 refereeRouter.post('/races/:id/start-simulation', refereeController.startSimulation);
+refereeRouter.post('/races/:id/finish', refereeController.finishRace);
 refereeRouter.get('/races/:id/result', refereeController.getResult);
 refereeRouter.get('/races/:id/violations', refereeController.listRaceViolations);
 refereeRouter.post('/races/:id/penalize', refereeController.penalize);

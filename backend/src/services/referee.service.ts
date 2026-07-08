@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { Horse } from '../models/Horse.model.js';
+import { User } from '../models/User.model.js';
 import { Notification } from '../models/Notification.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
@@ -67,29 +68,21 @@ function mapResultSaveError(err: unknown): HttpError {
   return new HttpError(500, message);
 }
 
-// Mức độ vi phạm → số bậc bị tụt (nhẹ 1 · trung bình 2 · nặng 3 · rất nặng 5).
-const SEVERITY_DEMOTE_RANKS: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 5 };
-function demoteRanksForSeverity(severity: string): number {
-  return SEVERITY_DEMOTE_RANKS[severity] ?? 2;
-}
-
-type RankingRow = { horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean };
-
-// Tụt ngựa vi phạm xuống `drop` bậc trong bảng xếp hạng (tràn khỏi bảng thì xếp cuối).
-// Trả về hạng mới (1-based) của ngựa.
-function applyDemoteBySeverity(
-  result: { rankings: RankingRow[] },
+// Hạ bậc ngựa vi phạm xuống ngay sau "ngựa bị ảnh hưởng" (dùng cho penaltyApplied 'demote').
+function applyRelegationToRankings(
+  result: { rankings: Array<{ horseId: mongoose.Types.ObjectId; rank: number; finishTime?: number; marginBehind?: number; isDeadHeat?: boolean }> },
   penalizedHorseId: mongoose.Types.ObjectId,
-  drop: number,
-): number {
-  const idx = result.rankings.findIndex((r) => r.horseId.toString() === penalizedHorseId.toString());
-  if (idx === -1) {
-    throw new HttpError(400, 'Ngựa vi phạm không có trong bảng xếp hạng để tụt bậc');
-  }
-  const [penalized] = result.rankings.splice(idx, 1);
-  if (!penalized) throw new HttpError(500, 'Không thể tụt hạng ngựa vi phạm');
-  const target = Math.min(idx + Math.max(1, drop), result.rankings.length);
-  result.rankings.splice(target, 0, penalized);
+  affectedHorseId: mongoose.Types.ObjectId,
+): void {
+  const penalizedIndex = result.rankings.findIndex((r) => r.horseId.toString() === penalizedHorseId.toString());
+  const affectedIndex = result.rankings.findIndex((r) => r.horseId.toString() === affectedHorseId.toString());
+  if (penalizedIndex === -1) throw new HttpError(400, 'Ngựa vi phạm chưa có trong bảng xếp hạng để hạ bậc');
+  if (affectedIndex === -1) throw new HttpError(400, 'Ngựa bị ảnh hưởng chưa có trong bảng xếp hạng');
+  if (penalizedIndex > affectedIndex) throw new HttpError(409, 'Ngựa vi phạm đã đứng sau ngựa bị ảnh hưởng, không cần hạ bậc');
+  const [penalized] = result.rankings.splice(penalizedIndex, 1);
+  if (!penalized) throw new HttpError(500, 'Không thể hạ bậc ngựa vi phạm');
+  const nextAffectedIndex = result.rankings.findIndex((r) => r.horseId.toString() === affectedHorseId.toString());
+  result.rankings.splice(nextAffectedIndex + 1, 0, penalized);
   refreshRankingOrder(result);
 }
 
@@ -334,12 +327,8 @@ export async function simulateRace(raceId: string) {
     { upsert: true, new: true },
   );
 
-  race.status = 'completed';
-  try {
-    await race.save();
-  } catch (err) {
-    throw new HttpError(500, err instanceof Error ? err.message : 'Lỗi khi lưu trận đua');
-  }
+  // Giữ race ở 'ongoing' (Live) trong suốt lúc ngựa chạy & trọng tài xem trực tiếp.
+  // Chỉ chuyển 'completed' khi trọng tài xem xong (gọi finishRefereeRace).
 
   // Dựng timeline phát lại (giống admin) để trọng tài xem đua trực tiếp
   const populated = await Race.findById(raceId)
@@ -393,6 +382,25 @@ export async function simulateRace(raceId: string) {
   return timeline;
 }
 
+/**
+ * Kết thúc cuộc đua: chuyển 'ongoing' → 'completed' khi trọng tài đã xem xong đua
+ * và kết quả tạm thời đã hiển thị. Idempotent nếu đã completed.
+ */
+export async function finishRefereeRace(refereeId: string, raceId: string): Promise<void> {
+  if (!mongoose.isValidObjectId(raceId)) throw new HttpError(400, 'ID cuộc đua không hợp lệ');
+  const race = await Race.findById(raceId);
+  if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
+  if (race.refereeId?.toString() !== refereeId) {
+    throw new HttpError(403, 'Bạn không phải trọng tài cuộc đua này');
+  }
+  if (race.status === 'completed') return; // đã kết thúc thì bỏ qua
+  if (race.status !== 'ongoing') {
+    throw new HttpError(409, 'Chỉ kết thúc được cuộc đua đang diễn ra (Live)');
+  }
+  race.status = 'completed';
+  await race.save();
+}
+
 export async function buildResultFromRace(raceId: string, refereeId: string) {
   const race = await Race.findById(raceId).lean();
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
@@ -414,7 +422,7 @@ export async function buildResultFromRace(raceId: string, refereeId: string) {
 export async function applyRacePenalty(
   refereeId: string,
   raceId: string,
-  payload: { ruleId: string; target: 'horse' | 'jockey'; horseId?: string; jockeyId?: string; notes?: string; }
+  payload: { ruleId: string; target: 'horse' | 'jockey'; horseId?: string; jockeyId?: string; affectedHorseId?: string; notes?: string; }
 ): Promise<void> {
   const race = await Race.findById(raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
@@ -500,15 +508,6 @@ export async function applyRacePenalty(
     bannedUntil,
     recordedAt: new Date(),
   } as any);
-
-  // Dựng lại bảng xếp hạng từ tập án hiện có (gồm cả án vừa thêm).
-  await recomputeRankingsWithDemotions(resultDoc);
-  const newRank = resultDoc.rankings.find(
-    (r) => r.horseId.toString() === participant.horseId.toString(),
-  )?.rank ?? oldRank;
-  // Ghi hạng cũ→mới vào mô tả biên bản vừa lập.
-  const lastViolation = resultDoc.violations[resultDoc.violations.length - 1] as any;
-  lastViolation.description = `${rule.name} — tụt ${drop} bậc (hạng ${oldRank}→${newRank})${payload.notes ? ` · ${payload.notes}` : ''}`;
 
   let savedResult;
   try {
