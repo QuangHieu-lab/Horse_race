@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 import { User, type IUser } from '../models/User.model.js';
 import type { UserRole } from '../types/shared.types.js';
+import type { PenaltyStatusDto } from '../types/api.types.js';
+import { toPenaltyStatusDto } from '../utils/penalty-status.util.js';
 import { HttpError } from '../utils/http-error.js';
 
 export interface AuthUserDto {
@@ -12,6 +14,7 @@ export interface AuthUserDto {
   fullName: string;
   phone?: string;
   avatarUrl?: string;
+  penaltyStatus?: PenaltyStatusDto;
 }
 
 export interface AuthResponse {
@@ -33,6 +36,7 @@ function toUserDto(doc: IUser & { _id: mongoose.Types.ObjectId }): AuthUserDto {
     fullName: doc.fullName,
     phone: doc.phone,
     avatarUrl: doc.avatarUrl,
+    penaltyStatus: doc.role === 'jockey' ? toPenaltyStatusDto(doc.jockeyProfile?.penaltyStatus) : undefined,
   };
 }
 

@@ -28,6 +28,27 @@ export interface HorseWithPenaltyDto extends NamedEntityDto {
   penaltyStatus: PenaltyStatusDto;
 }
 
+export interface PenaltyDetailDto {
+  target: 'horse' | 'jockey' | 'both';
+  description: string;
+  penaltyApplied: string | null;
+  recordedAt: string;
+  bannedUntil: string | null;
+  rule: {
+    code: string;
+    name: string;
+    description: string;
+    category: string;
+    severity: string;
+    banDurationDays: number;
+  } | null;
+  race: {
+    id: string;
+    name: string;
+    scheduledAt: string;
+  } | null;
+}
+
 export interface InvitationDto {
   id: string;
   status: InvitationStatus;
