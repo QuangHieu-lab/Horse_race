@@ -79,6 +79,7 @@ export interface RaceRankingDto {
   jockey: UserSummaryDto;
   finishTime?: number;
   prize: number;
+  isDisqualified?: boolean;
 }
 
 export interface RaceViolationSummaryDto {
