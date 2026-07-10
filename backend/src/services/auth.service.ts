@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 import { User, type IUser } from '../models/User.model.js';
 import type { UserRole } from '../types/shared.types.js';
+import type { PenaltyStatusDto } from '../types/api.types.js';
+import { toPenaltyStatusDto } from '../utils/penalty-status.util.js';
 import { HttpError } from '../utils/http-error.js';
 
 export interface AuthUserDto {
@@ -12,6 +14,9 @@ export interface AuthUserDto {
   fullName: string;
   phone?: string;
   avatarUrl?: string;
+  penaltyStatus?: PenaltyStatusDto;
+  licenseNumber?: string;
+  licenseExpiry?: string | null;
 }
 
 export interface AuthResponse {
@@ -33,6 +38,12 @@ function toUserDto(doc: IUser & { _id: mongoose.Types.ObjectId }): AuthUserDto {
     fullName: doc.fullName,
     phone: doc.phone,
     avatarUrl: doc.avatarUrl,
+    penaltyStatus: doc.role === 'jockey' ? toPenaltyStatusDto(doc.jockeyProfile?.penaltyStatus) : undefined,
+    licenseNumber: doc.role === 'jockey' ? doc.jockeyProfile?.licenseNumber : undefined,
+    licenseExpiry:
+      doc.role === 'jockey' && doc.jockeyProfile?.licenseExpiry
+        ? new Date(doc.jockeyProfile.licenseExpiry).toISOString()
+        : null,
   };
 }
 
@@ -118,6 +129,36 @@ export async function getMe(userId: string): Promise<AuthUserDto> {
   if (!user || !user.isActive) {
     throw new HttpError(401, 'Token không hợp lệ');
   }
+  return toUserDto(user);
+}
+
+export interface UpdateProfileInput {
+  fullName?: string;
+  phone?: string;
+}
+
+export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<AuthUserDto> {
+  if (!mongoose.isValidObjectId(userId)) {
+    throw new HttpError(401, 'Token không hợp lệ');
+  }
+  const user = await User.findById(userId);
+  if (!user || !user.isActive) {
+    throw new HttpError(401, 'Token không hợp lệ');
+  }
+
+  if (input.fullName !== undefined) {
+    const fullName = input.fullName.trim();
+    if (!fullName) {
+      throw new HttpError(400, 'Họ tên là bắt buộc');
+    }
+    user.fullName = fullName;
+  }
+
+  if (input.phone !== undefined) {
+    user.phone = input.phone.trim() || undefined;
+  }
+
+  await user.save();
   return toUserDto(user);
 }
 

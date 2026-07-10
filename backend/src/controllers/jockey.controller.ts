@@ -48,4 +48,9 @@ export class JockeyController {
     const notifications = await listNotificationsForUser(req.user!.id);
     res.json({ notifications });
   });
+
+  getPenaltyDetail = asyncHandler(async (req: Request, res: Response) => {
+    const penalty = await jockeyService.getJockeyPenaltyDetail(req.user!.id);
+    res.json({ penalty });
+  });
 }

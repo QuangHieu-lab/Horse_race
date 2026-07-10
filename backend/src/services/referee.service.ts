@@ -148,9 +148,7 @@ function describeBanDuration(
 async function resolveCompetitionDayBanUntil(
   banRaceDays: number,
   fromDate: Date,
-): Promise<Date | null> {
-  if (banRaceDays <= 0) return null;
-
+): Promise<Date> {
   const races = await Race.find({
     scheduledAt: { $gt: fromDate },
     status: { $ne: 'cancelled' },
@@ -170,7 +168,12 @@ async function resolveCompetitionDayBanUntil(
   }
 
   const targetDay = raceDays[banRaceDays - 1];
-  return targetDay ? endOfRaceDay(targetDay) : null;
+  if (targetDay) return endOfRaceDay(targetDay);
+
+  // Not enough scheduled race days yet to count out the full ban — fall back to a calendar-day estimate
+  const fallback = new Date(fromDate);
+  fallback.setDate(fallback.getDate() + banRaceDays);
+  return endOfRaceDay(fallback);
 }
 
 export async function getRefereeDashboard(refereeId: string) {

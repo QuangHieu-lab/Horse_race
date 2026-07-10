@@ -15,3 +15,5 @@ jockeyRouter.get('/races', jockeyController.listRaces);
 jockeyRouter.get('/races/:id', jockeyController.getRaceById);
 
 jockeyRouter.get('/notifications', jockeyController.listNotifications);
+
+jockeyRouter.get('/penalty-detail', jockeyController.getPenaltyDetail);

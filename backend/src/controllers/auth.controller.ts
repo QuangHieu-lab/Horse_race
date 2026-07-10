@@ -36,6 +36,12 @@ export class AuthController {
     res.json({ user });
   });
 
+  updateProfile = asyncHandler(async (req: Request, res: Response) => {
+    const { fullName, phone } = req.body as { fullName?: string; phone?: string };
+    const user = await authService.updateProfile(req.user!.id, { fullName, phone });
+    res.json({ user });
+  });
+
   changePassword = asyncHandler(async (req: Request, res: Response) => {
     const { oldPassword, newPassword } = req.body as { oldPassword?: string; newPassword?: string };
     if (!oldPassword || !newPassword) {

@@ -6,14 +6,16 @@ import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import { User } from '../models/User.model.js';
+import { ViolationRule } from '../models/ViolationRule.model.js';
 import type {
   InvitationDto,
   JockeyDashboardDto,
   JockeyRaceDto,
+  PenaltyDetailDto,
 } from '../types/api.types.js';
 import type { InvitationStatus } from '../types/shared.types.js';
 import { HttpError } from '../utils/http-error.js';
-import { toPenaltyStatusDto, type RawPenaltyStatus } from '../utils/penalty-status.util.js';
+import { isPenaltyActive, toPenaltyStatusDto, type RawPenaltyStatus } from '../utils/penalty-status.util.js';
 
 function toInvitationDto(
   inv: {
@@ -281,6 +283,55 @@ export async function getJockeyRace(
   );
   if (!dto) throw new HttpError(404, 'Bạn không tham gia cuộc đua này');
   return dto;
+}
+
+export async function getJockeyPenaltyDetail(jockeyId: string): Promise<PenaltyDetailDto> {
+  const user = await User.findById(jockeyId).select('jockeyProfile.penaltyStatus').lean();
+  const penaltyStatus = user?.jockeyProfile?.penaltyStatus;
+  if (!isPenaltyActive(penaltyStatus)) {
+    throw new HttpError(404, 'Bạn không có án phạt nào đang áp dụng');
+  }
+
+  const violationId = penaltyStatus?.currentViolationId;
+  if (!violationId) {
+    throw new HttpError(404, 'Không tìm thấy chi tiết vi phạm');
+  }
+
+  const result = await Result.findOne({ 'violations._id': violationId }).lean();
+  const violation = result?.violations.find((v) => v._id?.toString() === violationId.toString());
+  if (!result || !violation) {
+    throw new HttpError(404, 'Không tìm thấy chi tiết vi phạm');
+  }
+
+  const [rule, race] = await Promise.all([
+    violation.ruleId ? ViolationRule.findById(violation.ruleId).lean() : null,
+    Race.findById(result.raceId).select('name scheduledAt').lean(),
+  ]);
+
+  return {
+    target: violation.target,
+    description: violation.description,
+    penaltyApplied: violation.penaltyApplied ?? null,
+    recordedAt: violation.recordedAt.toISOString(),
+    bannedUntil: violation.bannedUntil?.toISOString() ?? null,
+    rule: rule
+      ? {
+          code: rule.code,
+          name: rule.name,
+          description: rule.description,
+          category: rule.category,
+          severity: rule.severity,
+          banDurationDays: rule.banDurationDays,
+        }
+      : null,
+    race: race
+      ? {
+          id: race._id.toString(),
+          name: race.name,
+          scheduledAt: race.scheduledAt.toISOString(),
+        }
+      : null,
+  };
 }
 
 export async function getJockeyDashboard(jockeyId: string): Promise<JockeyDashboardDto> {

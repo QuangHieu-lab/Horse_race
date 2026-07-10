@@ -12,4 +12,6 @@ authRouter.post('/register', authController.register);
 
 authRouter.get('/me', authenticate, authController.me);
 
+authRouter.patch('/me', authenticate, authController.updateProfile);
+
 authRouter.post('/change-password', authenticate, authController.changePassword);

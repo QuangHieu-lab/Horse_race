@@ -58,7 +58,7 @@ async function buildSpectatorRaceDto(
       announcementMessage?: string;
       allowVipRedemption?: boolean;
     };
-    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber?: number }>;
+    participants: Array<{ horseId: mongoose.Types.ObjectId; laneNumber?: number; isDisqualified?: boolean }>;
   },
   spectatorId?: mongoose.Types.ObjectId,
 ): Promise<SpectatorRaceDto> {
@@ -100,6 +100,9 @@ async function buildSpectatorRaceDto(
 
   let resultDto: SpectatorRaceDto['result'] = null;
   if (result) {
+    const dqHorseIds = new Set(
+      race.participants.filter((p) => p.isDisqualified).map((p) => p.horseId.toString()),
+    );
     const jockeyIds = result.rankings.map((r) => r.jockeyId);
     const resultHorseIds = [
       ...result.rankings.map((r) => r.horseId),
@@ -129,6 +132,7 @@ async function buildSpectatorRaceDto(
         },
         finishTime: r.finishTime,
         prize: r.prize,
+        isDisqualified: dqHorseIds.has(r.horseId.toString()),
       })),
       violations: result.violations.map((v) => ({
         horseId: v.horseId?.toString() ?? null,
@@ -460,9 +464,11 @@ export async function getRaceSimulation(raceId: string) {
   if (!mongoose.isValidObjectId(raceId)) throw new HttpError(400, 'ID không hợp lệ');
   const race = await Race.findById(raceId).lean();
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
-  if (race.status !== 'completed') return { available: false as const, rankings: [] };
-  const result = await Result.findOne({ raceId: race._id, publishedAt: { $ne: null } }).lean();
-  if (!result) return { available: false as const, rankings: [] };
+  if (race.status !== 'ongoing' && race.status !== 'completed') {
+    return { available: false as const, rankings: [] };
+  }
+  const result = await Result.findOne({ raceId: race._id }).lean();
+  if (!result || result.rankings.length === 0) return { available: false as const, rankings: [] };
   return {
     available: true as const,
     rankings: result.rankings.map(r => ({
