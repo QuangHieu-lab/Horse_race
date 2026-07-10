@@ -165,6 +165,30 @@ async function seed(): Promise<void> {
       fullName: 'Khách Risk 2x',
       phone: '0900000009',
     },
+    {
+      email: 'owner.admincreated@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'horse_owner',
+      fullName: 'Owner Do Admin Tạo',
+      phone: '0900000010',
+    },
+    {
+      email: 'jockey.admincreated@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'jockey',
+      fullName: 'Jockey Do Admin Tạo',
+      phone: '0900000011',
+      jockeyProfile: { licenseNumber: 'VN-JKY-ADM-001', isSuspended: false },
+    },
+    {
+      email: 'referee.inactive@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'referee',
+      fullName: 'Referee Tạm Khóa',
+      phone: '0900000012',
+      isActive: false,
+      refereeProfile: { certificationId: 'VN-REF-INACTIVE-001' },
+    },
   ]);
   const admin = users[0]!;
   const owner = users[1]!;
@@ -988,6 +1012,7 @@ async function seed(): Promise<void> {
   console.log('E — Independent: Horse registered, NO Jockey on', raceIndependent.name);
   console.log('   -> Free Jockey available: jockey3@demo.local');
   console.log('   -> Extra spectator accounts: spectator2@demo.local, spectator3@demo.local');
+  console.log('   -> Admin user management samples: owner.admincreated@demo.local, jockey.admincreated@demo.local, referee.inactive@demo.local');
 
   // 🚀 IN RA CÁC MẪU JSON ĐỂ TEST TRỰC TIẾP TRÊN POSTMAN
   console.log('\n======================================================');

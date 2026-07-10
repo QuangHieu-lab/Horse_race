@@ -11,6 +11,20 @@ export class AdminController {
     res.json({ users });
   });
 
+  createUser = asyncHandler(async (req: Request, res: Response) => {
+    const user = await adminService.createUser(req.body as adminService.CreateAdminUserInput);
+    res.status(201).json({ user });
+  });
+
+  updateUser = asyncHandler(async (req: Request, res: Response) => {
+    const user = await adminService.updateUser(
+      req.user!.id,
+      req.params.id as string,
+      req.body as adminService.UpdateAdminUserInput,
+    );
+    res.json({ user });
+  });
+
   listRegistrations = asyncHandler(async (req: Request, res: Response) => {
     const status = req.query.status as 'pending' | 'approved' | 'rejected' | undefined;
     const registrations = await adminRegistrationService.listRegistrations(status);

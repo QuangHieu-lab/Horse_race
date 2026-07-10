@@ -563,6 +563,33 @@ const swaggerDefinition = {
           notes: { type: 'string', example: 'Cố tình chèn ép ở vạch đích, đã check VAR.' },
         },
       },
+      AdminCreateUserRequest: {
+        type: 'object',
+        required: ['email', 'password', 'fullName', 'role'],
+        properties: {
+          email: { type: 'string', format: 'email', example: 'owner2@demo.local' },
+          password: { type: 'string', minLength: 8, example: 'Demo@123' },
+          fullName: { type: 'string', example: 'Horse Owner Two' },
+          role: { type: 'string', enum: ['horse_owner', 'jockey', 'referee', 'spectator'], example: 'horse_owner' },
+          phone: { type: 'string', example: '0900000000' },
+          licenseNumber: { type: 'string', description: 'Optional for jockey accounts' },
+          licenseExpiry: { type: 'string', format: 'date', nullable: true },
+          certificationId: { type: 'string', description: 'Optional for referee accounts' },
+        },
+      },
+      AdminUpdateUserRequest: {
+        type: 'object',
+        properties: {
+          fullName: { type: 'string' },
+          phone: { type: 'string', nullable: true },
+          role: { type: 'string', enum: ['horse_owner', 'jockey', 'referee', 'spectator', 'admin'] },
+          isActive: { type: 'boolean' },
+          password: { type: 'string', minLength: 8 },
+          licenseNumber: { type: 'string', nullable: true },
+          licenseExpiry: { type: 'string', format: 'date', nullable: true },
+          certificationId: { type: 'string', nullable: true },
+        },
+      },
       // === KẾT THÚC NEW SCHEMAS ===
     },
   },
@@ -641,6 +668,43 @@ const swaggerDefinition = {
         summary: 'List user accounts',
         security: [{ bearerAuth: [] }],
         responses: { 200: { description: 'User list' } },
+      },
+      post: {
+        tags: ['Admin'],
+        summary: 'Create a user account for horse owner, jockey, referee, or spectator',
+        description: 'Admin-created accounts can sign in immediately. Admin role creation is intentionally blocked from this endpoint.',
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/AdminCreateUserRequest' } },
+          },
+        },
+        responses: {
+          201: { description: 'Created user account' },
+          400: { description: 'Invalid role or account data' },
+          409: { description: 'Email already exists' },
+        },
+      },
+    },
+    '/api/admin/users/{id}': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Update a user role, active status, password, or profile fields',
+        description: 'Used by admin for permission management. The current admin cannot disable or demote their own account.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/AdminUpdateUserRequest' } },
+          },
+        },
+        responses: {
+          200: { description: 'Updated user account' },
+          400: { description: 'Invalid update' },
+          404: { description: 'User not found' },
+        },
       },
     },
     // === NEW: ADMIN - QUẢN LÝ LUẬT VI PHẠM ===
