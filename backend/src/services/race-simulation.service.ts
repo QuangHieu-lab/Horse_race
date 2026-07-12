@@ -169,3 +169,77 @@ export async function finishRaceSimulation(raceId: string, adminId: string): Pro
   result.publishedAt = now;
   await result.save();
 }
+
+/**
+ * Dựng lại RaceSimTimeline cho spectator xem lại (replay) một cuộc đua đã/đang mô phỏng.
+ * Khác getRaceSimulation (endpoint mobile đang dùng, chỉ trả rankings rút gọn):
+ * hàm này trả đủ timeline để tái sử dụng RaceLivePlayer bên web, dựng từ Result đã lưu
+ * (kể cả bản nháp chưa publish) thay vì mô phỏng ngẫu nhiên mới.
+ */
+export async function getRaceReplayTimeline(
+  raceId: string,
+): Promise<{ available: boolean; resultPublished: boolean; timeline: RaceSimTimeline | null }> {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID cuộc đua không hợp lệ');
+  }
+
+  const race = await Race.findById(raceId)
+    .populate('trackId', 'name location surfaceDefault')
+    .populate('participants.horseId', 'name')
+    .populate('participants.jockeyId', 'fullName');
+  if (!race) {
+    return { available: false, resultPublished: false, timeline: null };
+  }
+  if (race.status !== 'ongoing' && race.status !== 'completed') {
+    return { available: false, resultPublished: false, timeline: null };
+  }
+
+  const result = await Result.findOne({ raceId: race._id });
+  if (!result || result.rankings.length === 0) {
+    return { available: false, resultPublished: false, timeline: null };
+  }
+
+  const participantByHorseId = new Map(
+    race.participants.map((p) => [(p.horseId as unknown as { _id: mongoose.Types.ObjectId })._id.toString(), p]),
+  );
+
+  const horses: RaceSimHorse[] = result.rankings.map((r) => {
+    const participant = participantByHorseId.get(r.horseId.toString());
+    const horse = participant?.horseId as unknown as { _id: mongoose.Types.ObjectId; name: string } | undefined;
+    const jockey = participant?.jockeyId as unknown as { _id: mongoose.Types.ObjectId; fullName: string } | undefined;
+    return {
+      horseId: r.horseId.toString(),
+      horseName: horse?.name ?? 'Unknown',
+      jockeyId: r.jockeyId.toString(),
+      jockeyName: jockey?.fullName ?? 'Unknown',
+      ownerId: r.ownerId.toString(),
+      laneNumber: participant?.laneNumber ?? 0,
+      clothNumber: participant?.clothNumber ?? participant?.laneNumber ?? 0,
+      rank: r.rank,
+      finishTime: r.finishTime ?? 0,
+      prize: r.prize,
+    };
+  });
+
+  const track = race.trackId as unknown as
+    | { name: string; location: string; surfaceDefault: string }
+    | null;
+  const surface = track?.surfaceDefault ?? race.surface ?? 'turf';
+
+  return {
+    available: true,
+    resultPublished: !!result.publishedAt,
+    timeline: {
+      raceId: race._id.toString(),
+      name: race.name,
+      distance: race.distance ?? 1200,
+      laps: 1,
+      trackCondition: race.going && race.going !== 'unknown' ? race.going : 'good',
+      trackName: track?.name ?? null,
+      trackLocation: track?.location ?? null,
+      surface,
+      durationMs: 18000,
+      horses,
+    },
+  };
+}

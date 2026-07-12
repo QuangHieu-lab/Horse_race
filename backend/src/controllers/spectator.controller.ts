@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/error.middleware.js';
 import { cancelPrediction, createPrediction } from '../services/prediction.service.js';
 import * as paymentService from '../services/payment.service.js';
 import * as spectatorService from '../services/spectator.service.js';
+import { getRaceReplayTimeline } from '../services/race-simulation.service.js';
 import * as viewingTicketService from '../services/viewing-ticket.service.js';
 import { listNotificationsForUser } from '../services/notification.service.js';
 import { HttpError } from '../utils/http-error.js';
@@ -125,6 +126,11 @@ export class SpectatorController {
 
   getRaceSimulation = asyncHandler(async (req: Request, res: Response) => {
     const data = await spectatorService.getRaceSimulation(req.params.id as string);
+    res.json(data);
+  });
+
+  getRaceReplay = asyncHandler(async (req: Request, res: Response) => {
+    const data = await getRaceReplayTimeline(req.params.id as string);
     res.json(data);
   });
 }
