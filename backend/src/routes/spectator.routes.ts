@@ -12,6 +12,8 @@ spectatorRouter.get('/races/:id', spectatorController.getRaceById);
 
 spectatorRouter.get('/races/:id/simulation', spectatorController.getRaceSimulation);
 
+spectatorRouter.get('/races/:id/replay', spectatorController.getRaceReplay);
+
 spectatorRouter.post('/races/:id/viewing-pass', spectatorController.purchaseViewingPass);
 
 spectatorRouter.get('/viewing-passes', spectatorController.listViewingPasses);
