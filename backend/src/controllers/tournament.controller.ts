@@ -6,6 +6,7 @@ import {
   getTournamentById,
   listTournaments,
   updatePredictionConfig,
+  updateTournamentPrizePool,
   updateTournamentStatus,
 } from '../services/tournament.service.js';
 
@@ -31,6 +32,14 @@ export class TournamentController {
     const tournament = await updateTournamentStatus(
       String(req.params.id),
       req.body.status,
+    );
+    res.json({ tournament });
+  });
+
+  updatePrizePool = asyncHandler(async (req: Request, res: Response) => {
+    const tournament = await updateTournamentPrizePool(
+      String(req.params.id),
+      Number(req.body.prizePool),
     );
     res.json({ tournament });
   });

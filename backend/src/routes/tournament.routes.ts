@@ -12,6 +12,8 @@ tournamentRouter.get('/:id', tournamentController.getById);
 
 tournamentRouter.patch('/:id/status', tournamentController.updateStatus);
 
+tournamentRouter.patch('/:id/prize-pool', tournamentController.updatePrizePool);
+
 tournamentRouter.patch('/:id/prediction-config', tournamentController.updatePredictionConfig);
 
 tournamentRouter.delete('/:id', tournamentController.delete);

@@ -86,6 +86,16 @@ async function awardPoolPoints(
   await profile.addPoints(points, 'earned_pool_share', 'PredictionPool', poolId, note);
 }
 
+function disqualifiedHorseIdsFromRace(race: {
+  participants: Array<{ horseId: mongoose.Types.ObjectId; isDisqualified?: boolean }>;
+}): Set<string> {
+  return new Set(
+    race.participants
+      .filter((participant) => participant.isDisqualified)
+      .map((participant) => participant.horseId.toString()),
+  );
+}
+
 export async function getOrCreatePredictionPool(race: {
   _id: mongoose.Types.ObjectId;
   tournamentId: mongoose.Types.ObjectId;
@@ -234,11 +244,15 @@ export async function settlePredictionPoolFromResult(
     rank: r.rank,
     horseId: r.horseId,
   }));
+  const disqualifiedHorseIds = disqualifiedHorseIdsFromRace(race);
+  const eligibleActualRankings = actualRankings.filter(
+    (ranking) => !disqualifiedHorseIds.has(ranking.horseId.toString()),
+  );
   const winners = predictions.filter((prediction) =>
-    isWinningPrediction(prediction.predictedRanks, actualRankings),
+    isWinningPrediction(prediction.predictedRanks, eligibleActualRankings),
   );
   const losers = predictions.filter(
-    (prediction) => !isWinningPrediction(prediction.predictedRanks, actualRankings),
+    (prediction) => !isWinningPrediction(prediction.predictedRanks, eligibleActualRankings),
   );
   const totalBountyPool = predictions.reduce((sum, p) => sum + p.contribution, 0);
   const winPool = losers.reduce((sum, p) => sum + p.contribution, 0);
@@ -339,6 +353,7 @@ export async function settlePredictionPoolFromResult(
 
   const rankedGroups = new Map<number, typeof result.rankings>();
   for (const ranking of result.rankings) {
+    if (disqualifiedHorseIds.has(ranking.horseId.toString())) continue;
     if (!rankedGroups.has(ranking.rank)) rankedGroups.set(ranking.rank, []);
     rankedGroups.get(ranking.rank)!.push(ranking);
   }

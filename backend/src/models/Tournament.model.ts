@@ -21,6 +21,8 @@ export interface IPredictionConfig {
   ownerShareRate: number;
   jockeyShareRate: number;
   rankRewardRates: number[];
+  fixedPrizeTopCount: number;
+  fixedPrizeRankRates: number[];
   rolloverPolicy: PoolRolloverPolicy;
   minScoreToShare: number;
 }
@@ -81,6 +83,17 @@ const PredictionConfigSchema = new Schema<IPredictionConfig>(
         message: 'rankRewardRates must contain non-negative numbers',
       },
     },
+    fixedPrizeTopCount: { type: Number, default: 5, enum: [4, 5] },
+    fixedPrizeRankRates: {
+      type: [Number],
+      default: () => [50, 25, 12, 8, 5],
+      validate: {
+        validator(rates: number[]) {
+          return rates.length > 0 && rates.every((rate) => rate >= 0);
+        },
+        message: 'fixedPrizeRankRates must contain non-negative numbers',
+      },
+    },
     rolloverPolicy: {
       type: String,
       enum: POOL_ROLLOVER_POLICIES,
@@ -138,6 +151,16 @@ TournamentSchema.pre('save', function (next) {
   const rankTotal = cfg.rankRewardRates.reduce((sum, rate) => sum + rate, 0);
   if (rankTotal !== 100) {
     return next(new Error('Rank reward rates must sum to 100'));
+  }
+  if (![4, 5].includes(cfg.fixedPrizeTopCount)) {
+    return next(new Error('Fixed prize top count must be 4 or 5'));
+  }
+  if (cfg.fixedPrizeRankRates.length !== cfg.fixedPrizeTopCount) {
+    return next(new Error('Fixed prize rank rates must match fixed prize top count'));
+  }
+  const fixedPrizeTotal = cfg.fixedPrizeRankRates.reduce((sum, rate) => sum + rate, 0);
+  if (fixedPrizeTotal !== 100) {
+    return next(new Error('Fixed prize rank rates must sum to 100'));
   }
   if (cfg.predictionOpenAt && cfg.predictionCloseAt) {
     if (cfg.predictionCloseAt <= cfg.predictionOpenAt) {

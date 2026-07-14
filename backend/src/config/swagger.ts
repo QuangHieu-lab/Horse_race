@@ -194,6 +194,16 @@ const swaggerDefinition = {
             type: 'string',
             example: 'RacingRewardPool is split by rank presets for 5-13 horses; same-rank dead heats split that rank share equally.',
           },
+          fixedPrizePool: {
+            type: 'string',
+            example:
+              'Tournament.prizePool is separate from bounty pool. It is paid only to top 4 or top 5 eligible horses, then split by ownerShareRate/jockeyShareRate.',
+          },
+          disqualificationPolicy: {
+            type: 'string',
+            example:
+              'Disqualified horses are moved to the bottom for display and receive 0 from fixed prizes and bounty racing rewards.',
+          },
           userReward: {
             type: 'string',
             example:
@@ -245,6 +255,19 @@ const swaggerDefinition = {
             items: { type: 'number' },
             example: [50, 25, 15, 7, 3],
             description: 'Must sum to 100. Used to split RacingRewardPool by result rank.',
+          },
+          fixedPrizeTopCount: {
+            type: 'integer',
+            enum: [4, 5],
+            example: 5,
+            description: 'Number of ranks eligible for the initial tournament prize pool.',
+          },
+          fixedPrizeRankRates: {
+            type: 'array',
+            items: { type: 'number' },
+            example: [50, 25, 12, 8, 5],
+            description:
+              'Must sum to 100 and length must match fixedPrizeTopCount. Used only for Tournament.prizePool, separate from bounty pool.',
           },
           rolloverPolicy: {
             type: 'string',
@@ -881,6 +904,32 @@ const swaggerDefinition = {
         tags: ['Tournaments'],
         summary: 'Create a tournament',
         security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'location', 'startDate', 'endDate'],
+                properties: {
+                  name: { type: 'string', example: 'Spring Cup 2026' },
+                  location: { type: 'string', example: 'Binh Duong Racecourse' },
+                  startDate: { type: 'string', format: 'date', example: '2026-08-01' },
+                  endDate: { type: 'string', format: 'date', example: '2026-08-31' },
+                  prizePool: {
+                    type: 'number',
+                    minimum: 0,
+                    example: 50000000,
+                    description:
+                      'Initial tournament prize pool. On result publish, backend splits this by fixedPrizeRankRates to top 4/top 5 eligible horses.',
+                  },
+                  description: { type: 'string' },
+                  predictionConfig: { $ref: '#/components/schemas/PredictionConfigRequest' },
+                },
+              },
+            },
+          },
+        },
         responses: { 201: { description: 'Created tournament' } },
       },
     },
@@ -916,12 +965,40 @@ const swaggerDefinition = {
         },
       },
     },
+    '/api/tournaments/{id}/prize-pool': {
+      patch: {
+        tags: ['Tournaments'],
+        summary: 'Update initial tournament prize pool',
+        description:
+          'Admin-only endpoint. Updates the fixed tournament prize pool while the tournament is draft or published. The prize pool is later split to top 4/top 5 eligible horses when race results are published.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['prizePool'],
+                properties: {
+                  prizePool: { type: 'number', minimum: 0, example: 50000000 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Updated prize pool' },
+          409: { description: 'Tournament already started' },
+        },
+      },
+    },
     '/api/tournaments/{id}/prediction-config': {
       patch: {
         tags: ['Tournaments'],
         summary: 'Update prediction bounty pool configuration',
         description:
-          'Admin-only endpoint. Allows changing ticket price, pool distribution, owner/jockey split, rank reward split, rolloverPolicy, and minScoreToShare while the tournament is draft or published. Pool distribution and rank reward rates must each sum to 100.',
+          'Admin-only endpoint. Allows changing ticket price, pool distribution, fixed tournament prize split, owner/jockey split, bounty rank reward split, rolloverPolicy, and minScoreToShare while the tournament is draft or published. Pool distribution, fixed prize rates, and bounty rank reward rates must each sum to 100.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {

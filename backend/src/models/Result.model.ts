@@ -147,11 +147,8 @@ ResultSchema.pre('save', async function (next) {
     return next(new Error('Rankings can only be set when race is ongoing or completed'));
   }  
 
-
-
-  if (this.rankings.length > 0 && !['ongoing', 'completed'].includes(race.status)) {
-    return next(new Error('Rankings can only be set when race is ongoing or completed'));
-  }
+  const rankingErr = validateRankings(this.rankings, race.participants, new Set());
+  if (rankingErr) return next(new Error(rankingErr));
 
   if (this.isModified('confirmedAt') && this.confirmedAt) {
     if (race.status !== 'completed') {
@@ -175,9 +172,6 @@ ResultSchema.pre('save', async function (next) {
       return next(err instanceof Error ? err : new Error(String(err)));
     }
   }
-
-  const rankingErr = validateRankings(this.rankings, race.participants, new Set());
-  if (rankingErr) return next(new Error(rankingErr));
 
   next();
 });

@@ -431,6 +431,8 @@ async function seed(): Promise<void> {
       ownerShareRate: 80,
       jockeyShareRate: 20,
       rankRewardRates: [50, 25, 15, 7, 3],
+      fixedPrizeTopCount: 5,
+      fixedPrizeRankRates: [50, 25, 12, 8, 5],
     },
     createdBy: admin._id,
   });
@@ -462,6 +464,8 @@ async function seed(): Promise<void> {
       ownerShareRate: 80,
       jockeyShareRate: 20,
       rankRewardRates: [50, 30, 20],
+      fixedPrizeTopCount: 4,
+      fixedPrizeRankRates: [55, 25, 12, 8],
     },
     createdBy: admin._id,
   });

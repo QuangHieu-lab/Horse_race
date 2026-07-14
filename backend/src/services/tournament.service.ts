@@ -39,6 +39,20 @@ function validatePredictionConfigRates(config: ITournament['predictionConfig']):
   ) {
     throw new HttpError(400, 'Allowed risk multipliers must contain positive integers');
   }
+  const fixedPrizeTopCount = config.fixedPrizeTopCount ?? 5;
+  const fixedPrizeRankRates = config.fixedPrizeRankRates ?? [50, 25, 12, 8, 5];
+  if (![4, 5].includes(fixedPrizeTopCount)) {
+    throw new HttpError(400, 'Fixed prize top count must be 4 or 5');
+  }
+  if (fixedPrizeRankRates.length !== fixedPrizeTopCount) {
+    throw new HttpError(400, 'Fixed prize rank rates must match fixed prize top count');
+  }
+  if (fixedPrizeRankRates.some((rate) => rate < 0)) {
+    throw new HttpError(400, 'Fixed prize rank rates must contain non-negative numbers');
+  }
+  if (fixedPrizeRankRates.reduce((sum, rate) => sum + rate, 0) !== 100) {
+    throw new HttpError(400, 'Fixed prize rank rates must sum to 100');
+  }
 }
 
 export async function createTournament(
@@ -139,6 +153,27 @@ export async function updateTournamentStatus(id: string, status: ITournament['st
 
   return tournament;
   
+}
+
+export async function updateTournamentPrizePool(id: string, prizePool: number) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new HttpError(400, 'ID giải đấu không hợp lệ');
+  }
+  if (!Number.isFinite(prizePool) || prizePool < 0) {
+    throw new HttpError(400, 'Prize pool must be a non-negative number');
+  }
+
+  const tournament = await Tournament.findById(id);
+  if (!tournament) {
+    throw new HttpError(404, 'Không tìm thấy giải đấu để cập nhật giải thưởng');
+  }
+  if (!['draft', 'published'].includes(tournament.status)) {
+    throw new HttpError(409, 'Chỉ chỉnh giải thưởng ban đầu khi giải đấu chưa bắt đầu');
+  }
+
+  tournament.prizePool = Math.floor(prizePool);
+  await tournament.save();
+  return tournament.toObject();
 }
 
 export async function updatePredictionConfig(
