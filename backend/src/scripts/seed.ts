@@ -839,6 +839,139 @@ async function seed(): Promise<void> {
    * predictionScore = contribution = entryFee * ticketCount.
    */
 
+  // --- Scenario C2: Published results for spectator horse leaderboard ---
+  console.log('Scenario C2 — Published horse leaderboard demo…');
+  const leaderboardRace1 = await Race.create({
+    tournamentId: tournamentSpring._id,
+    meetingId: meetingCompleted._id,
+    trackId: track._id,
+    name: 'Leaderboard Demo — Sprint 1',
+    round: 4,
+    raceClass: 'Open',
+    scheduledAt: daysFromNow(3),
+    distance: 1200,
+    surface: 'turf',
+    going: 'good',
+    maxParticipants: 8,
+    status: 'completed',
+    refereeId: referee._id,
+    participants: [
+      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date(), vetApprovedAt: new Date() },
+    ],
+  });
+  await Result.create({
+    raceId: leaderboardRace1._id,
+    tournamentId: tournamentSpring._id,
+    rankings: [
+      { rank: 1, horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, finishTime: 75.11, marginBehind: 0, prize: 0 },
+      { rank: 2, horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, finishTime: 76.04, marginBehind: 0.93, prize: 0 },
+      { rank: 3, horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, finishTime: 77.58, marginBehind: 2.47, prize: 0 },
+    ],
+    violations: [],
+    isPhotoFinish: false,
+    confirmedBy: referee._id,
+    confirmedAt: new Date(),
+    publishedBy: admin._id,
+    publishedAt: daysFromNow(-2),
+  });
+
+  const leaderboardRace2 = await Race.create({
+    tournamentId: tournamentSpring._id,
+    meetingId: meetingCompleted._id,
+    trackId: track._id,
+    name: 'Leaderboard Demo — Sprint 2',
+    round: 5,
+    raceClass: 'Open',
+    scheduledAt: daysFromNow(4),
+    distance: 1200,
+    surface: 'turf',
+    going: 'good',
+    maxParticipants: 8,
+    status: 'completed',
+    refereeId: referee._id,
+    participants: [
+      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date(), vetApprovedAt: new Date() },
+    ],
+  });
+  await Result.create({
+    raceId: leaderboardRace2._id,
+    tournamentId: tournamentSpring._id,
+    rankings: [
+      { rank: 1, horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, finishTime: 74.88, marginBehind: 0, prize: 0 },
+      { rank: 2, horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, finishTime: 75.36, marginBehind: 0.48, prize: 0 },
+      { rank: 3, horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, finishTime: 76.02, marginBehind: 1.14, prize: 0 },
+    ],
+    violations: [],
+    isPhotoFinish: false,
+    confirmedBy: referee._id,
+    confirmedAt: new Date(),
+    publishedBy: admin._id,
+    publishedAt: daysFromNow(-1),
+  });
+
+  const leaderboardRace3 = await Race.create({
+    tournamentId: tournamentSpring._id,
+    meetingId: meetingCompleted._id,
+    trackId: track._id,
+    name: 'Leaderboard Demo — DQ Check',
+    round: 6,
+    raceClass: 'Open',
+    scheduledAt: daysFromNow(5),
+    distance: 1200,
+    surface: 'turf',
+    going: 'good',
+    maxParticipants: 8,
+    status: 'completed',
+    refereeId: referee._id,
+    participants: [
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      {
+        horseId: horseA._id,
+        jockeyId: jockey1._id,
+        ownerId: owner._id,
+        laneNumber: 3,
+        clothNumber: 3,
+        confirmedAt: new Date(),
+        vetApprovedAt: new Date(),
+        isDisqualified: true,
+        disqualifiedReason: 'Seed DQ demo',
+        disqualifiedAt: new Date(),
+        scratchedAt: new Date(),
+      },
+    ],
+  });
+  await Result.create({
+    raceId: leaderboardRace3._id,
+    tournamentId: tournamentSpring._id,
+    rankings: [
+      { rank: 1, horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, finishTime: 75.33, marginBehind: 0, prize: 0 },
+      { rank: 2, horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, finishTime: 76.10, marginBehind: 0.77, prize: 0 },
+      { rank: 3, horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, finishTime: 74.90, marginBehind: 0, prize: 0 },
+    ],
+    violations: [
+      {
+        target: 'horse',
+        horseId: horseA._id,
+        jockeyId: jockey1._id,
+        ownerId: owner._id,
+        type: 'doping',
+        description: 'Seed DQ demo — horse is excluded from leaderboard wins',
+        penaltyApplied: 'disqualification',
+        recordedAt: new Date(),
+      },
+    ],
+    isPhotoFinish: false,
+    confirmedBy: referee._id,
+    confirmedAt: new Date(),
+    publishedBy: admin._id,
+    publishedAt: new Date(),
+  });
+
   // --- 🚀 SCENARIO D: BẢN NHÁP CHO REFEREE TEST PHẠT ---
   console.log('Scenario D — Referee Draft Result for Testing Penalties…');
   const raceDraft = await Race.create({

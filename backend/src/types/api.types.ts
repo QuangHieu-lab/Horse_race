@@ -180,6 +180,19 @@ export interface TournamentDto {
   status: TournamentStatus;
 }
 
+export interface HorseLeaderboardItemDto {
+  rank: number;
+  horseId: string;
+  horseName: string;
+  ownerId: string | null;
+  ownerName: string | null;
+  firstPlaceWins: number;
+  totalPublishedRaces: number;
+  winRate: number;
+  latestWinAt: string | null;
+  latestRaceName: string | null;
+}
+
 export interface PredictedRankDto {
   rank: number;
   horseId: string;
