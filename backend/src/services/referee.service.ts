@@ -107,7 +107,11 @@ function applyDisqualificationToRankings(
   const index = result.rankings.findIndex((r) => r.horseId.toString() === disqualifiedHorseId.toString());
   if (index === -1) return;
 
-  result.rankings.splice(index, 1);
+  const [disqualified] = result.rankings.splice(index, 1);
+  if (!disqualified) return;
+
+  disqualified.prize = 0;
+  result.rankings.push(disqualified);
   refreshRankingOrder(result);
 }
 

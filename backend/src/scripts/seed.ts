@@ -564,26 +564,7 @@ async function seed(): Promise<void> {
     maxParticipants: 8,
     status: 'scheduled',
     refereeId: referee._id,
-    participants: [
-      {
-        horseId: horseA._id,
-        jockeyId: jockey1._id,
-        ownerId: owner._id,
-        laneNumber: 1,
-        clothNumber: 1,
-        confirmedAt: new Date(),
-        vetApprovedAt: new Date(),
-      },
-      {
-        horseId: horseB._id,
-        jockeyId: jockey2._id,
-        ownerId: owner._id,
-        laneNumber: 2,
-        clothNumber: 2,
-        confirmedAt: new Date(),
-        vetApprovedAt: new Date(),
-      },
-    ],
+    participants: [],
     viewingTicket: {
       enabled: true,
       pricePoints: 200,
@@ -970,6 +951,7 @@ async function seed(): Promise<void> {
     rankings: [
       { rank: 1, horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, finishTime: 75.33, marginBehind: 0, prize: 0 },
       { rank: 2, horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, finishTime: 76.10, marginBehind: 0.77, prize: 0 },
+      { rank: 3, horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, finishTime: 74.90, marginBehind: 0, prize: 0 },
     ],
     violations: [
       {

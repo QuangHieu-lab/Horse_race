@@ -5,9 +5,9 @@ import type { PenaltyApplied } from '../types/shared.types.js';
 export function validateRankings(
   rankings: IRanking[],
   participants: IParticipant[],
-  disqualifiedHorseIds: Set<string>,
+  _disqualifiedHorseIds: Set<string>,
 ): string | null {
-  const eligible = participants.filter((p) => !p.scratchedAt && !p.isDisqualified);
+  const eligible = participants.filter((p) => !p.scratchedAt || p.isDisqualified);
 
   if (rankings.length === 0) return null;
   if (rankings.length > eligible.length) {
@@ -35,9 +35,6 @@ export function validateRankings(
     const horseKey = r.horseId.toString();
     if (!participantHorseIds.has(horseKey)) {
       return `Ngựa có ID ${horseKey} không nằm trong danh sách thi đấu hợp lệ`;
-    }
-    if (disqualifiedHorseIds.has(horseKey)) {
-      return `Ngựa có ID ${horseKey} đã bị tước quyền, không được xuất hiện trong bảng xếp hạng`;
     }
     if (rankHorseIds.has(horseKey)) {
       return `Trùng lặp kết quả cho ngựa có ID ${horseKey}`;
