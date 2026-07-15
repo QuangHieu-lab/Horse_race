@@ -495,6 +495,40 @@ const swaggerDefinition = {
           isActive: { type: 'boolean', example: true },
         },
       },
+      RefereeCheck: {
+        type: 'object',
+        required: [
+          'raceId', 'raceName', 'horseId', 'horseName', 'horseBreed', 'horseAge',
+          'horseHealthStatus', 'jockeyId', 'jockeyName', 'ownerId', 'ownerName',
+          'vetApproved', 'confirmed',
+        ],
+        properties: {
+          raceId: { type: 'string' },
+          raceName: { type: 'string' },
+          horseId: { type: 'string' },
+          horseName: { type: 'string' },
+          horseRegistrationId: { type: 'string', nullable: true },
+          horseBreed: { type: 'string' },
+          horseSire: { type: 'string', nullable: true },
+          horseDam: { type: 'string', nullable: true },
+          horseTrainerName: { type: 'string', nullable: true },
+          horseAge: { type: 'number' },
+          horseColor: { type: 'string', nullable: true },
+          horseWeight: { type: 'number', nullable: true },
+          horseHealthStatus: { type: 'string', enum: ['fit', 'injured', 'retired'] },
+          horseImageUrl: { type: 'string', nullable: true },
+          horseProfilePdfUrl: { type: 'string', nullable: true },
+          horseProfilePdfName: { type: 'string', nullable: true },
+          jockeyId: { type: 'string' },
+          jockeyName: { type: 'string' },
+          ownerId: { type: 'string' },
+          ownerName: { type: 'string' },
+          laneNumber: { type: 'number', nullable: true },
+          clothNumber: { type: 'number', nullable: true },
+          vetApproved: { type: 'boolean' },
+          confirmed: { type: 'boolean' },
+        },
+      },
       ToggleRaceCheckRequest: {
         type: 'object',
         required: ['horseId', 'field'],
@@ -1323,7 +1357,24 @@ const swaggerDefinition = {
         summary: 'List pre-race checks',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Check list' } },
+        responses: {
+          200: {
+            description: 'Check list with horse and owner details',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    checks: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/RefereeCheck' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       patch: {
         tags: ['Referee'],

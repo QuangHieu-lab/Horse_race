@@ -26,10 +26,24 @@ export interface RefereeCheckDto {
   raceName: string;
   horseId: string;
   horseName: string;
+  horseRegistrationId: string | null;
+  horseBreed: string;
+  horseSire: string | null;
+  horseDam: string | null;
+  horseTrainerName: string | null;
+  horseAge: number;
+  horseColor: string | null;
+  horseWeight: number | null;
+  horseHealthStatus: string;
+  horseImageUrl: string | null;
+  horseProfilePdfUrl: string | null;
+  horseProfilePdfName: string | null;
   jockeyId: string;
   jockeyName: string;
   ownerId: string;
+  ownerName: string;
   laneNumber: number | null;
+  clothNumber: number | null;
   vetApproved: boolean;
   confirmed: boolean;
 }
@@ -221,8 +235,12 @@ export async function listRefereeChecks(refereeId: string, raceId: string): Prom
   }
 
   const race = await Race.findById(raceId)
-    .populate('participants.horseId', 'name')
+    .populate(
+      'participants.horseId',
+      'name registrationId breed sire dam trainerName age color weight healthStatus imageUrl profilePdfUrl profilePdfName',
+    )
     .populate('participants.jockeyId', 'fullName')
+    .populate('participants.ownerId', 'fullName')
     .lean();
 
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
@@ -231,17 +249,47 @@ export async function listRefereeChecks(refereeId: string, raceId: string): Prom
   }
 
   return race.participants.map((p) => {
-    const horse = p.horseId as unknown as { _id: mongoose.Types.ObjectId; name: string };
+    const horse = p.horseId as unknown as {
+      _id: mongoose.Types.ObjectId;
+      name: string;
+      registrationId?: string;
+      breed: string;
+      sire?: string;
+      dam?: string;
+      trainerName?: string;
+      age: number;
+      color?: string;
+      weight?: number;
+      healthStatus: string;
+      imageUrl?: string;
+      profilePdfUrl?: string;
+      profilePdfName?: string;
+    };
     const jockey = p.jockeyId as unknown as { _id: mongoose.Types.ObjectId; fullName: string };
+    const owner = p.ownerId as unknown as { _id: mongoose.Types.ObjectId; fullName: string };
     return {
       raceId: race._id.toString(),
       raceName: race.name,
       horseId: horse._id.toString(),
       horseName: horse.name,
+      horseRegistrationId: horse.registrationId ?? null,
+      horseBreed: horse.breed,
+      horseSire: horse.sire ?? null,
+      horseDam: horse.dam ?? null,
+      horseTrainerName: horse.trainerName ?? null,
+      horseAge: horse.age,
+      horseColor: horse.color ?? null,
+      horseWeight: horse.weight ?? null,
+      horseHealthStatus: horse.healthStatus,
+      horseImageUrl: horse.imageUrl ?? null,
+      horseProfilePdfUrl: horse.profilePdfUrl ?? null,
+      horseProfilePdfName: horse.profilePdfName ?? null,
       jockeyId: jockey._id.toString(),
       jockeyName: jockey.fullName,
-      ownerId: p.ownerId.toString(),
+      ownerId: owner._id.toString(),
+      ownerName: owner.fullName,
       laneNumber: p.laneNumber ?? null,
+      clothNumber: p.clothNumber ?? null,
       vetApproved: !!p.vetApprovedAt,
       confirmed: !!p.confirmedAt,
     };
