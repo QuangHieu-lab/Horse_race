@@ -1,8 +1,8 @@
 import type { IParticipant } from '../models/Race.model.js';
 
-/** Ngựa/kỵ sĩ còn thi đấu (chưa scratch). */
+/** Ngựa/kỵ sĩ còn thi đấu (chưa scratch và chưa bị DQ). */
 export function activeParticipants(participants: IParticipant[]): IParticipant[] {
-  return participants.filter((p) => !p.scratchedAt);
+  return participants.filter((p) => !p.scratchedAt && !p.isDisqualified);
 }
 
 export function validateParticipants(

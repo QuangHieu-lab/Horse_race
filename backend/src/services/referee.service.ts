@@ -107,11 +107,7 @@ function applyDisqualificationToRankings(
   const index = result.rankings.findIndex((r) => r.horseId.toString() === disqualifiedHorseId.toString());
   if (index === -1) return;
 
-  const [disqualified] = result.rankings.splice(index, 1);
-  if (!disqualified) return;
-
-  disqualified.prize = 0;
-  result.rankings.push(disqualified);
+  result.rankings.splice(index, 1);
   refreshRankingOrder(result);
 }
 
@@ -457,6 +453,21 @@ export async function buildResultFromRace(raceId: string, refereeId: string) {
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
   if (race.refereeId?.toString() !== refereeId) {
     throw new HttpError(403, 'Bạn không phải trọng tài cuộc đua này');
+  }
+
+  const existing = await Result.findOne({ raceId: race._id }).select('rankings publishedAt').lean();
+  if (existing?.publishedAt) {
+    throw new HttpError(409, 'Kết quả đã công bố, không thể sửa');
+  }
+  if (existing?.rankings?.length) {
+    return existing.rankings.map((r) => ({
+      rank: r.rank,
+      horseId: r.horseId.toString(),
+      jockeyId: r.jockeyId.toString(),
+      ownerId: r.ownerId.toString(),
+      finishTime: r.finishTime,
+      prize: r.prize ?? 0,
+    }));
   }
 
   const active = activeParticipants(race.participants);

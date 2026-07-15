@@ -55,16 +55,25 @@ export async function upsertRaceResult(
     throw new HttpError(409, 'Chỉ ghi kết quả khi cuộc đua đang diễn ra hoặc đã kết thúc');
   }
 
-  const rankings: IRanking[] = input.rankings.map((r) => ({
-    rank: r.rank,
-    horseId: new mongoose.Types.ObjectId(r.horseId),
-    jockeyId: new mongoose.Types.ObjectId(r.jockeyId),
-    ownerId: new mongoose.Types.ObjectId(r.ownerId),
-    finishTime: r.finishTime,
-    prize: r.prize ?? 0,
-  }));
-
   let result = await Result.findOne({ raceId: race._id });
+  const previousByHorseId = new Map(
+    (result?.rankings ?? []).map((r) => [r.horseId.toString(), r]),
+  );
+
+  const rankings: IRanking[] = input.rankings.map((r) => {
+    const previous = previousByHorseId.get(r.horseId);
+    return {
+      rank: r.rank,
+      horseId: new mongoose.Types.ObjectId(r.horseId),
+      jockeyId: new mongoose.Types.ObjectId(r.jockeyId),
+      ownerId: new mongoose.Types.ObjectId(r.ownerId),
+      finishTime: r.finishTime ?? previous?.finishTime,
+      marginBehind: previous?.marginBehind,
+      isDeadHeat: previous?.isDeadHeat,
+      prize: r.prize ?? previous?.prize ?? 0,
+    };
+  });
+
   if (result) {
     if (result.publishedAt) throw new HttpError(409, 'Kết quả đã công bố, không thể sửa');
     result.rankings = rankings;

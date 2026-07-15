@@ -7,7 +7,7 @@ export function validateRankings(
   participants: IParticipant[],
   disqualifiedHorseIds: Set<string>,
 ): string | null {
-  const eligible = participants.filter((p) => !p.scratchedAt || p.isDisqualified);
+  const eligible = participants.filter((p) => !p.scratchedAt && !p.isDisqualified);
 
   if (rankings.length === 0) return null;
   if (rankings.length > eligible.length) {
