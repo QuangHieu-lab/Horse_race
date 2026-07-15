@@ -433,6 +433,31 @@ const swaggerDefinition = {
           result: { type: 'object', nullable: true },
         },
       },
+      HorseLeaderboardItemDto: {
+        type: 'object',
+        description:
+          'Horse leaderboard item for spectator/mobile. Counts only published race results and excludes disqualified horses.',
+        properties: {
+          rank: { type: 'integer', example: 1 },
+          horseId: { type: 'string' },
+          horseName: { type: 'string', example: 'Sóng Gió' },
+          ownerId: { type: 'string', nullable: true },
+          ownerName: { type: 'string', nullable: true, example: 'Owner Demo' },
+          firstPlaceWins: {
+            type: 'integer',
+            example: 2,
+            description: 'Number of published races where this horse finished rank 1 and was not disqualified.',
+          },
+          totalPublishedRaces: {
+            type: 'integer',
+            example: 3,
+            description: 'Number of published race results where this horse appeared and was not disqualified.',
+          },
+          winRate: { type: 'number', example: 66.67 },
+          latestWinAt: { type: 'string', format: 'date-time', nullable: true },
+          latestRaceName: { type: 'string', nullable: true, example: 'Leaderboard Demo — Sprint 2' },
+        },
+      },
       CreateRaceRequest: {
         type: 'object',
         required: ['tournamentId', 'name', 'round', 'scheduledAt', 'maxParticipants'],
@@ -1517,6 +1542,60 @@ const swaggerDefinition = {
                             saleExpiresAt: null,
                             allowVipRedemption: false,
                           },
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/spectator/leaderboard/horses': {
+      get: {
+        tags: ['Spectator'],
+        summary: 'List top horses by first-place wins',
+        description:
+          'Golden mobile leaderboard endpoint. It ranks horses by how many published races they won. Disqualified horses are excluded from both wins and total published race count.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'limit',
+            in: 'query',
+            schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Horse leaderboard',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    items: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/HorseLeaderboardItemDto' },
+                    },
+                  },
+                },
+                examples: {
+                  seededLeaderboard: {
+                    value: {
+                      items: [
+                        {
+                          rank: 1,
+                          horseId: '665f1e000000000000000001',
+                          horseName: 'Sóng Gió',
+                          ownerId: '665f1e000000000000000101',
+                          ownerName: 'Owner Demo',
+                          firstPlaceWins: 2,
+                          totalPublishedRaces: 2,
+                          winRate: 100,
+                          latestWinAt: '2026-07-14T10:00:00.000Z',
+                          latestRaceName: 'Leaderboard Demo — Sprint 2',
                         },
                       ],
                     },

@@ -8,6 +8,8 @@ spectatorRouter.get('/tournaments', spectatorController.listTournaments);
 
 spectatorRouter.get('/races', spectatorController.listRaces);
 
+spectatorRouter.get('/leaderboard/horses', spectatorController.listHorseLeaderboard);
+
 spectatorRouter.get('/races/:id', spectatorController.getRaceById);
 
 spectatorRouter.get('/races/:id/simulation', spectatorController.getRaceSimulation);

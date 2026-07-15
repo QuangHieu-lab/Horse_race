@@ -24,6 +24,15 @@ export class SpectatorController {
     res.json({ races });
   });
 
+  listHorseLeaderboard = asyncHandler(async (req: Request, res: Response) => {
+    const limit = req.query.limit === undefined ? 10 : Number(req.query.limit);
+    if (!Number.isFinite(limit) || limit < 1) {
+      throw new HttpError(400, 'limit không hợp lệ');
+    }
+    const items = await spectatorService.listHorseLeaderboard(limit);
+    res.json({ items });
+  });
+
   getRaceById = asyncHandler(async (req: Request, res: Response) => {
     const race = await spectatorService.getSpectatorRace(req.user!.id, req.params.id as string);
     res.json({ race });
