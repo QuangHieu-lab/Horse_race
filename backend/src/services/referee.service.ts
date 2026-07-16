@@ -582,7 +582,7 @@ export async function applyRacePenalty(
     throw mapResultSaveError(err);
   }
 
-  const isBannedPenalty = isDoping || ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
+  const isBannedPenalty = isDQ || ['time_ban', 'permanent_ban'].includes(rule.penaltyApplied);
 
   if (isBannedPenalty) {
     const latestViolationId = savedResult.violations[savedResult.violations.length - 1]?._id;
@@ -717,7 +717,7 @@ export async function revokeRacePenalty(
     }
   }
 
-  const isBannedPenalty = isDoping || ['time_ban', 'permanent_ban'].includes(violation.penaltyApplied || '');
+  const isBannedPenalty = isDQ || ['time_ban', 'permanent_ban'].includes(violation.penaltyApplied || '');
   if (isBannedPenalty) {
     const resetStatus = {
       isBanned: false,
