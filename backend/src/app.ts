@@ -20,6 +20,7 @@ import { adminTrackRouter } from './routes/admin-track.routes.js';
 import { adminViolationRuleRouter } from './routes/admin-violation-rule.routes.js';
 import { paymentRouter } from './routes/payment.routes.js';
 import { leaderboardRouter } from './routes/leaderboard.routes.js';
+import { pointsRouter } from './routes/points.routes.js';
 export function createApp() {
   const app = express();
   const corsOptions = buildCorsOptions();
@@ -40,6 +41,7 @@ export function createApp() {
 
   app.use('/api/payments', paymentRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/points', authenticate, pointsRouter);
   app.use('/api/jockey', authenticate, requireRole('jockey'), jockeyRouter);
   app.use('/api/spectator', authenticate, requireRole('spectator'), spectatorRouter);
   app.use('/api/tournaments', authenticate, requireRole('admin'), tournamentRouter);

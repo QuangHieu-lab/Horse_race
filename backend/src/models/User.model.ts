@@ -105,7 +105,7 @@ UserSchema.index({ role: 1, isActive: 1 });
 UserSchema.index({ 'jockeyProfile.licenseNumber': 1 }, { sparse: true });
 
 UserSchema.post('save', async function (doc) {
-  if (doc.role !== 'spectator') return;
+  if (doc.role === 'admin') return;
   await SpectatorProfile.findOneAndUpdate(
     { userId: doc._id },
     { $setOnInsert: { userId: doc._id } },

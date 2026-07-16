@@ -686,6 +686,7 @@ const swaggerDefinition = {
     { name: 'Jockey' },
     { name: 'Referee' },
     { name: 'Spectator' },
+    { name: 'Points' },
   ],
   paths: {
     '/api/health': {
@@ -1814,6 +1815,31 @@ const swaggerDefinition = {
               },
             },
           },
+        },
+      },
+    },
+    '/api/points/me': {
+      get: {
+        tags: ['Points'],
+        summary: 'Get my point wallet',
+        description:
+          'Returns the authenticated user point wallet for every non-admin role. Spectators use this wallet for top-up and betting; horse owners and jockeys receive race prize points here. Admin uses OrganizerLedger instead of a point wallet.',
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Point wallet',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    points: { $ref: '#/components/schemas/SpectatorPointsDto' },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Admin does not have a point wallet' },
         },
       },
     },

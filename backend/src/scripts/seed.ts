@@ -200,15 +200,26 @@ async function seed(): Promise<void> {
   const spectator2 = users[7]!;
   const spectator3 = users[8]!;
 
-  console.log('Setting spectator points…');
-  const spectatorProfile =
-    (await SpectatorProfile.findOne({ userId: spectator._id })) ??
-    (await SpectatorProfile.create({ userId: spectator._id }));
-  spectatorProfile.currentBalance = 0;
-  spectatorProfile.totalPointsEarned = 0;
-  spectatorProfile.totalPointsSpent = 0;
-  spectatorProfile.transactions = [];
-  await spectatorProfile.save();
+  console.log('Setting point wallets…');
+  async function resetPointWallet(userId: mongoose.Types.ObjectId) {
+    const profile =
+      (await SpectatorProfile.findOne({ userId })) ??
+      (await SpectatorProfile.create({ userId }));
+    profile.currentBalance = 0;
+    profile.totalPointsEarned = 0;
+    profile.totalPointsSpent = 0;
+    profile.transactions = [];
+    await profile.save();
+    return profile;
+  }
+
+  await resetPointWallet(owner._id);
+  await resetPointWallet(jockey1._id);
+  await resetPointWallet(jockey2._id);
+  await resetPointWallet(jockey3._id);
+  await resetPointWallet(referee._id);
+
+  const spectatorProfile = await resetPointWallet(spectator._id);
   await spectatorProfile.addPoints(
     250_000,
     'topup',
@@ -216,14 +227,7 @@ async function seed(): Promise<void> {
     undefined,
     'Seed demo top-up: 250,000 points',
   );
-  const spectator2Profile =
-    (await SpectatorProfile.findOne({ userId: spectator2._id })) ??
-    (await SpectatorProfile.create({ userId: spectator2._id }));
-  spectator2Profile.currentBalance = 0;
-  spectator2Profile.totalPointsEarned = 0;
-  spectator2Profile.totalPointsSpent = 0;
-  spectator2Profile.transactions = [];
-  await spectator2Profile.save();
+  const spectator2Profile = await resetPointWallet(spectator2._id);
   await spectator2Profile.addPoints(
     250_000,
     'topup',
@@ -238,14 +242,7 @@ async function seed(): Promise<void> {
     undefined,
     'Seed demo spend: viewing ticket',
   );
-  const spectator3Profile =
-    (await SpectatorProfile.findOne({ userId: spectator3._id })) ??
-    (await SpectatorProfile.create({ userId: spectator3._id }));
-  spectator3Profile.currentBalance = 0;
-  spectator3Profile.totalPointsEarned = 0;
-  spectator3Profile.totalPointsSpent = 0;
-  spectator3Profile.transactions = [];
-  await spectator3Profile.save();
+  const spectator3Profile = await resetPointWallet(spectator3._id);
   await spectator3Profile.addPoints(
     300_000,
     'topup',
