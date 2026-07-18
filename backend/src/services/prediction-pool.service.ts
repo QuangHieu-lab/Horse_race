@@ -14,9 +14,15 @@ const DEFAULT_TICKET_PRICE = MIN_ENTRY_POINTS;
 const ORGANIZER_FEE_RATE = 10;
 const RACING_REWARD_RATE = 15;
 const SPECTATOR_REWARD_RATE = 75;
+const NO_WINNER_ORGANIZER_RATE = 40;
+const NO_WINNER_RACING_REWARD_RATE = 60;
 const OWNER_SHARE_RATE = 80;
 const JOCKEY_SHARE_RATE = 20;
 const RANK_REWARD_RATE_PRESETS: Record<number, number[]> = {
+  1: [100],
+  2: [70, 30],
+  3: [50, 30, 20],
+  4: [50, 25, 15, 10],
   5: [50, 25, 15, 7, 3],
   6: [45, 23, 15, 8, 6, 3],
   7: [40, 22, 15, 10, 6, 4, 3],
@@ -52,7 +58,7 @@ function resolveRankRewardRates(participantCount: number, configuredRates?: numb
     return configuredRates;
   }
 
-  const cappedCount = Math.min(13, Math.max(5, participantCount));
+  const cappedCount = Math.min(13, Math.max(1, participantCount));
   const preset = RANK_REWARD_RATE_PRESETS[cappedCount] ?? RANK_REWARD_RATE_PRESETS[5]!;
   if (participantCount <= 13) return preset.slice(0, participantCount);
   return [...preset, ...Array(participantCount - 13).fill(0)];
@@ -83,6 +89,33 @@ async function awardPoolPoints(
 ): Promise<void> {
   if (points <= 0) return;
   const profile = await getOrCreateProfile(userId);
+  const alreadyAwarded = profile.transactions.some(
+    (transaction) =>
+      transaction.type === 'earned_pool_share' &&
+      transaction.refModel === 'PredictionPool' &&
+      transaction.refId?.toString() === poolId.toString() &&
+      transaction.note === note,
+  );
+  if (alreadyAwarded) return;
+  await profile.addPoints(points, 'earned_pool_share', 'PredictionPool', poolId, note);
+}
+
+async function awardSpectatorPoolPoints(
+  userId: mongoose.Types.ObjectId,
+  points: number,
+  note: string,
+  poolId: mongoose.Types.ObjectId,
+): Promise<void> {
+  if (points <= 0) return;
+  const profile = await getOrCreateProfile(userId);
+  const alreadyAwarded = profile.transactions.some(
+    (transaction) =>
+      transaction.type === 'earned_pool_share' &&
+      transaction.refModel === 'PredictionPool' &&
+      transaction.refId?.toString() === poolId.toString() &&
+      transaction.note === note,
+  );
+  if (alreadyAwarded) return;
   await profile.addPoints(points, 'earned_pool_share', 'PredictionPool', poolId, note);
 }
 
@@ -273,17 +306,10 @@ export async function settlePredictionPoolFromResult(
   pool.totalWinnerScore = totalWinnerScore;
 
   if (totalWinnerScore === 0) {
-    // Không ai đủ điều kiện nhận PrizePool. Chính sách xử lý phần dư nằm ở rolloverPolicy.
-    pool.jackpotAmount = pool.spectatorRewardPool;
-    if (tournament?.predictionConfig.rolloverPolicy === 'refund') {
-      pool.jackpotAmount = 0;
-    } else if (tournament?.predictionConfig.rolloverPolicy === 'to_organizer') {
-      pool.organizerFee += pool.spectatorRewardPool;
-      pool.jackpotAmount = 0;
-      pool.spectatorRewardPool = 0;
-    } else {
-      pool.spectatorRewardPool = 0;
-    }
+    pool.racingRewardPool = pct(winPool, NO_WINNER_RACING_REWARD_RATE);
+    pool.organizerFee = winPool - pool.racingRewardPool;
+    pool.spectatorRewardPool = 0;
+    pool.jackpotAmount = 0;
   }
 
   // Chia PrizePool theo tỷ lệ predictionScore. Phần dư do làm tròn (floor) được
@@ -329,25 +355,34 @@ export async function settlePredictionPoolFromResult(
     await prediction.save();
 
     if (totalReturned > 0) {
-      const profile = await getOrCreateProfile(prediction.spectatorId);
-      await profile.addPoints(
-        totalReturned,
-        'earned_pool_share',
-        'PredictionPool',
-        pool._id,
+      const note =
         noWinnerRefund > 0
           ? `Hoàn điểm do bounty pool cuộc đua ${race.name} không có người thắng`
-          : `Hoàn điểm dự đoán đúng và chia thưởng bounty pool cuộc đua ${race.name}`,
+          : `Hoàn điểm dự đoán đúng và chia thưởng bounty pool cuộc đua ${race.name}`;
+      await awardSpectatorPoolPoints(
+        prediction.spectatorId,
+        totalReturned,
+        note,
+        pool._id,
       );
 
-      await Notification.create({
+      const existingNotification = await Notification.findOne({
         userId: prediction.spectatorId,
         type: 'prediction_reward',
-        title: 'Thưởng bounty pool',
-        message: `Bạn nhận ${totalReturned} điểm từ dự đoán đúng cuộc đua ${race.name}.`,
         refModel: 'PredictionPool',
         refId: pool._id,
+        message: `Bạn nhận ${totalReturned} điểm từ dự đoán đúng cuộc đua ${race.name}.`,
       });
+      if (!existingNotification) {
+        await Notification.create({
+          userId: prediction.spectatorId,
+          type: 'prediction_reward',
+          title: 'Thưởng bounty pool',
+          message: `Bạn nhận ${totalReturned} điểm từ dự đoán đúng cuộc đua ${race.name}.`,
+          refModel: 'PredictionPool',
+          refId: pool._id,
+        });
+      }
     }
   }
 
@@ -398,36 +433,64 @@ export async function settlePredictionPoolFromResult(
         pool._id,
       );
 
-      await Notification.create([
-        {
+      const ownerMessage = `Owner nhận ${ownerReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`;
+      const jockeyMessage = `Jockey nhận ${jockeyReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`;
+      const existingOwnerNotification = await Notification.findOne({
+        userId: ranking.ownerId,
+        type: 'prediction_reward',
+        refModel: 'PredictionPool',
+        refId: pool._id,
+        message: ownerMessage,
+      });
+      const existingJockeyNotification = await Notification.findOne({
+        userId: ranking.jockeyId,
+        type: 'prediction_reward',
+        refModel: 'PredictionPool',
+        refId: pool._id,
+        message: jockeyMessage,
+      });
+      const notifications = [];
+      if (!existingOwnerNotification) {
+        notifications.push({
           userId: ranking.ownerId,
           type: 'prediction_reward',
           title: 'Thưởng owner từ bounty pool',
-          message: `Owner nhận ${ownerReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
+          message: ownerMessage,
           refModel: 'PredictionPool',
           refId: pool._id,
-        },
-        {
+        });
+      }
+      if (!existingJockeyNotification) {
+        notifications.push({
           userId: ranking.jockeyId,
           type: 'prediction_reward',
           title: 'Thưởng jockey từ bounty pool',
-          message: `Jockey nhận ${jockeyReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`,
+          message: jockeyMessage,
           refModel: 'PredictionPool',
           refId: pool._id,
-        },
-      ]);
+        });
+      }
+      if (notifications.length > 0) await Notification.create(notifications);
     }
   }
 
   if (pool.organizerFee > 0) {
-    await OrganizerLedger.create({
-      tournamentId: result.tournamentId,
-      raceId: result.raceId,
-      predictionPoolId: pool._id,
-      feeAmount: pool.organizerFee,
-      note: `Organizer fee 10% từ bounty pool cuộc đua ${race.name}`,
-      recordedBy: result.publishedBy ?? predictions[0]!.spectatorId,
-    });
+    const organizerRate = totalWinnerScore === 0 ? NO_WINNER_ORGANIZER_RATE : pool.organizerFeeRate;
+    const organizerNote = `Organizer fee ${organizerRate}% từ bounty pool cuộc đua ${race.name}`;
+    await OrganizerLedger.findOneAndUpdate(
+      { predictionPoolId: pool._id },
+      {
+        $setOnInsert: {
+          tournamentId: result.tournamentId,
+          raceId: result.raceId,
+          predictionPoolId: pool._id,
+          feeAmount: pool.organizerFee,
+          note: organizerNote,
+          recordedBy: result.publishedBy ?? predictions[0]!.spectatorId,
+        },
+      },
+      { upsert: true },
+    );
   }
 
   pool.status = 'settled';

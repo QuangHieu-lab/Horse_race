@@ -833,7 +833,7 @@ async function seed(): Promise<void> {
    * - spectator3@demo.local: correct winner, 2 tickets, contribution 100,000.
    *
    * Publishing the result lets you test ticket-based pool sharing:
-   * predictionScore = contribution = entryFee * ticketCount.
+   * predictionScore = ticketCount; contribution = entryFee * ticketCount.
    */
 
   // --- Scenario C2: Published results for spectator horse leaderboard ---

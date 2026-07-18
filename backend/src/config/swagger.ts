@@ -172,15 +172,15 @@ const swaggerDefinition = {
           },
           organizerFee: {
             type: 'string',
-            example: 'winPool * 10%',
+            example: 'winPool * 10% when there is a qualified winner; winPool * 40% when no prediction qualifies',
           },
           racingRewardPool: {
             type: 'string',
-            example: 'winPool * 15%',
+            example: 'winPool * 15% when there is a qualified winner; winPool * 60% when no prediction qualifies',
           },
           spectatorRewardPool: {
             type: 'string',
-            example: 'winPool * 75%',
+            example: 'winPool * 75% when there is a qualified winner; 0 when no prediction qualifies',
           },
           ownerReward: {
             type: 'string',
@@ -192,7 +192,7 @@ const swaggerDefinition = {
           },
           rankRewardRates: {
             type: 'string',
-            example: 'RacingRewardPool is split by rank presets for 5-13 horses; same-rank dead heats split that rank share equally.',
+            example: 'RacingRewardPool is split by rank presets for 1-13 horses; demo races with fewer than 5 horses still distribute 100%, and standard races use the 5-13 horse presets. Same-rank dead heats split that rank share equally.',
           },
           fixedPrizePool: {
             type: 'string',
@@ -212,7 +212,7 @@ const swaggerDefinition = {
           noWinnerPolicy: {
             type: 'string',
             example:
-              'If totalWinnerScore is 0, rolloverPolicy controls the spectator reward pool: refund, rollover_next_race, or to_organizer.',
+              'If totalWinnerScore is 0, spectators do not receive pool rewards. The full losing pool is split as 40% OrganizerLedger and 60% RacingRewardPool, then RacingRewardPool is split by rankRewardRates and ownerShareRate/jockeyShareRate.',
           },
         },
       },
@@ -871,7 +871,7 @@ const swaggerDefinition = {
         tags: ['Admin'],
         summary: 'Publish a race result and settle prizes',
         description:
-          'Publishes confirmed race results and settles the point betting pool plus fixed race prizes. Correct spectators receive returned contribution plus spectator pool share; owner and jockey rewards are added to their point ledgers from both the bounty racing reward pool and each ranking.prize using ownerShareRate/jockeyShareRate; organizer fee is recorded in OrganizerLedger. If no prediction qualifies, rolloverPolicy controls refund, jackpot rollover, or transfer to organizer.',
+          'Publishes confirmed race results and settles the point betting pool plus fixed race prizes. If at least one prediction qualifies, correct spectators receive returned contribution plus spectator pool share while the losing pool is split by organizerFeeRate/racingRewardRate/spectatorRewardRate. If no prediction qualifies, spectators receive no pool reward and the losing pool is split 40% to OrganizerLedger and 60% to RacingRewardPool. Owner and jockey rewards are added to their point ledgers from both the bounty racing reward pool and each ranking.prize using ownerShareRate/jockeyShareRate. Organizer fee is recorded in OrganizerLedger.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: {
