@@ -75,16 +75,6 @@ export const VIOLATION_RULES: ViolationRuleSeed[] = [
     banDurationDays: 0,
   },
   {
-    code: 'JCK-06',
-    name: 'Xuất phát sớm (False start)',
-    description: 'Nài thúc ngựa vượt cổng trước hiệu lệnh xuất phát — cảnh cáo.',
-    category: 'race_conduct',
-    severity: 'low',
-    appliesTo: 'jockey',
-    penaltyApplied: 'warning',
-    banDurationDays: 0,
-  },
-  {
     code: 'JCK-07',
     name: 'Hành vi phản thể thao nghiêm trọng (Serious misconduct)',
     description: 'Cố ý gian lận, thông đồng dàn xếp hoặc hành vi phi thể thao nghiêm trọng — cấm thi đấu 14 ngày.',

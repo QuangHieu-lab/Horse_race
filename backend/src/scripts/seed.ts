@@ -344,54 +344,15 @@ async function seed(): Promise<void> {
   const horseD = horses[3]!;
 
   console.log('Creating Violation Rules…');
-  const rules = await ViolationRule.create([
-    {
-      code: 'ERR-001',
-      name: 'Xuất phát sớm (False Start)',
-      description: 'Ngựa hoặc kỵ sĩ vượt rào trước hiệu lệnh bắt đầu.',
-      category: 'race_conduct',
-      severity: 'high',
-      penaltyApplied: 'disqualify',
-      banDurationDays: 0,
+  const rules = await ViolationRule.create(
+    VIOLATION_RULES.map((rule) => ({
+      ...rule,
       isActive: true,
       createdBy: admin._id,
-    },
-    {
-      code: 'ERR-002',
-      name: 'Chèn ép làn đối thủ (Obstruction)',
-      description: 'Kỵ sĩ điều khiển ngựa tạt đầu, chèn ép sai luật gây nguy hiểm.',
-      category: 'race_conduct',
-      severity: 'high',
-      penaltyApplied: 'demote',
-      banDurationDays: 0,
-      isActive: true,
-      createdBy: admin._id,
-    },
-    {
-      code: 'ERR-003',
-      name: 'Sử dụng roi quá mức',
-      description: 'Kỵ sĩ quất roi vượt quá số lần quy định ở đoạn nước rút.',
-      category: 'equipment',
-      severity: 'medium',
-      penaltyApplied: 'warning',
-      banDurationDays: 0,
-      isActive: true,
-      createdBy: admin._id,
-    },
-    {
-      code: 'ERR-004',
-      name: 'Su dung doping',
-      description: 'Ngua co ket qua kiem tra doping duong tinh, huy ket qua va cam thi dau cac ben lien quan.',
-      category: 'medical',
-      severity: 'critical',
-      penaltyApplied: 'disqualification',
-      banDurationDays: 365,
-      isActive: true,
-      createdBy: admin._id,
-    }
-  ]);
-  const ruleFalseStart = rules[0]!;
-  const ruleObstruction = rules[1]!;
+    })),
+  );
+  const ruleObstruction = rules.find((rule) => rule.code === 'JCK-01')!;
+  const ruleDangerousRiding = rules.find((rule) => rule.code === 'JCK-02')!;
 
   console.log('Creating tracks & tournaments…');
   const track = await Track.create({
@@ -1169,9 +1130,9 @@ async function seed(): Promise<void> {
   console.log(JSON.stringify({
     horseId: horseC._id.toString(),
     jockeyId: jockey1._id.toString(),
-    ruleId: ruleFalseStart._id.toString(),
+    ruleId: ruleDangerousRiding._id.toString(),
     target: "jockey",
-    notes: "Nài ngựa C xuất phát sớm theo lỗi JCK-06."
+    notes: "Nài ngựa C lái ẩu gây va chạm nguy hiểm theo lỗi JCK-02."
   }, null, 2));
 
   console.log('\n======================================================');
