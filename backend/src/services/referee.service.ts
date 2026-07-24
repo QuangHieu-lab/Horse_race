@@ -6,7 +6,7 @@ import { User } from '../models/User.model.js';
 import { Notification } from '../models/Notification.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
-import { activeParticipants, randomizeActiveParticipantLanes } from '../utils/race-participants.js';
+import { activeParticipants, randomizeActiveParticipantLanes, validatePreRaceChecks } from '../utils/race-participants.js';
 import type { RaceSimTimeline } from './race-simulation.service.js';
 
 export interface RefereeRaceDto {
@@ -307,9 +307,15 @@ export async function toggleParticipantCheck(
   if (race.refereeId?.toString() !== refereeId) {
     throw new HttpError(403, 'Bạn không phải trọng tài cuộc đua này');
   }
+  if (race.status !== 'scheduled') {
+    throw new HttpError(409, 'Chỉ có thể cập nhật kiểm tra trước khi cuộc đua bắt đầu');
+  }
 
   const participant = race.participants.find((p) => p.horseId.toString() === horseId);
   if (!participant) throw new HttpError(404, 'Không tìm thấy ngựa trong cuộc đua');
+  if (participant.scratchedAt || participant.isDisqualified) {
+    throw new HttpError(409, 'Không thể cập nhật kiểm tra cho participant đã rút khỏi hoặc bị truất quyền thi đấu');
+  }
 
   if (field === 'vetApprovedAt') {
     participant.vetApprovedAt = participant.vetApprovedAt ? null : new Date();
@@ -321,7 +327,7 @@ export async function toggleParticipantCheck(
 }
 
 // 🚀 Chuyển từ race.service sang
-export async function simulateRace(raceId: string) {
+export async function simulateRace(refereeId: string, raceId: string) {
   if (!mongoose.isValidObjectId(raceId)) {
     throw new HttpError(400, 'ID trận đua không hợp lệ');
   }
@@ -329,6 +335,9 @@ export async function simulateRace(raceId: string) {
   const race = await Race.findById(raceId);
   if (!race) {
     throw new HttpError(404, 'Không tìm thấy trận đua để giả lập');
+  }
+  if (race.refereeId?.toString() !== refereeId) {
+    throw new HttpError(403, 'Bạn không phải trọng tài cuộc đua này');
   }
 
   if (race.status === 'completed' || race.status === 'cancelled') {
@@ -338,6 +347,10 @@ export async function simulateRace(raceId: string) {
   if (race.status !== 'ready') {
     throw new HttpError(409, 'Can boc tham lan va bat dau cuoc dua truoc khi chay mo phong');
   }
+
+  const checkErr = validatePreRaceChecks(race.participants);
+  if (checkErr) throw new HttpError(409, checkErr);
+
   race.status = 'ongoing';
   await race.save();
 
@@ -797,6 +810,9 @@ export async function startRefereeRace(refereeId: string, raceId: string): Promi
   if (activeParticipants(race.participants).length < 2) {
     throw new HttpError(409, 'Cần ít nhất 2 ngựa trong đường đua để bắt đầu cuộc đua');
   }
+  const checkErr = validatePreRaceChecks(race.participants);
+  if (checkErr) throw new HttpError(409, checkErr);
+
   race.participants = randomizeActiveParticipantLanes(race.participants);
   race.status = 'ready';
   await race.save(); // model yêu cầu ≥2 ngựa đang thi đấu

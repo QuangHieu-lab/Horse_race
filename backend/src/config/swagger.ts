@@ -557,6 +557,8 @@ const swaggerDefinition = {
       ToggleRaceCheckRequest: {
         type: 'object',
         required: ['horseId', 'field'],
+        description:
+          'Referee pre-race gate. Every active participant must have both vetApprovedAt and confirmedAt before /api/referee/races/{id}/start or /start-simulation can proceed.',
         properties: {
           horseId: { type: 'string' },
           field: { type: 'string', enum: ['vetApprovedAt', 'confirmedAt'] },
@@ -787,6 +789,20 @@ const swaggerDefinition = {
           200: { description: 'Updated user account' },
           400: { description: 'Invalid update' },
           404: { description: 'User not found' },
+        },
+      },
+      delete: {
+        tags: ['Admin'],
+        summary: 'Delete an unused non-admin user account',
+        description:
+          'Safe delete. Only removes non-admin accounts that have no linked horses, race registrations, invitations, race assignments, results, payments, point ledger entries, or notifications. Use deactivate instead for accounts with history.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          204: { description: 'Deleted user account' },
+          400: { description: 'Cannot delete self or admin account' },
+          404: { description: 'User not found' },
+          409: { description: 'User has linked business data; deactivate instead' },
         },
       },
     },
@@ -1360,12 +1376,29 @@ const swaggerDefinition = {
       post: {
         tags: ['Referee'],
         summary: 'Simulate a race and create a draft result',
-        description: 'Generates randomized finish times for active participants, stores a draft result, and marks the race completed for referee review.',
+        description:
+          'Assigned referee only. Requires the race to be ready and every active participant to have passed the veterinary check and race-information confirmation. Generates randomized finish times, stores a draft result, and keeps the race live until the referee finishes it.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
         responses: {
           200: { description: 'Draft result generated' },
-          409: { description: 'Race is completed/cancelled or has fewer than two active participants' },
+          403: { description: 'The referee is not assigned to this race' },
+          409: { description: 'Race is not ready, has fewer than two active participants, or has missing pre-race checks' },
+        },
+      },
+    },
+    '/api/referee/races/{id}/start': {
+      post: {
+        tags: ['Referee'],
+        summary: 'Start referee race control and assign lanes',
+        description:
+          'Assigned referee only. Moves a scheduled race to ready after lane draw. Requires at least two active participants and requires every active participant to have both vetApprovedAt and confirmedAt.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
+        responses: {
+          200: { description: 'Race moved to ready' },
+          403: { description: 'The referee is not assigned to this race' },
+          409: { description: 'Race is not scheduled, has fewer than two active participants, or has missing pre-race checks' },
         },
       },
     },
@@ -1405,6 +1438,8 @@ const swaggerDefinition = {
       patch: {
         tags: ['Referee'],
         summary: 'Toggle a pre-race check',
+        description:
+          'Toggles either veterinary approval or race-information confirmation for one active participant. Both checks are required before a race can be started.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
@@ -1413,20 +1448,28 @@ const swaggerDefinition = {
             'application/json': { schema: { $ref: '#/components/schemas/ToggleRaceCheckRequest' } },
           },
         },
-        responses: { 200: { description: 'Updated check' } },
+        responses: {
+          200: { description: 'Updated check' },
+          409: { description: 'Race already started, participant scratched/disqualified, or check update is no longer allowed' },
+        },
       },
     },
     '/api/races/{id}/participants': {
       post: {
         tags: ['Races'],
-        summary: 'Add a participant to the race (barrier is assigned randomly)',
+        summary: 'Add an approved participant to the race',
+        description:
+          'Admin/BTC operation. The horse must already have an approved race registration, and the jockey must be attached through the approved registration or an accepted jockey invitation. Lane draw is handled later by the assigned referee.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
           required: true,
           content: { 'application/json': { schema: { $ref: '#/components/schemas/AddParticipantRequest' } } }
         },
-        responses: { 201: { description: 'Added participant' } },
+        responses: {
+          200: { description: 'Added participant' },
+          409: { description: 'Missing approved registration, confirmed jockey, or participant capacity/rule violation' },
+        },
       },
     },
     

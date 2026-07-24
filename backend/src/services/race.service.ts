@@ -184,6 +184,28 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
     throw new HttpError(409, 'Không thể thêm participant vào trận đua đã kết thúc hoặc hủy');
   }
 
+  const registration = await RaceRegistration.findOne({
+    raceId: race._id,
+    horseId: horse._id,
+    ownerId: new mongoose.Types.ObjectId(payload.ownerId),
+    status: 'approved',
+  }).lean();
+  if (!registration) {
+    throw new HttpError(409, 'Ngựa phải có đơn đăng ký đã được duyệt trước khi xếp vào cuộc đua');
+  }
+
+  const acceptedInvitation = await JockeyInvitation.findOne({
+    raceId: race._id,
+    horseId: horse._id,
+    horseOwnerId: new mongoose.Types.ObjectId(payload.ownerId),
+    jockeyId: new mongoose.Types.ObjectId(payload.jockeyId),
+    status: 'accepted',
+  }).lean();
+  const registrationJockeyId = registration.jockeyId?.toString() ?? null;
+  if (registrationJockeyId !== payload.jockeyId && !acceptedInvitation) {
+    throw new HttpError(409, 'Nài ngựa phải được chủ ngựa chọn/xác nhận cho đơn đăng ký này trước khi xếp vào cuộc đua');
+  }
+
   const participant: IParticipant = {
     horseId: new mongoose.Types.ObjectId(payload.horseId),
     jockeyId: new mongoose.Types.ObjectId(payload.jockeyId),

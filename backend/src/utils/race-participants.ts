@@ -48,6 +48,21 @@ export function validateParticipants(
   return null;
 }
 
+export function validatePreRaceChecks(participants: IParticipant[]): string | null {
+  const active = activeParticipants(participants);
+  const missingVet = active.filter((p) => !p.vetApprovedAt);
+  if (missingVet.length > 0) {
+    return 'All active participants must pass the veterinary check before the race can start';
+  }
+
+  const missingConfirmation = active.filter((p) => !p.confirmedAt);
+  if (missingConfirmation.length > 0) {
+    return 'All active participants must have their race information confirmed before the race can start';
+  }
+
+  return null;
+}
+
 export function nextLaneNumber(participants: IParticipant[]): number {
   const assigned = activeParticipants(participants)
     .map((p) => p.laneNumber)
