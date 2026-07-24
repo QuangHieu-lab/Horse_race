@@ -353,6 +353,7 @@ async function seed(): Promise<void> {
   );
   const ruleObstruction = rules.find((rule) => rule.code === 'JCK-01')!;
   const ruleDangerousRiding = rules.find((rule) => rule.code === 'JCK-02')!;
+  const ruleBleeding = rules.find((rule) => rule.code === 'HRS-03')!;
 
   console.log('Creating tracks & tournaments…');
   const track = await Track.create({
@@ -897,7 +898,7 @@ async function seed(): Promise<void> {
         confirmedAt: new Date(),
         vetApprovedAt: new Date(),
         isDisqualified: true,
-        disqualifiedReason: 'Seed DQ demo',
+        disqualifiedReason: 'Xuất huyết phổi khi đua (EIPH) — ngựa bị đình chỉ thi đấu 14 ngày',
         disqualifiedAt: new Date(),
         scratchedAt: new Date(),
       },
@@ -917,9 +918,11 @@ async function seed(): Promise<void> {
         horseId: horseA._id,
         jockeyId: jockey1._id,
         ownerId: owner._id,
-        type: 'doping',
-        description: 'Seed DQ demo — horse is excluded from leaderboard wins',
-        penaltyApplied: 'disqualification',
+        ruleId: ruleBleeding._id,
+        type: 'medical',
+        description: 'Seed DQ demo — ngựa xuất huyết phổi khi đua (EIPH), đình chỉ 14 ngày, loại khỏi leaderboard',
+        penaltyApplied: 'time_ban',
+        bannedUntil: daysFromNow(14),
         recordedAt: new Date(),
       },
     ],
