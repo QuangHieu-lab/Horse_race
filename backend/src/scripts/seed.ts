@@ -3,8 +3,10 @@
  * A — Jockey: pending invitation + upcoming race
  * B — Spectator: open prediction window, chưa có prediction
  * C — Scoring: race completed, result confirmed, chưa publish, 1 prediction pending
+ * C3 — No-winner pool: race completed, result confirmed, mọi prediction đều sai
  * D — Referee: race completed, result DRAFT, ready for testing Time Penalty & Disqualify
  * E — Independent: New tournament, new race, horse registered but NO jockey invited yet. Free jockey available.
+ * F — Pre-race checks: scheduled race with 5 valid participants, ready for referee start
  *
  * Chạy: npm run db:seed — Mật khẩu: Demo@123
  */
@@ -166,6 +168,43 @@ async function seed(): Promise<void> {
       phone: '0900000009',
     },
     {
+      email: 'spectator4@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'spectator',
+      fullName: 'Khách No Winner A',
+      phone: '0900000013',
+    },
+    {
+      email: 'spectator5@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'spectator',
+      fullName: 'Khách No Winner B',
+      phone: '0900000014',
+    },
+    {
+      email: 'owner2@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'horse_owner',
+      fullName: 'Lê Minh Owner Two',
+      phone: '0900000015',
+    },
+    {
+      email: 'jockey4@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'jockey',
+      fullName: 'Vũ Quốc Jockey',
+      phone: '0900000016',
+      jockeyProfile: { licenseNumber: 'VN-JKY-004', isSuspended: false },
+    },
+    {
+      email: 'jockey5@demo.local',
+      passwordHash: DEMO_PASSWORD,
+      role: 'jockey',
+      fullName: 'Đỗ Hải Jockey',
+      phone: '0900000017',
+      jockeyProfile: { licenseNumber: 'VN-JKY-005', isSuspended: false },
+    },
+    {
       email: 'owner.admincreated@demo.local',
       passwordHash: DEMO_PASSWORD,
       role: 'horse_owner',
@@ -199,6 +238,11 @@ async function seed(): Promise<void> {
   const spectator = users[6]!;
   const spectator2 = users[7]!;
   const spectator3 = users[8]!;
+  const spectator4 = users.find((user) => user.email === 'spectator4@demo.local')!;
+  const spectator5 = users.find((user) => user.email === 'spectator5@demo.local')!;
+  const owner2 = users.find((user) => user.email === 'owner2@demo.local')!;
+  const jockey4 = users.find((user) => user.email === 'jockey4@demo.local')!;
+  const jockey5 = users.find((user) => user.email === 'jockey5@demo.local')!;
 
   console.log('Setting point wallets…');
   async function resetPointWallet(userId: mongoose.Types.ObjectId) {
@@ -217,7 +261,10 @@ async function seed(): Promise<void> {
   await resetPointWallet(jockey1._id);
   await resetPointWallet(jockey2._id);
   await resetPointWallet(jockey3._id);
+  await resetPointWallet(jockey4._id);
+  await resetPointWallet(jockey5._id);
   await resetPointWallet(referee._id);
+  await resetPointWallet(owner2._id);
 
   const spectatorProfile = await resetPointWallet(spectator._id);
   await spectatorProfile.addPoints(
@@ -249,6 +296,22 @@ async function seed(): Promise<void> {
     undefined,
     undefined,
     'Seed demo top-up: 300,000 points',
+  );
+  const spectator4Profile = await resetPointWallet(spectator4._id);
+  await spectator4Profile.addPoints(
+    400_000,
+    'topup',
+    undefined,
+    undefined,
+    'Seed demo top-up: 400,000 points',
+  );
+  const spectator5Profile = await resetPointWallet(spectator5._id);
+  await spectator5Profile.addPoints(
+    400_000,
+    'topup',
+    undefined,
+    undefined,
+    'Seed demo top-up: 400,000 points',
   );
 
   await PaymentTransaction.create([
@@ -282,6 +345,28 @@ async function seed(): Promise<void> {
       exchangeRateVndPerPoint: 1000,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator3',
+      providerPayload: { mode: 'seed' },
+      paidAt: daysFromNow(-1),
+    },
+    {
+      userId: spectator4._id,
+      provider: 'mock',
+      amountVnd: 400_000_000,
+      points: 400_000,
+      exchangeRateVndPerPoint: 1000,
+      status: 'paid',
+      providerTransactionId: 'seed_mock_topup_spectator4',
+      providerPayload: { mode: 'seed' },
+      paidAt: daysFromNow(-1),
+    },
+    {
+      userId: spectator5._id,
+      provider: 'mock',
+      amountVnd: 400_000_000,
+      points: 400_000,
+      exchangeRateVndPerPoint: 1000,
+      status: 'paid',
+      providerTransactionId: 'seed_mock_topup_spectator5',
       providerPayload: { mode: 'seed' },
       paidAt: daysFromNow(-1),
     },
@@ -337,11 +422,51 @@ async function seed(): Promise<void> {
       weight: 490,
       healthStatus: 'fit',
     },
+    {
+      ownerId: owner2._id,
+      name: 'Mãnh Long',
+      registrationId: 'VN-HORSE-005',
+      breed: 'Thoroughbred',
+      trainerName: 'Stable Demo C',
+      age: 5,
+      color: 'Dark Bay',
+      weight: 475,
+      healthStatus: 'fit',
+      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
+      profilePdfName: 'NJ 4-H Horse Registration Form',
+    },
+    {
+      ownerId: owner2._id,
+      name: 'Hải Phong',
+      registrationId: 'VN-HORSE-006',
+      breed: 'Arabian',
+      trainerName: 'Stable Demo C',
+      age: 4,
+      color: 'Grey',
+      weight: 455,
+      healthStatus: 'fit',
+      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
+      profilePdfName: 'NJ 4-H Horse Registration Form',
+    },
+    {
+      ownerId: owner2._id,
+      name: 'Bạch Hổ',
+      registrationId: 'VN-HORSE-007',
+      breed: 'Quarter Horse',
+      trainerName: 'Stable Demo D',
+      age: 6,
+      color: 'White',
+      weight: 500,
+      healthStatus: 'fit',
+    },
   ]);
   const horseA = horses[0]!;
   const horseB = horses[1]!;
   const horseC = horses[2]!;
   const horseD = horses[3]!;
+  const horseE = horses[4]!;
+  const horseF = horses[5]!;
+  const horseG = horses[6]!;
 
   console.log('Creating Violation Rules…');
   const rules = await ViolationRule.create(
@@ -798,6 +923,103 @@ async function seed(): Promise<void> {
    * predictionScore = ticketCount; contribution = entryFee * ticketCount.
    */
 
+  // --- Scenario C3: No-winner betting pool settlement ---
+  console.log('Scenario C3 — No-winner betting pool demo…');
+  const raceNoWinner = await Race.create({
+    tournamentId: tournamentSpring._id,
+    meetingId: meetingCompleted._id,
+    trackId: track._id,
+    name: 'No-Winner Pool — Heat 2',
+    round: 7,
+    raceClass: 'Open',
+    scheduledAt: daysFromNow(6),
+    distance: 1400,
+    surface: 'turf',
+    going: 'good',
+    weather: 'Nắng nhẹ',
+    predictionOpenAt: daysFromNow(-6),
+    predictionCloseAt: daysFromNow(-3),
+    maxParticipants: 8,
+    status: 'completed',
+    refereeId: referee._id,
+    participants: [
+      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseE._id, jockeyId: jockey4._id, ownerId: owner2._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date(), vetApprovedAt: new Date() },
+    ],
+  });
+
+  await Result.create({
+    raceId: raceNoWinner._id,
+    tournamentId: tournamentSpring._id,
+    rankings: [
+      { rank: 1, horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, finishTime: 89.12, marginBehind: 0, prize: 25_000_000 },
+      { rank: 2, horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, finishTime: 90.01, marginBehind: 0.89, prize: 12_500_000 },
+      { rank: 3, horseId: horseE._id, jockeyId: jockey4._id, ownerId: owner2._id, finishTime: 91.44, marginBehind: 2.32, prize: 5_000_000 },
+    ],
+    violations: [],
+    confirmedBy: referee._id,
+    confirmedAt: new Date(),
+    publishedBy: null,
+    publishedAt: null,
+  });
+
+  const noWinnerPrediction1 = await Prediction.create({
+    spectatorId: spectator4._id,
+    raceId: raceNoWinner._id,
+    tournamentId: tournamentSpring._id,
+    predictedRanks: [{ rank: 1, horseId: horseB._id }],
+    status: 'pending',
+    ticketCount: 2,
+    riskMultiplier: 2,
+    contribution: 100_000,
+    pointsEarned: 0,
+    bonusPoints: 0,
+    totalPoints: 0,
+  });
+  await spectator4Profile.spendPoints(
+    100_000,
+    'spent_pool_entry',
+    'Prediction',
+    noWinnerPrediction1._id,
+    `Seed no-winner pool entry: 2 tickets — ${raceNoWinner.name}`,
+  );
+
+  const noWinnerPrediction2 = await Prediction.create({
+    spectatorId: spectator5._id,
+    raceId: raceNoWinner._id,
+    tournamentId: tournamentSpring._id,
+    predictedRanks: [{ rank: 1, horseId: horseE._id }],
+    status: 'pending',
+    ticketCount: 1,
+    riskMultiplier: 1,
+    contribution: 50_000,
+    pointsEarned: 0,
+    bonusPoints: 0,
+    totalPoints: 0,
+  });
+  await spectator5Profile.spendPoints(
+    50_000,
+    'spent_pool_entry',
+    'Prediction',
+    noWinnerPrediction2._id,
+    `Seed no-winner pool entry: 1 ticket — ${raceNoWinner.name}`,
+  );
+
+  await PredictionPool.create({
+    raceId: raceNoWinner._id,
+    tournamentId: tournamentSpring._id,
+    status: 'open',
+    ticketPrice: 50_000,
+    minRiskMultiplier: 1,
+    maxRiskMultiplier: 10,
+    quickRiskMultipliers: [1],
+    totalTickets: 3,
+    totalBountyPool: 150_000,
+    winPool: 0,
+    contributorCount: 2,
+  });
+
   // --- Scenario C2: Published results for spectator horse leaderboard ---
   console.log('Scenario C2 — Published horse leaderboard demo…');
   const leaderboardRace1 = await Race.create({
@@ -1032,6 +1254,51 @@ async function seed(): Promise<void> {
     waiverAcceptedAt: new Date(),
   });
 
+  // --- Scenario F: Scheduled race with 5 valid participants and completed pre-race checks ---
+  console.log('Scenario F — 5-horse pre-race checks demo…');
+  const raceFiveReady = await Race.create({
+    tournamentId: tournamentSummer._id,
+    meetingId: meetingSummer._id,
+    trackId: track._id,
+    name: 'Pre-Race Gate — 5 Horse Field',
+    round: 2,
+    raceClass: 'Open',
+    scheduledAt: daysFromNow(18),
+    distance: 1500,
+    surface: 'turf',
+    going: 'good',
+    weather: 'Mát',
+    predictionOpenAt: daysFromNow(12),
+    predictionCloseAt: daysFromNow(17),
+    maxParticipants: 8,
+    status: 'scheduled',
+    refereeId: referee._id,
+    participants: [],
+  });
+
+  await RaceRegistration.create([
+    { raceId: raceFiveReady._id, horseId: horseA._id, ownerId: owner._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
+    { raceId: raceFiveReady._id, horseId: horseB._id, ownerId: owner._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
+    { raceId: raceFiveReady._id, horseId: horseC._id, ownerId: owner._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
+    { raceId: raceFiveReady._id, horseId: horseE._id, ownerId: owner2._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
+    { raceId: raceFiveReady._id, horseId: horseF._id, ownerId: owner2._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
+  ]);
+
+  await acceptInvitation(owner._id, jockey1._id, horseA._id, raceFiveReady._id, 'Mời điều khiển Sóng Gió ở field 5 ngựa.');
+  await acceptInvitation(owner._id, jockey2._id, horseB._id, raceFiveReady._id, 'Mời điều khiển Bóng Mây ở field 5 ngựa.');
+  await acceptInvitation(owner._id, jockey3._id, horseC._id, raceFiveReady._id, 'Mời điều khiển Gió Xuân ở field 5 ngựa.');
+  await acceptInvitation(owner2._id, jockey4._id, horseE._id, raceFiveReady._id, 'Mời điều khiển Mãnh Long ở field 5 ngựa.');
+  await acceptInvitation(owner2._id, jockey5._id, horseF._id, raceFiveReady._id, 'Mời điều khiển Hải Phong ở field 5 ngựa.');
+
+  const raceFiveReadyDoc = await Race.findById(raceFiveReady._id);
+  if (raceFiveReadyDoc) {
+    raceFiveReadyDoc.participants.forEach((participant) => {
+      participant.confirmedAt = new Date();
+      participant.vetApprovedAt = new Date();
+    });
+    await raceFiveReadyDoc.save();
+  }
+
   await Product.create([
     {
       name: 'Voucher xem giải VIP',
@@ -1106,10 +1373,14 @@ async function seed(): Promise<void> {
   console.log('C — Scoring:  result confirmed, awaiting publish on', raceCompleted.name);
   console.log('   -> spectator@demo.local correct 1 ticket, spectator2 incorrect 1 ticket, spectator3 correct 2 tickets');
   console.log('   -> fixed race prizes: rank 1/2/3 = 30M/15M/5M points, split 80% owner / 20% jockey on publish');
+  console.log('C3 — No winner: confirmed result awaiting publish on', raceNoWinner.name);
+  console.log('   -> spectator4 and spectator5 both predict non-winning horses; publish tests 40/60 no-winner split');
   console.log('D — Referee:  result DRAFT created on', raceDraft.name);
   console.log('E — Independent: Horse registered, NO Jockey on', raceIndependent.name);
+  console.log('F — Pre-race: 5-horse checked field on', raceFiveReady.name);
   console.log('   -> Free Jockey available: jockey3@demo.local');
-  console.log('   -> Extra spectator accounts: spectator2@demo.local, spectator3@demo.local');
+  console.log('   -> Extra spectator accounts: spectator2@demo.local, spectator3@demo.local, spectator4@demo.local, spectator5@demo.local');
+  console.log('   -> Extra owner/jockey accounts: owner2@demo.local, jockey4@demo.local, jockey5@demo.local');
   console.log('   -> Admin user management samples: owner.admincreated@demo.local, jockey.admincreated@demo.local, referee.inactive@demo.local');
 
   // 🚀 IN RA CÁC MẪU JSON ĐỂ TEST TRỰC TIẾP TRÊN POSTMAN
