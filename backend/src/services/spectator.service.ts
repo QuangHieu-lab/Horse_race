@@ -104,7 +104,10 @@ async function buildSpectatorRaceDto(
     const dqHorseIds = new Set(
       race.participants.filter((p) => p.isDisqualified).map((p) => p.horseId.toString()),
     );
-    const jockeyIds = result.rankings.map((r) => r.jockeyId);
+    const jockeyIds = [
+      ...result.rankings.map((r) => r.jockeyId),
+      ...result.violations.flatMap((v) => (v.jockeyId ? [v.jockeyId] : [])),
+    ];
     const resultHorseIds = [
       ...result.rankings.map((r) => r.horseId),
       ...result.violations.flatMap((v) => (v.horseId ? [v.horseId] : [])),
@@ -136,8 +139,11 @@ async function buildSpectatorRaceDto(
         isDisqualified: dqHorseIds.has(r.horseId.toString()),
       })),
       violations: result.violations.map((v) => ({
+        target: v.target,
         horseId: v.horseId?.toString() ?? null,
         horseName: v.horseId ? rHorseMap.get(v.horseId.toString()) ?? null : null,
+        jockeyId: v.jockeyId?.toString() ?? null,
+        jockeyName: v.jockeyId ? jockeyMap.get(v.jockeyId.toString()) ?? null : null,
         type: v.type,
         description: v.description,
         penaltyApplied: v.penaltyApplied ?? null,
