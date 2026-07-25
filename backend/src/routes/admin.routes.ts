@@ -7,6 +7,7 @@ const adminController = new AdminController();
 adminRouter.get('/users', adminController.listUsers);
 adminRouter.post('/users', adminController.createUser);
 adminRouter.patch('/users/:id', adminController.updateUser);
+adminRouter.delete('/users/:id', adminController.deleteUser);
 adminRouter.get('/registrations', adminController.listRegistrations);
 adminRouter.patch('/registrations/:id', adminController.updateRegistration);
 adminRouter.patch('/races/:id/result/publish', adminController.publishResult);

@@ -25,6 +25,11 @@ export class AdminController {
     res.json({ user });
   });
 
+  deleteUser = asyncHandler(async (req: Request, res: Response) => {
+    await adminService.deleteUser(req.user!.id, req.params.id as string);
+    res.status(204).send();
+  });
+
   listRegistrations = asyncHandler(async (req: Request, res: Response) => {
     const status = req.query.status as 'pending' | 'approved' | 'rejected' | undefined;
     const registrations = await adminRegistrationService.listRegistrations(status);

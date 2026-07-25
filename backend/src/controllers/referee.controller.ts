@@ -130,7 +130,7 @@ export class RefereeController {
 
     // Trả về timeline phát lại để trọng tài xem đua trực tiếp (giống admin).
     // Race đang ở 'ongoing' (Live) trong lúc xem; chỉ 'completed' khi gọi finishRace.
-    const timeline = await refereeService.simulateRace(raceId);
+    const timeline = await refereeService.simulateRace(req.user!.id, raceId);
 
     res.status(200).json({
       success: true,
