@@ -42,7 +42,7 @@ export const VIOLATION_RULES: ViolationRuleSeed[] = [
     severity: 'critical',
     appliesTo: 'jockey',
     penaltyApplied: 'disqualify',
-    banDurationDays: 0,
+    banDurationDays: 365,
   },
   {
     code: 'JCK-03',
@@ -62,7 +62,7 @@ export const VIOLATION_RULES: ViolationRuleSeed[] = [
     severity: 'high',
     appliesTo: 'jockey',
     penaltyApplied: 'disqualify',
-    banDurationDays: 0,
+    banDurationDays: 365,
   },
   {
     code: 'JCK-05',
@@ -72,7 +72,7 @@ export const VIOLATION_RULES: ViolationRuleSeed[] = [
     severity: 'high',
     appliesTo: 'jockey',
     penaltyApplied: 'disqualify',
-    banDurationDays: 0,
+    banDurationDays: 365,
   },
   {
     code: 'JCK-07',
@@ -94,7 +94,7 @@ export const VIOLATION_RULES: ViolationRuleSeed[] = [
     severity: 'critical',
     appliesTo: 'horse',
     penaltyApplied: 'disqualify',
-    banDurationDays: 0,
+    banDurationDays: 365,
   },
   {
     code: 'HRS-02',
@@ -104,7 +104,7 @@ export const VIOLATION_RULES: ViolationRuleSeed[] = [
     severity: 'high',
     appliesTo: 'horse',
     penaltyApplied: 'disqualify',
-    banDurationDays: 0,
+    banDurationDays: 365,
   },
   {
     code: 'HRS-03',
