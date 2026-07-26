@@ -1,11 +1,12 @@
 import type {
-  HealthStatus,          
+  HealthStatus,
   RegistrationStatus,
   InvitationStatus,
   PredictionStatus,
   RaceStatus,
   RedemptionStatus,
   TournamentStatus,
+  TrackSurface,
 } from './shared.types.js';
 
 export interface NamedEntityDto {
@@ -55,12 +56,16 @@ export interface InvitationDto {
   message?: string;
   respondedAt?: string | null;
   createdAt: string;
-  horse: HorseWithPenaltyDto;
+  horse: HorseWithPenaltyDto & { breed: string; age: number };
   race: {
     id: string;
     name: string;
     scheduledAt?: string;
     status: RaceStatus;
+    distance?: number;
+    surface?: TrackSurface;
+    location: string;
+    purse: number;
   };
   owner: UserSummaryDto;
   jockey?: UserSummaryDto | null; // Bổ sung thông tin người nhận lời mời

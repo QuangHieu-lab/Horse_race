@@ -3,6 +3,8 @@ import { Horse } from '../models/Horse.model.js';
 import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
 import { Notification } from '../models/Notification.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
+import { Tournament } from '../models/Tournament.model.js';
+import { Track } from '../models/Track.model.js';
 import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 // Giả định bạn đã khai báo các DTO này trong thư mục types
@@ -112,7 +114,7 @@ function toRegistrationDto(reg: any): RegistrationDto {
   };
 }
  
-function toInvitationDto(inv: any): InvitationDto {
+function toInvitationDto(inv: any, raceExtras: { location: string; purse: number }): InvitationDto {
   return {
     id: inv._id.toString(),
     status: inv.status,
@@ -122,6 +124,8 @@ function toInvitationDto(inv: any): InvitationDto {
     horse: {
       id: inv.horseId._id.toString(),
       name: inv.horseId.name,
+      breed: inv.horseId.breed,
+      age: inv.horseId.age,
       penaltyStatus: toPenaltyStatusDto(inv.horseId.penaltyStatus),
     },
     race: {
@@ -129,6 +133,10 @@ function toInvitationDto(inv: any): InvitationDto {
       name: inv.raceId.name,
       scheduledAt: inv.raceId.scheduledAt?.toISOString(),
       status: inv.raceId.status,
+      distance: inv.raceId.distance,
+      surface: inv.raceId.surface,
+      location: raceExtras.location,
+      purse: raceExtras.purse,
     },
     owner: {
       id: inv.horseOwnerId._id.toString(),
@@ -139,6 +147,20 @@ function toInvitationDto(inv: any): InvitationDto {
       id: inv.jockeyId._id.toString(),
       fullName: inv.jockeyId.fullName,
     } : null,
+  };
+}
+
+async function resolveInvitationRaceExtras(race: {
+  trackId?: mongoose.Types.ObjectId | null;
+  tournamentId: mongoose.Types.ObjectId;
+}): Promise<{ location: string; purse: number }> {
+  const [track, tournament] = await Promise.all([
+    race.trackId ? Track.findById(race.trackId).select('location').lean() : Promise.resolve(null),
+    Tournament.findById(race.tournamentId).select('location prizePool').lean(),
+  ]);
+  return {
+    location: track?.location ?? tournament?.location ?? '-',
+    purse: tournament?.prizePool ?? 0,
   };
 }
 // ============================================================================
@@ -358,8 +380,8 @@ async deleteHorse(ownerId: string, horseId: string) {
 
     // 4. Query lại để lấy đủ thông tin (populate) cho DTO
     const populatedInvitation = await JockeyInvitation.findById(invitation._id)
-      .populate('horseId', 'name penaltyStatus')
-      .populate('raceId', 'name scheduledAt status')
+      .populate('horseId', 'name penaltyStatus breed age')
+      .populate('raceId', 'name scheduledAt status distance surface trackId tournamentId')
       .populate('horseOwnerId', 'fullName')
       .lean();
 
@@ -368,6 +390,10 @@ async deleteHorse(ownerId: string, horseId: string) {
     }
 
     // 5. Trả về DTO chuẩn mực
-    return toInvitationDto(populatedInvitation);
+    const raceExtras = await resolveInvitationRaceExtras(populatedInvitation.raceId as unknown as {
+      trackId?: mongoose.Types.ObjectId | null;
+      tournamentId: mongoose.Types.ObjectId;
+    });
+    return toInvitationDto(populatedInvitation, raceExtras);
   }
 }

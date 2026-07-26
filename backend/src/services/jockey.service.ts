@@ -5,6 +5,7 @@ import { Notification } from '../models/Notification.model.js';
 import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { Tournament } from '../models/Tournament.model.js';
+import { Track } from '../models/Track.model.js';
 import { User } from '../models/User.model.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
 import type {
@@ -29,6 +30,8 @@ function toInvitationDto(
           _id: mongoose.Types.ObjectId;
           name: string;
           penaltyStatus?: RawPenaltyStatus;
+          breed: string;
+          age: number;
         }
       | mongoose.Types.ObjectId;
     raceId:
@@ -37,21 +40,30 @@ function toInvitationDto(
           name: string;
           scheduledAt: Date;
           status: string;
+          distance?: number;
+          surface?: string;
+          trackId?: mongoose.Types.ObjectId | null;
+          tournamentId: mongoose.Types.ObjectId;
         }
       | mongoose.Types.ObjectId;
     horseOwnerId: { _id: mongoose.Types.ObjectId; fullName: string } | mongoose.Types.ObjectId;
   },
+  raceExtras: { location: string; purse: number },
 ): InvitationDto {
   const horse = inv.horseId as {
     _id: mongoose.Types.ObjectId;
     name: string;
     penaltyStatus?: RawPenaltyStatus;
+    breed: string;
+    age: number;
   };
   const race = inv.raceId as {
     _id: mongoose.Types.ObjectId;
     name: string;
     scheduledAt: Date;
     status: string;
+    distance?: number;
+    surface?: string;
   };
   const owner = inv.horseOwnerId as { _id: mongoose.Types.ObjectId; fullName: string };
 
@@ -64,6 +76,8 @@ function toInvitationDto(
     horse: {
       id: horse._id.toString(),
       name: horse.name,
+      breed: horse.breed,
+      age: horse.age,
       penaltyStatus: toPenaltyStatusDto(horse.penaltyStatus),
     },
     race: {
@@ -71,9 +85,45 @@ function toInvitationDto(
       name: race.name,
       scheduledAt: race.scheduledAt.toISOString(),
       status: race.status as InvitationDto['race']['status'],
+      distance: race.distance,
+      surface: race.surface as InvitationDto['race']['surface'],
+      location: raceExtras.location,
+      purse: raceExtras.purse,
     },
     owner: { id: owner._id.toString(), fullName: owner.fullName },
   };
+}
+
+async function resolveRaceLocationAndPurse(
+  races: Array<{
+    _id: mongoose.Types.ObjectId;
+    trackId?: mongoose.Types.ObjectId | null;
+    tournamentId: mongoose.Types.ObjectId;
+  }>,
+): Promise<Map<string, { location: string; purse: number }>> {
+  const trackIds = [...new Set(races.filter((r) => r.trackId).map((r) => r.trackId!.toString()))];
+  const tournamentIds = [...new Set(races.map((r) => r.tournamentId.toString()))];
+
+  const [tracks, tournaments] = await Promise.all([
+    trackIds.length
+      ? Track.find({ _id: { $in: trackIds } }).select('location').lean()
+      : Promise.resolve([]),
+    Tournament.find({ _id: { $in: tournamentIds } }).select('location prizePool').lean(),
+  ]);
+
+  const trackMap = new Map(tracks.map((t) => [t._id.toString(), t]));
+  const tournamentMap = new Map(tournaments.map((t) => [t._id.toString(), t]));
+
+  const result = new Map<string, { location: string; purse: number }>();
+  for (const race of races) {
+    const track = race.trackId ? trackMap.get(race.trackId.toString()) : undefined;
+    const tournament = tournamentMap.get(race.tournamentId.toString());
+    result.set(race._id.toString(), {
+      location: track?.location ?? tournament?.location ?? '-',
+      purse: tournament?.prizePool ?? 0,
+    });
+  }
+  return result;
 }
 
 export async function listInvitations(
@@ -86,13 +136,27 @@ export async function listInvitations(
   if (status) filter.status = status;
 
   const invitations = await JockeyInvitation.find(filter)
-    .populate('horseId', 'name penaltyStatus')
-    .populate('raceId', 'name scheduledAt status')
+    .populate('horseId', 'name penaltyStatus breed age')
+    .populate('raceId', 'name scheduledAt status distance surface trackId tournamentId')
     .populate('horseOwnerId', 'fullName')
     .sort({ createdAt: -1 })
     .lean();
 
-  return invitations.map((inv) => toInvitationDto(inv as Parameters<typeof toInvitationDto>[0]));
+  const races = invitations.map(
+    (inv) =>
+      inv.raceId as unknown as {
+        _id: mongoose.Types.ObjectId;
+        trackId?: mongoose.Types.ObjectId | null;
+        tournamentId: mongoose.Types.ObjectId;
+      },
+  );
+  const extrasMap = await resolveRaceLocationAndPurse(races);
+
+  return invitations.map((inv) => {
+    const race = inv.raceId as { _id: mongoose.Types.ObjectId };
+    const extras = extrasMap.get(race._id.toString()) ?? { location: '-', purse: 0 };
+    return toInvitationDto(inv as Parameters<typeof toInvitationDto>[0], extras);
+  });
 }
 
 export async function respondToInvitation(
@@ -157,13 +221,22 @@ export async function respondToInvitation(
   }
 
   const updated = await JockeyInvitation.findById(invitation._id)
-    .populate('horseId', 'name penaltyStatus')
-    .populate('raceId', 'name scheduledAt status')
+    .populate('horseId', 'name penaltyStatus breed age')
+    .populate('raceId', 'name scheduledAt status distance surface trackId tournamentId')
     .populate('horseOwnerId', 'fullName')
     .lean();
 
   if (!updated) throw new HttpError(500, 'Lỗi cập nhật lời mời');
-  return toInvitationDto(updated as Parameters<typeof toInvitationDto>[0]);
+
+  const raceDoc = updated.raceId as unknown as {
+    _id: mongoose.Types.ObjectId;
+    trackId?: mongoose.Types.ObjectId | null;
+    tournamentId: mongoose.Types.ObjectId;
+  };
+  const extrasMap = await resolveRaceLocationAndPurse([raceDoc]);
+  const extras = extrasMap.get(raceDoc._id.toString()) ?? { location: '-', purse: 0 };
+
+  return toInvitationDto(updated as Parameters<typeof toInvitationDto>[0], extras);
 }
 
 async function buildJockeyRaceDto(
