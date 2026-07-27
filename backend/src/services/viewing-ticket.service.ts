@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { Notification } from '../models/Notification.model.js';
 import { OrganizerLedger } from '../models/OrganizerLedger.model.js';
 import { Race, type IRace } from '../models/Race.model.js';
 import { RaceViewingPass } from '../models/RaceViewingPass.model.js';
@@ -11,6 +10,7 @@ import type {
 import type { ViewingPassSource } from '../types/shared.types.js';
 import { HttpError } from '../utils/http-error.js';
 import { isTicketRequired } from '../utils/viewing-ticket.js';
+import { createNotification } from './notification.service.js';
 
 type RaceLike = Pick<IRace, 'status' | 'streamUrl' | 'viewingTicket' | 'scheduledAt' | 'name' | 'tournamentId'> & {
   _id: mongoose.Types.ObjectId;
@@ -171,7 +171,7 @@ export async function grantViewingPassFromVip(
 
   const pass = await createPassRecord(spectatorId, race as RaceLike, 'vip_redemption', 0);
 
-  await Notification.create({
+  await createNotification({
     userId: new mongoose.Types.ObjectId(spectatorId),
     type: 'viewing_ticket_purchased',
     title: 'Vé xem VIP đã kích hoạt',
@@ -228,7 +228,7 @@ export async function purchaseViewingPass(
     `Mua vé xem ${race.name}`,
   );
 
-  await Notification.create({
+  await createNotification({
     userId: new mongoose.Types.ObjectId(spectatorId),
     type: 'viewing_ticket_purchased',
     title: 'Mua vé thành công',

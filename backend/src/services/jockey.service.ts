@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import { Horse } from '../models/Horse.model.js';
 import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
-import { Notification } from '../models/Notification.model.js';
 import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { Tournament } from '../models/Tournament.model.js';
@@ -17,6 +16,7 @@ import type {
 import type { InvitationStatus } from '../types/shared.types.js';
 import { HttpError } from '../utils/http-error.js';
 import { isPenaltyActive, toPenaltyStatusDto, type RawPenaltyStatus } from '../utils/penalty-status.util.js';
+import { createNotification } from './notification.service.js';
 
 function toInvitationDto(
   inv: {
@@ -187,7 +187,7 @@ export async function respondToInvitation(
 
     const horse = await Horse.findById(invitation.horseId).select('name').lean();
     const race = await Race.findById(invitation.raceId).select('name').lean();
-    await Notification.create({
+    await createNotification({
       userId: invitation.horseOwnerId,
       type: 'invitation_declined',
       title: 'Jockey từ chối lời mời',
@@ -210,7 +210,7 @@ export async function respondToInvitation(
     const horse = await Horse.findById(invitation.horseId).select('name').lean();
     const race = await Race.findById(invitation.raceId).select('name').lean();
     const jockey = await User.findById(jockeyId).select('fullName').lean();
-    await Notification.create({
+    await createNotification({
       userId: invitation.horseOwnerId,
       type: 'invitation_accepted',
       title: 'Jockey chấp nhận lời mời',

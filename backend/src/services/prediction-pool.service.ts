@@ -8,6 +8,7 @@ import type { IResult } from '../models/Result.model.js';
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import { HttpError } from '../utils/http-error.js';
+import { createNotification, createNotifications, type NotificationInput } from './notification.service.js';
 
 const MIN_ENTRY_POINTS = 100;
 const DEFAULT_TICKET_PRICE = MIN_ENTRY_POINTS;
@@ -374,7 +375,7 @@ export async function settlePredictionPoolFromResult(
         message: `Bạn nhận ${totalReturned} điểm từ dự đoán đúng cuộc đua ${race.name}.`,
       });
       if (!existingNotification) {
-        await Notification.create({
+        await createNotification({
           userId: prediction.spectatorId,
           type: 'prediction_reward',
           title: 'Thưởng bounty pool',
@@ -449,7 +450,7 @@ export async function settlePredictionPoolFromResult(
         refId: pool._id,
         message: jockeyMessage,
       });
-      const notifications = [];
+      const notifications: NotificationInput[] = [];
       if (!existingOwnerNotification) {
         notifications.push({
           userId: ranking.ownerId,
@@ -470,7 +471,7 @@ export async function settlePredictionPoolFromResult(
           refId: pool._id,
         });
       }
-      if (notifications.length > 0) await Notification.create(notifications);
+      if (notifications.length > 0) await createNotifications(notifications);
     }
   }
 

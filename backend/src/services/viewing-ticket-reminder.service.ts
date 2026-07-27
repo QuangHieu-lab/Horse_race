@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
-import { Notification } from '../models/Notification.model.js';
 import { Race } from '../models/Race.model.js';
 import { RaceViewingPass } from '../models/RaceViewingPass.model.js';
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import { ViewingTicketReminderLog } from '../models/ViewingTicketReminderLog.model.js';
 import { formatReminderDate } from '../utils/viewing-ticket.js';
+import { createNotification } from './notification.service.js';
 
 export interface ReminderJobResult {
   racesProcessed: number;
@@ -35,7 +35,7 @@ async function notifyIfNew(
     throw err;
   }
 
-  await Notification.create({
+  await createNotification({
     userId,
     type:
       kind === 'sale_open'

@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
-import { Notification } from '../models/Notification.model.js';
 import { Race } from '../models/Race.model.js';
 import { Result, type IRanking } from '../models/Result.model.js';
 import { HttpError } from '../utils/http-error.js';
 import type { RaceResultDto } from '../types/api.types.js';
+import { createNotification } from './notification.service.js';
 
 export interface UpsertResultInput {
   rankings: Array<{
@@ -124,7 +124,7 @@ export async function confirmRaceResult(
   (result as any).isConfirmed = true; 
   await result.save();
 
-  await Notification.create({
+  await createNotification({
     userId: new mongoose.Types.ObjectId(refereeId),
     type: 'result_confirmed',
     title: 'Kết quả đã xác nhận',

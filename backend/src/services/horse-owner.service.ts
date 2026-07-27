@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import { Horse } from '../models/Horse.model.js';
 import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
-import { Notification } from '../models/Notification.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import { Track } from '../models/Track.model.js';
@@ -10,6 +9,7 @@ import { HttpError } from '../utils/http-error.js';
 // Giả định bạn đã khai báo các DTO này trong thư mục types
 import type { HorseDto, RegistrationDto, InvitationDto } from '../types/api.types.js';
 import { isPenaltyActive, toPenaltyStatusDto } from '../utils/penalty-status.util.js';
+import { createNotification } from './notification.service.js';
 
 // ============================================================================
 // 1. INPUT INTERFACES (Định nghĩa dữ liệu đầu vào rõ ràng)
@@ -369,7 +369,7 @@ async deleteHorse(ownerId: string, horseId: string) {
     });
 
     // 3. Side Effect: Bắn thông báo
-    await Notification.create({
+    await createNotification({
       userId: invitation.jockeyId,
       type: 'invitation_received',
       title: 'Lời mời thi đấu mới 🏇',

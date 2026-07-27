@@ -37,6 +37,7 @@ export {
 export { Product, type IProduct } from './Product.model.js';
 export { Redemption, type IRedemption } from './Redemption.model.js';
 export { Notification, type INotification } from './Notification.model.js';
+export { DeviceToken, type IDeviceToken } from './DeviceToken.model.js';
 export { AuditLog, type IAuditLog } from './AuditLog.model.js';
 export { OrganizerLedger, type IOrganizerLedger } from './OrganizerLedger.model.js';
 export { ViolationRule, type IViolationRule } from './ViolationRule.model.js';

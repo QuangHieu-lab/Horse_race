@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
-import { Notification } from '../models/Notification.model.js';
 import { Race } from '../models/Race.model.js';
 import type { IResult } from '../models/Result.model.js';
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import type { PointsTxType } from '../types/shared.types.js';
+import { createNotifications, type NotificationInput } from './notification.service.js';
 
 const DEFAULT_OWNER_SHARE_RATE = 80;
 const DEFAULT_FIXED_PRIZE_TOP_COUNT = 5;
@@ -154,7 +154,7 @@ export async function settleRacePrizesFromResult(
       jockeyNote,
     );
 
-    const notifications = [];
+    const notifications: NotificationInput[] = [];
     if (ownerAwarded) {
       notifications.push({
         userId: ranking.ownerId,
@@ -175,6 +175,6 @@ export async function settleRacePrizesFromResult(
         refId: result._id,
       });
     }
-    if (notifications.length > 0) await Notification.create(notifications);
+    if (notifications.length > 0) await createNotifications(notifications);
   }
 }

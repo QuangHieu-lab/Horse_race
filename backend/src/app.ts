@@ -21,6 +21,7 @@ import { adminViolationRuleRouter } from './routes/admin-violation-rule.routes.j
 import { paymentRouter } from './routes/payment.routes.js';
 import { leaderboardRouter } from './routes/leaderboard.routes.js';
 import { pointsRouter } from './routes/points.routes.js';
+import { notificationRouter } from './routes/notification.routes.js';
 export function createApp() {
   const app = express();
   const corsOptions = buildCorsOptions();
@@ -41,6 +42,7 @@ export function createApp() {
 
   app.use('/api/payments', paymentRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/notifications', authenticate, notificationRouter);
   app.use('/api/points', authenticate, pointsRouter);
   app.use('/api/jockey', authenticate, requireRole('jockey'), jockeyRouter);
   app.use('/api/spectator', authenticate, requireRole('spectator'), spectatorRouter);

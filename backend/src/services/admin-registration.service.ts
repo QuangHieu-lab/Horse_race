@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
-import { Notification } from '../models/Notification.model.js';
 import { RaceRegistration } from '../models/RaceRegistration.model.js';
 import type { RegistrationStatus } from '../types/shared.types.js';
 import type { RegistrationDto } from '../types/api.types.js';
 import { HttpError } from '../utils/http-error.js';
+import { createNotification } from './notification.service.js';
 
 function toRegistrationDto(reg: {
   _id: mongoose.Types.ObjectId;
@@ -110,7 +110,7 @@ export async function updateRegistrationStatus(
   if (adminNote) reg.adminNote = adminNote;
   await reg.save();
 
-  await Notification.create({
+  await createNotification({
     userId: reg.ownerId,
     type: status === 'approved' ? 'registration_approved' : 'registration_rejected',
     title: status === 'approved' ? 'Đăng ký được duyệt' : 'Đăng ký bị từ chối',

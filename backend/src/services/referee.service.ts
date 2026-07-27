@@ -3,11 +3,11 @@ import { Race } from '../models/Race.model.js';
 import { Result } from '../models/Result.model.js';
 import { Horse } from '../models/Horse.model.js';
 import { User } from '../models/User.model.js';
-import { Notification } from '../models/Notification.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
 import { activeParticipants, randomizeActiveParticipantLanes, validatePreRaceChecks } from '../utils/race-participants.js';
 import type { RaceSimTimeline } from './race-simulation.service.js';
+import { createNotification, createNotifications, type NotificationInput } from './notification.service.js';
 
 export interface RefereeRaceDto {
   id: string;
@@ -644,7 +644,7 @@ export async function applyRacePenalty(
   if (isDQ) {
     const reason = payload.notes ? `${rule.name} - ${payload.notes}` : rule.description;
     const banLine = describeBanDuration(rule, bannedUntil, isBannedPenalty);
-    const notices = [];
+    const notices: NotificationInput[] = [];
 
     if (participant.jockeyId) {
       notices.push({
@@ -669,7 +669,7 @@ export async function applyRacePenalty(
     }
 
     if (notices.length > 0) {
-      await Notification.insertMany(notices);
+      await createNotifications(notices);
     }
   }
 
@@ -680,7 +680,7 @@ export async function applyRacePenalty(
         : 'Án phạt cấm thi đấu không có thời hạn kết thúc tự động')
       : 'Án phạt được ghi nhận vào biên bản, không áp dụng cấm thi đấu.';
 
-    await Notification.create({
+    await createNotification({
       userId: participant.jockeyId,
       type: 'jockey_penalty',
       title: 'Biên bản xử phạt jockey',

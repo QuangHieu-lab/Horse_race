@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
-import { Notification } from '../models/Notification.model.js';
 import {
   PaymentTransaction,
   type IPaymentTransaction,
@@ -10,6 +9,7 @@ import {
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import type { PaymentTransactionDto, SpectatorPointsDto } from '../types/api.types.js';
 import { HttpError } from '../utils/http-error.js';
+import { createNotification } from './notification.service.js';
 import { getOrCreateProfile } from './spectator.service.js';
 
 export const VND_PER_POINT = 1000;
@@ -92,7 +92,7 @@ async function grantTopUpPoints(payment: typeof PaymentTransaction.prototype): P
     `Nạp ${payment.points} points (${payment.amountVnd.toLocaleString('vi-VN')} VND)`,
   );
 
-  await Notification.create({
+  await createNotification({
     userId: payment.userId,
     type: 'points_topup',
     title: 'Nạp điểm thành công',

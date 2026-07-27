@@ -1,11 +1,11 @@
 import mongoose from 'mongoose';
-import { Notification } from '../models/Notification.model.js';
 import { Prediction } from '../models/Prediction.model.js';
 import { Race } from '../models/Race.model.js';
 import type { IResult } from '../models/Result.model.js';
 import { SpectatorProfile } from '../models/SpectatorProfile.model.js';
 import { Tournament } from '../models/Tournament.model.js';
 import type { PredictionStatus } from '../types/shared.types.js';
+import { createNotification } from './notification.service.js';
 import { settlePredictionPoolFromResult } from './prediction-pool.service.js';
 
 function evaluatePrediction(
@@ -146,7 +146,7 @@ export async function scorePredictionsFromResult(
         }
       }
 
-      await Notification.create({
+      await createNotification({
         userId: prediction.spectatorId,
         type: 'prediction_reward',
         title: 'Thưởng dự đoán',

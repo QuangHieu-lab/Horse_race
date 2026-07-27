@@ -118,6 +118,7 @@ export type NotificationType =
   | 'prediction_reward'
   | 'race_prize_reward'
   | 'registration_approved'
+  | 'registration_rejected'
   | 'participant_scratched'
   | 'result_protest_filed'
   | 'jockey_penalty'
