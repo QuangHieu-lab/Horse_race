@@ -233,7 +233,7 @@ export async function refundPredictionTicket(
 
   const pool = await PredictionPool.findOne({ raceId });
   if (!pool) {
-    throw new HttpError(404, 'Không tìm thấy bounty pool');
+    throw new HttpError(404, 'Không tìm thấy quỹ dự đoán');
   }
   if (pool.status !== 'open') {
     throw new HttpError(409, 'Bounty pool đã đóng, không thể hủy dự đoán');
@@ -358,8 +358,8 @@ export async function settlePredictionPoolFromResult(
     if (totalReturned > 0) {
       const note =
         noWinnerRefund > 0
-          ? `Hoàn điểm do bounty pool cuộc đua ${race.name} không có người thắng`
-          : `Hoàn điểm dự đoán đúng và chia thưởng bounty pool cuộc đua ${race.name}`;
+          ? `Hoàn điểm do quỹ dự đoán cuộc đua ${race.name} không có người thắng`
+          : `Hoàn điểm dự đoán đúng và chia thưởng quỹ dự đoán cuộc đua ${race.name}`;
       await awardSpectatorPoolPoints(
         prediction.spectatorId,
         totalReturned,
@@ -378,7 +378,7 @@ export async function settlePredictionPoolFromResult(
         await createNotification({
           userId: prediction.spectatorId,
           type: 'prediction_reward',
-          title: 'Thưởng bounty pool',
+          title: 'Thưởng quỹ dự đoán',
           message: `Bạn nhận ${totalReturned} điểm từ dự đoán đúng cuộc đua ${race.name}.`,
           refModel: 'PredictionPool',
           refId: pool._id,
@@ -424,18 +424,18 @@ export async function settlePredictionPoolFromResult(
       await awardPoolPoints(
         ranking.ownerId,
         ownerReward,
-        `Thưởng owner hạng ${rank} từ bounty pool cuộc đua ${race.name}`,
+        `Thưởng chủ ngựa hạng ${rank} từ quỹ dự đoán cuộc đua ${race.name}`,
         pool._id,
       );
       await awardPoolPoints(
         ranking.jockeyId,
         jockeyReward,
-        `Thưởng jockey hạng ${rank} từ bounty pool cuộc đua ${race.name}`,
+        `Thưởng nài ngựa hạng ${rank} từ quỹ dự đoán cuộc đua ${race.name}`,
         pool._id,
       );
 
-      const ownerMessage = `Owner nhận ${ownerReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`;
-      const jockeyMessage = `Jockey nhận ${jockeyReward} điểm thưởng hạng ${rank} từ bounty pool cuộc đua ${race.name}.`;
+      const ownerMessage = `Chủ ngựa nhận ${ownerReward} điểm thưởng hạng ${rank} từ quỹ dự đoán cuộc đua ${race.name}.`;
+      const jockeyMessage = `Nài ngựa nhận ${jockeyReward} điểm thưởng hạng ${rank} từ quỹ dự đoán cuộc đua ${race.name}.`;
       const existingOwnerNotification = await Notification.findOne({
         userId: ranking.ownerId,
         type: 'prediction_reward',
@@ -455,7 +455,7 @@ export async function settlePredictionPoolFromResult(
         notifications.push({
           userId: ranking.ownerId,
           type: 'prediction_reward',
-          title: 'Thưởng owner từ bounty pool',
+          title: 'Thưởng chủ ngựa từ quỹ dự đoán',
           message: ownerMessage,
           refModel: 'PredictionPool',
           refId: pool._id,
@@ -465,7 +465,7 @@ export async function settlePredictionPoolFromResult(
         notifications.push({
           userId: ranking.jockeyId,
           type: 'prediction_reward',
-          title: 'Thưởng jockey từ bounty pool',
+          title: 'Thưởng nài ngựa từ quỹ dự đoán',
           message: jockeyMessage,
           refModel: 'PredictionPool',
           refId: pool._id,
@@ -477,7 +477,7 @@ export async function settlePredictionPoolFromResult(
 
   if (pool.organizerFee > 0) {
     const organizerRate = totalWinnerScore === 0 ? NO_WINNER_ORGANIZER_RATE : pool.organizerFeeRate;
-    const organizerNote = `Organizer fee ${organizerRate}% từ bounty pool cuộc đua ${race.name}`;
+    const organizerNote = `Phí ban tổ chức ${organizerRate}% từ quỹ dự đoán cuộc đua ${race.name}`;
     await OrganizerLedger.findOneAndUpdate(
       { predictionPoolId: pool._id },
       {

@@ -55,7 +55,7 @@ const HorseSchema = new Schema<IHorse>(
         validator(value?: string) {
           return !value || /\.pdf($|\?)/i.test(value);
         },
-        message: 'profilePdfUrl must point to a PDF file',
+        message: 'profilePdfUrl phải trỏ tới file PDF',
       },
     },
     profilePdfName: { type: String, trim: true },

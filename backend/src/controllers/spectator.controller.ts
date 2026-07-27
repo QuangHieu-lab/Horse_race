@@ -75,7 +75,7 @@ export class SpectatorController {
   createTopUp = asyncHandler(async (req: Request, res: Response) => {
     const { points } = req.body as { points?: number };
     if (points === undefined) {
-      throw new HttpError(400, 'points là bắt buộc');
+      throw new HttpError(400, 'Số điểm là bắt buộc');
     }
     const result = await paymentService.createMockTopUp(req.user!.id, points);
     res.status(201).json(result);
@@ -84,7 +84,7 @@ export class SpectatorController {
   createPayosTopUp = asyncHandler(async (req: Request, res: Response) => {
     const { points } = req.body as { points?: number };
     if (points === undefined) {
-      throw new HttpError(400, 'points là bắt buộc');
+      throw new HttpError(400, 'Số điểm là bắt buộc');
     }
     const result = await paymentService.createPayosTopUp(req.user!.id, points);
     res.status(201).json(result);

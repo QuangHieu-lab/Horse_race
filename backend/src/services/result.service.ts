@@ -32,8 +32,8 @@ function toResultDto(result: {
     publishedAt: result.publishedAt?.toISOString() ?? null,
     rankings: result.rankings.map((r) => ({
       rank: r.rank,
-      horse: { id: r.horseId.toString(), name: 'Horse' },
-      jockey: { id: r.jockeyId.toString(), fullName: 'Jockey' },
+      horse: { id: r.horseId.toString(), name: 'Ngựa' },
+      jockey: { id: r.jockeyId.toString(), fullName: 'Nài ngựa' },
       finishTime: r.finishTime,
       prize: r.prize,
     })),

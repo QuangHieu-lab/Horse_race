@@ -136,8 +136,8 @@ export async function settleRacePrizesFromResult(
 
     const ownerPrize = pct(prize, ownerShareRate);
     const jockeyPrize = prize - ownerPrize;
-    const ownerNote = `Thưởng cố định owner hạng ${ranking.rank} cuộc đua ${race.name}`;
-    const jockeyNote = `Thưởng cố định jockey hạng ${ranking.rank} cuộc đua ${race.name}`;
+    const ownerNote = `Thưởng cố định cho chủ ngựa hạng ${ranking.rank} cuộc đua ${race.name}`;
+    const jockeyNote = `Thưởng cố định cho nài ngựa hạng ${ranking.rank} cuộc đua ${race.name}`;
 
     const ownerAwarded = await awardRacePrizePoints(
       ranking.ownerId,
@@ -159,8 +159,8 @@ export async function settleRacePrizesFromResult(
       notifications.push({
         userId: ranking.ownerId,
         type: 'race_prize_reward',
-        title: 'Fixed race prize',
-        message: `Owner received ${ownerPrize} points for rank ${ranking.rank} in ${race.name}.`,
+        title: 'Thưởng cuộc đua',
+        message: `Chủ ngựa nhận ${ownerPrize} điểm cho hạng ${ranking.rank} trong cuộc đua ${race.name}.`,
         refModel: 'Result',
         refId: result._id,
       });
@@ -169,8 +169,8 @@ export async function settleRacePrizesFromResult(
       notifications.push({
         userId: ranking.jockeyId,
         type: 'race_prize_reward',
-        title: 'Fixed race prize',
-        message: `Jockey received ${jockeyPrize} points for rank ${ranking.rank} in ${race.name}.`,
+        title: 'Thưởng cuộc đua',
+        message: `Nài ngựa nhận ${jockeyPrize} điểm cho hạng ${ranking.rank} trong cuộc đua ${race.name}.`,
         refModel: 'Result',
         refId: result._id,
       });

@@ -36,17 +36,17 @@ const JockeyInvitationSchema = new Schema<IJockeyInvitation>(
 JockeyInvitationSchema.pre('save', async function (next) {
   const owner = await User.findById(this.horseOwnerId).select('role isActive').lean();
   if (!owner?.isActive || owner.role !== 'horse_owner') {
-    return next(new Error('horseOwnerId must be an active horse_owner'));
+    return next(new Error('Chủ ngựa phải là tài khoản đang hoạt động'));
   }
 
   const jockey = await User.findById(this.jockeyId).select('role isActive').lean();
   if (!jockey?.isActive || jockey.role !== 'jockey') {
-    return next(new Error('jockeyId must be an active jockey'));
+    return next(new Error('Nài ngựa phải là tài khoản đang hoạt động'));
   }
 
   const horse = await Horse.findById(this.horseId);
   if (!horse || horse.ownerId.toString() !== this.horseOwnerId.toString()) {
-    return next(new Error('horse must belong to horseOwnerId'));
+    return next(new Error('Ngựa phải thuộc về chủ ngựa đã chọn'));
   }
 
   if (this.isNew) {

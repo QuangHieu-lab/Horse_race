@@ -73,7 +73,7 @@ function signPayosData(data: Record<string, unknown>): string {
 
 function validateTopUpPoints(points: number): void {
   if (!Number.isInteger(points) || points < MIN_TOPUP_POINTS) {
-    throw new HttpError(400, `Số điểm nạp tối thiểu là ${MIN_TOPUP_POINTS} points`);
+    throw new HttpError(400, `Số điểm nạp tối thiểu là ${MIN_TOPUP_POINTS} điểm`);
   }
 }
 
@@ -90,14 +90,14 @@ async function grantTopUpPoints(payment: typeof PaymentTransaction.prototype): P
     'topup',
     undefined,
     undefined,
-    `Nạp ${payment.points} points (${payment.amountVnd.toLocaleString('vi-VN')} VND)`,
+    `Nạp ${payment.points} điểm (${payment.amountVnd.toLocaleString('vi-VN')} VND)`,
   );
 
   await createNotification({
     userId: payment.userId,
     type: 'points_topup',
     title: 'Nạp điểm thành công',
-    message: `Bạn đã nạp ${payment.points} points vào ví.`,
+    message: `Bạn đã nạp ${payment.points} điểm vào ví.`,
   });
 }
 
@@ -122,7 +122,7 @@ export async function createMockTopUp(
     providerTransactionId,
     providerPayload: {
       mode: 'mock-paid',
-      note: 'Local demo top-up; disable before production.',
+      note: 'Nạp điểm demo.',
     },
     paidAt: new Date(),
   });
@@ -165,7 +165,7 @@ export async function createPayosTopUp(
   const payload = {
     orderCode,
     amount: amountVnd,
-    description: `Topup ${points} pts`,
+    description: `Nap diem ${points}`,
     returnUrl: env.payos.returnUrl,
     cancelUrl: env.payos.cancelUrl,
   };
@@ -215,12 +215,12 @@ export async function confirmPayosPayment(
     providerTransactionId: String(orderCode),
   });
 
-  if (!payment) return { code: '01', message: 'Order not found' };
+  if (!payment) return { code: '01', message: 'Không tìm thấy đơn thanh toán' };
 
   if (payment.status === 'paid') {
     return {
       code: '00',
-      message: 'Order already confirmed',
+      message: 'Đơn thanh toán đã được xác nhận',
       payment: toPaymentDto(payment),
       points: await getOrCreateProfile(payment.userId.toString()),
     };
@@ -237,7 +237,7 @@ export async function confirmPayosPayment(
 
   return {
     code: '00',
-    message: 'Confirm success',
+    message: 'Xác nhận thanh toán thành công',
     payment: toPaymentDto(payment),
     points: await getOrCreateProfile(payment.userId.toString()),
   };
@@ -250,12 +250,12 @@ export async function handlePayosWebhook(
   const data = payload.data ?? {};
   const signature = payload.signature ?? '';
   if (!signature || signPayosData(data) !== signature) {
-    return { code: '97', message: 'Invalid signature' };
+    return { code: '97', message: 'Chữ ký không hợp lệ' };
   }
 
   const orderCode = Number(data.orderCode);
   if (!Number.isFinite(orderCode)) {
-    return { code: '01', message: 'Invalid orderCode' };
+    return { code: '01', message: 'Mã đơn hàng không hợp lệ' };
   }
 
   const amount = Number(data.amount);
@@ -263,15 +263,15 @@ export async function handlePayosWebhook(
     provider: 'payos',
     providerTransactionId: String(orderCode),
   });
-  if (!payment) return { code: '01', message: 'Order not found' };
-  if (amount !== payment.amountVnd) return { code: '04', message: 'Invalid amount' };
+  if (!payment) return { code: '01', message: 'Không tìm thấy đơn thanh toán' };
+  if (amount !== payment.amountVnd) return { code: '04', message: 'Số tiền thanh toán không hợp lệ' };
 
   const paymentStatus = String(data.code ?? payload.code ?? '');
   if (paymentStatus && paymentStatus !== '00') {
     payment.status = 'failed';
     payment.providerPayload = { ...(payment.providerPayload ?? {}), callback: payload };
     await payment.save();
-    return { code: '02', message: 'Payment failed', payment: toPaymentDto(payment) };
+    return { code: '02', message: 'Thanh toán thất bại', payment: toPaymentDto(payment) };
   }
 
   return confirmPayosPayment(orderCode, payload as Record<string, unknown>);

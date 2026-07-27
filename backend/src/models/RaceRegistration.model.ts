@@ -52,14 +52,14 @@ RaceRegistrationSchema.pre('save', async function (next) {
   const horse = await Horse.findById(this.horseId);
   if (!horse) return next(new Error('Horse not found'));
   if (horse.ownerId.toString() !== this.ownerId.toString()) {
-    return next(new Error('ownerId must match horse owner'));
+    return next(new Error('Chủ đăng ký phải là chủ sở hữu của ngựa'));
   }
   if (['pending', 'approved'].includes(this.status) && isPenaltyActive(horse.penaltyStatus)) {
     return next(new Error('Horse is banned from competition'));
   }
   const owner = await User.findById(this.ownerId).select('role isActive penaltyStatus').lean();
   if (!owner?.isActive || owner.role !== 'horse_owner') {
-    return next(new Error('ownerId must be an active horse_owner user'));
+    return next(new Error('Chủ ngựa phải là tài khoản đang hoạt động'));
   }
   if (['pending', 'approved'].includes(this.status) && isPenaltyActive(owner.penaltyStatus)) {
     return next(new Error('Horse owner is banned from competition'));
@@ -73,10 +73,10 @@ RaceRegistrationSchema.pre('save', async function (next) {
   if (this.jockeyId) {
     const jockey = await User.findById(this.jockeyId).select('role isActive jockeyProfile.penaltyStatus').lean();
     if (!jockey?.isActive || jockey.role !== 'jockey') {
-      return next(new Error('jockeyId must be an active jockey user'));
+      return next(new Error('Nài ngựa phải là tài khoản đang hoạt động'));
     }
     if (['pending', 'approved'].includes(this.status) && isPenaltyActive(jockey.jockeyProfile?.penaltyStatus)) {
-      return next(new Error('Jockey is banned from competition'));
+      return next(new Error('Nài ngựa đang bị cấm thi đấu'));
     }
   }
 

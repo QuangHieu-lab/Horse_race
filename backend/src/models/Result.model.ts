@@ -155,12 +155,12 @@ ResultSchema.pre('save', async function (next) {
       return next(new Error('Result can only be confirmed after race is completed'));
     }
     if (this.protests.some((p) => p.status === 'pending')) {
-      return next(new Error('Cannot confirm result while a protest is pending'));
+      return next(new Error('Không thể xác nhận kết quả khi còn khiếu nại đang chờ xử lý'));
     }
   }
 
   if (this.isModified('publishedAt') && this.publishedAt) {
-    if (!this.confirmedAt) return next(new Error('Result must be confirmed before publish'));
+    if (!this.confirmedAt) return next(new Error('Kết quả phải được xác nhận trước khi công bố'));
     try {
       const { scorePredictionsFromResult } = await import(
         '../services/prediction-scoring.service.js'

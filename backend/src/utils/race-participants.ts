@@ -11,7 +11,7 @@ export function validateParticipants(
   requireAssignedLanes = false,
 ): string | null {
   if (participants.length > maxParticipants) {
-    return `participants exceed maxParticipants (${maxParticipants})`;
+    return `Số ngựa tham gia vượt quá giới hạn tối đa (${maxParticipants})`;
   }
 
   const active = activeParticipants(participants);
@@ -24,24 +24,24 @@ export function validateParticipants(
     const horseKey = p.horseId.toString();
     const jockeyKey = p.jockeyId.toString();
 
-    if (horseIds.has(horseKey)) return 'duplicate horseId in active participants';
-    if (jockeyIds.has(jockeyKey)) return 'duplicate jockeyId in active participants';
+    if (horseIds.has(horseKey)) return 'Trùng ngựa trong danh sách thi đấu';
+    if (jockeyIds.has(jockeyKey)) return 'Trùng nài ngựa trong danh sách thi đấu';
     horseIds.add(horseKey);
     jockeyIds.add(jockeyKey);
 
     if (p.laneNumber === undefined || p.laneNumber === null) {
-      if (requireAssignedLanes) return 'laneNumber is required for active participants';
+      if (requireAssignedLanes) return 'Ngựa đang thi đấu phải được gán làn chạy';
       continue;
     }
 
     if (p.laneNumber < 1 || p.laneNumber > maxParticipants) {
-      return `laneNumber must be between 1 and ${maxParticipants}`;
+      return `Số làn chạy phải nằm trong khoảng 1 đến ${maxParticipants}`;
     }
-    if (lanes.has(p.laneNumber)) return 'duplicate laneNumber in active participants';
+    if (lanes.has(p.laneNumber)) return 'Trùng số làn chạy trong danh sách thi đấu';
     lanes.add(p.laneNumber);
 
     const cloth = p.clothNumber ?? p.laneNumber;
-    if (cloths.has(cloth)) return 'duplicate clothNumber in active participants';
+    if (cloths.has(cloth)) return 'Trùng số áo trong danh sách thi đấu';
     cloths.add(cloth);
   }
 
@@ -52,12 +52,12 @@ export function validatePreRaceChecks(participants: IParticipant[]): string | nu
   const active = activeParticipants(participants);
   const missingVet = active.filter((p) => !p.vetApprovedAt);
   if (missingVet.length > 0) {
-    return 'All active participants must pass the veterinary check before the race can start';
+    return 'Tất cả ngựa đang thi đấu phải đạt kiểm tra thú y trước khi bắt đầu cuộc đua';
   }
 
   const missingConfirmation = active.filter((p) => !p.confirmedAt);
   if (missingConfirmation.length > 0) {
-    return 'All active participants must have their race information confirmed before the race can start';
+    return 'Tất cả ngựa đang thi đấu phải được xác nhận thông tin trước khi bắt đầu cuộc đua';
   }
 
   return null;

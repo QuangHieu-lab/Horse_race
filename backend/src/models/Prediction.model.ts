@@ -50,7 +50,7 @@ const PredictionSchema = new Schema<IPrediction>(
             new Set(horseIds).size === horseIds.length
           );
         },
-        message: 'predictedRanks must have unique ranks and unique horses',
+        message: 'Danh sách dự đoán không được trùng thứ hạng hoặc trùng ngựa',
       },
     },
     status: {

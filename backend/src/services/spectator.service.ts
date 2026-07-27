@@ -128,11 +128,11 @@ async function buildSpectatorRaceDto(
         rank: r.rank,
         horse: {
           id: r.horseId.toString(),
-          name: rHorseMap.get(r.horseId.toString()) ?? 'Unknown',
+          name: rHorseMap.get(r.horseId.toString()) ?? 'Không rõ',
         },
         jockey: {
           id: r.jockeyId.toString(),
-          fullName: jockeyMap.get(r.jockeyId.toString()) ?? 'Unknown',
+          fullName: jockeyMap.get(r.jockeyId.toString()) ?? 'Không rõ',
         },
         finishTime: r.finishTime,
         prize: r.prize,
@@ -193,7 +193,7 @@ async function buildSpectatorRaceDto(
     tournament: { id: tournament._id.toString(), name: tournament.name },
     participants: race.participants.map((p) => ({
       id: p.horseId.toString(),
-      name: horseMap.get(p.horseId.toString()) ?? 'Unknown',
+      name: horseMap.get(p.horseId.toString()) ?? 'Không rõ',
       laneNumber: p.laneNumber ?? 0,
       ticketCount: ticketCountByHorse.get(p.horseId.toString()) ?? 0,
     })),
@@ -326,7 +326,7 @@ export async function listHorseLeaderboard(limit = 10): Promise<HorseLeaderboard
     return {
       rank: index + 1,
       horseId: item.horseId.toString(),
-      horseName: horseNameById.get(item.horseId.toString()) ?? 'Unknown',
+      horseName: horseNameById.get(item.horseId.toString()) ?? 'Không rõ',
       ownerId,
       ownerName: ownerId ? ownerNameById.get(ownerId) ?? null : null,
       firstPlaceWins: item.firstPlaceWins,
@@ -546,12 +546,12 @@ export async function listPredictions(spectatorId: string): Promise<PredictionDt
   return predictions.map((p) => {
     const race = raceMap.get(p.raceId.toString());
     const tournamentName = race
-      ? (tournamentMap.get(race.tournamentId.toString()) ?? 'Unknown')
-      : 'Unknown';
+      ? (tournamentMap.get(race.tournamentId.toString()) ?? 'Không rõ')
+      : 'Không rõ';
     return {
       id: p._id.toString(),
       raceId: p.raceId.toString(),
-      raceName: race?.name ?? 'Unknown',
+      raceName: race?.name ?? 'Không rõ',
       tournamentName,
       predictedRanks: p.predictedRanks.map((r) => ({
         rank: r.rank,
