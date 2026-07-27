@@ -34,6 +34,7 @@ import {
 } from '../models/index.js';
 
 const DEMO_PASSWORD = 'Demo@123';
+const SEED_VND_PER_POINT = 0.01;
 
 const COLLECTIONS_TO_CLEAR = [
   'auditlogs',
@@ -318,9 +319,9 @@ async function seed(): Promise<void> {
     {
       userId: spectator._id,
       provider: 'mock',
-      amountVnd: 250_000_000,
+      amountVnd: Math.ceil(250_000 * SEED_VND_PER_POINT),
       points: 250_000,
-      exchangeRateVndPerPoint: 1000,
+      exchangeRateVndPerPoint: SEED_VND_PER_POINT,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator',
       providerPayload: { mode: 'seed' },
@@ -329,9 +330,9 @@ async function seed(): Promise<void> {
     {
       userId: spectator2._id,
       provider: 'mock',
-      amountVnd: 250_000_000,
+      amountVnd: Math.ceil(250_000 * SEED_VND_PER_POINT),
       points: 250_000,
-      exchangeRateVndPerPoint: 1000,
+      exchangeRateVndPerPoint: SEED_VND_PER_POINT,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator2',
       providerPayload: { mode: 'seed' },
@@ -340,9 +341,9 @@ async function seed(): Promise<void> {
     {
       userId: spectator3._id,
       provider: 'mock',
-      amountVnd: 300_000_000,
+      amountVnd: Math.ceil(300_000 * SEED_VND_PER_POINT),
       points: 300_000,
-      exchangeRateVndPerPoint: 1000,
+      exchangeRateVndPerPoint: SEED_VND_PER_POINT,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator3',
       providerPayload: { mode: 'seed' },
@@ -351,9 +352,9 @@ async function seed(): Promise<void> {
     {
       userId: spectator4._id,
       provider: 'mock',
-      amountVnd: 400_000_000,
+      amountVnd: Math.ceil(400_000 * SEED_VND_PER_POINT),
       points: 400_000,
-      exchangeRateVndPerPoint: 1000,
+      exchangeRateVndPerPoint: SEED_VND_PER_POINT,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator4',
       providerPayload: { mode: 'seed' },
@@ -362,9 +363,9 @@ async function seed(): Promise<void> {
     {
       userId: spectator5._id,
       provider: 'mock',
-      amountVnd: 400_000_000,
+      amountVnd: Math.ceil(400_000 * SEED_VND_PER_POINT),
       points: 400_000,
-      exchangeRateVndPerPoint: 1000,
+      exchangeRateVndPerPoint: SEED_VND_PER_POINT,
       status: 'paid',
       providerTransactionId: 'seed_mock_topup_spectator5',
       providerPayload: { mode: 'seed' },

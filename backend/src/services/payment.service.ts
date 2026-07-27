@@ -12,7 +12,8 @@ import { HttpError } from '../utils/http-error.js';
 import { createNotification } from './notification.service.js';
 import { getOrCreateProfile } from './spectator.service.js';
 
-export const VND_PER_POINT = 1000;
+export const POINTS_PER_1000_VND = 100_000;
+export const VND_PER_POINT = 1000 / POINTS_PER_1000_VND;
 export const MIN_TOPUP_POINTS = 100;
 
 type PayosWebhookPayload = {
@@ -105,13 +106,10 @@ export async function createMockTopUp(
   points: number,
   provider: PaymentProvider = 'mock',
 ): Promise<{ payment: PaymentTransactionDto; points: SpectatorPointsDto }> {
-  if (!env.allowMockTopUp) {
-    throw new HttpError(403, 'Mock top-up đã bị khóa trên môi trường này');
-  }
   validateTopUpPoints(points);
 
   const userObjectId = new mongoose.Types.ObjectId(userId);
-  const amountVnd = points * VND_PER_POINT;
+  const amountVnd = Math.ceil(points * VND_PER_POINT);
   const providerTransactionId = `${provider}_${Date.now()}_${userObjectId.toString().slice(-6)}`;
 
   const payment = await PaymentTransaction.create({
@@ -145,7 +143,7 @@ export async function createPayosTopUp(
   validateTopUpPoints(points);
 
   const userObjectId = new mongoose.Types.ObjectId(userId);
-  const amountVnd = points * VND_PER_POINT;
+  const amountVnd = Math.ceil(points * VND_PER_POINT);
   const expiredAt = new Date(Date.now() + 15 * 60 * 1000);
   const orderCode = Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-12));
 
