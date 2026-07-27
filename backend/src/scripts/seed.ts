@@ -1126,7 +1126,8 @@ async function seed(): Promise<void> {
       },
     ],
   });
-  await Result.create({
+  const seedHorseBanUntil = daysFromNow(14);
+  const leaderboardDQResult = await Result.create({
     raceId: leaderboardRace3._id,
     tournamentId: tournamentSpring._id,
     rankings: [
@@ -1144,7 +1145,7 @@ async function seed(): Promise<void> {
         type: 'medical',
         description: 'Seed DQ demo — ngựa xuất huyết phổi khi đua (EIPH), đình chỉ 14 ngày, loại khỏi leaderboard',
         penaltyApplied: 'time_ban',
-        bannedUntil: daysFromNow(14),
+        bannedUntil: seedHorseBanUntil,
         recordedAt: new Date(),
       },
     ],
@@ -1298,6 +1299,21 @@ async function seed(): Promise<void> {
     });
     await raceFiveReadyDoc.save();
   }
+
+  const seededBanViolation = leaderboardDQResult.violations[0];
+  if (!seedHorseBanUntil || !seededBanViolation) {
+    throw new Error('Seed safety check failed: horse ban violation must have bannedUntil');
+  }
+  await Horse.findByIdAndUpdate(horseA._id, {
+    $set: {
+      penaltyStatus: {
+        isBanned: true,
+        bannedUntil: seedHorseBanUntil,
+        currentViolationId: seededBanViolation._id ?? null,
+        reason: 'Seed DQ demo — EIPH, đình chỉ 14 ngày',
+      },
+    },
+  });
 
   await Product.create([
     {
