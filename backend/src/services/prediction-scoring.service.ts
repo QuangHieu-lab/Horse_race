@@ -141,7 +141,7 @@ export async function scorePredictionsFromResult(
             'earned_bonus',
             'Prediction',
             prediction._id,
-            `Bonus top 3 — ${race.name}`,
+            `Thưởng đoán đúng top 3 - ${race.name}`,
           );
         }
       }

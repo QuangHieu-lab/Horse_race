@@ -230,12 +230,12 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
 function mapRaceSaveError(err: unknown): HttpError {
   const message = err instanceof Error ? err.message : 'Không thể cập nhật trận đua';
   if (
-    message.includes('at least 2 active participants') ||
-    message.includes('can only be completed from ongoing')
+    message.includes('ít nhất 2 ngựa') ||
+    message.includes('Chỉ có thể kết thúc cuộc đua')
   ) {
     return new HttpError(409, message);
   }
-  if (message.includes('scheduledAt must be in the future')) {
+  if (message.includes('Thời gian đua phải ở tương lai')) {
     return new HttpError(400, message);
   }
   if (message.includes('participants')) {

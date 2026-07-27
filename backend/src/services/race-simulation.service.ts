@@ -209,9 +209,9 @@ export async function getRaceReplayTimeline(
     const jockey = participant?.jockeyId as unknown as { _id: mongoose.Types.ObjectId; fullName: string } | undefined;
     return {
       horseId: r.horseId.toString(),
-      horseName: horse?.name ?? 'Unknown',
+      horseName: horse?.name ?? 'Không rõ',
       jockeyId: r.jockeyId.toString(),
-      jockeyName: jockey?.fullName ?? 'Unknown',
+      jockeyName: jockey?.fullName ?? 'Không rõ',
       ownerId: r.ownerId.toString(),
       laneNumber: participant?.laneNumber ?? 0,
       clothNumber: participant?.clothNumber ?? participant?.laneNumber ?? 0,

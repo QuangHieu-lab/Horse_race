@@ -124,7 +124,7 @@ SpectatorProfileSchema.methods.spendPoints = async function (
   note?: string,
 ) {
   if (this.currentBalance < points) {
-    throw new Error('Insufficient points balance');
+    throw new Error('Không đủ điểm trong ví');
   }
   this.totalPointsSpent += points;
   this.currentBalance -= points;

@@ -160,7 +160,7 @@ const swaggerDefinition = {
       BountyPoolFormula: {
         type: 'object',
         description:
-          'Prediction bounty pool settlement formula used when admin publishes race results. Points are internal credits; current exchange for top-up is 1000 VND = 1 point.',
+          'Prediction bounty pool settlement formula used when admin publishes race results. Points are internal credits; current exchange for top-up is 1000 VND = 100000 points.',
         properties: {
           totalBountyPool: {
             type: 'string',
@@ -285,7 +285,7 @@ const swaggerDefinition = {
             type: 'integer',
             minimum: 100,
             example: 100,
-            description: 'Minimum top-up is 100 points. Current exchange rate is 1000 VND = 1 point.',
+            description: 'Minimum top-up is 100 points. Current exchange rate is 1000 VND = 100000 points.',
           },
         },
       },
@@ -307,7 +307,7 @@ const swaggerDefinition = {
           provider: { type: 'string', example: 'payos' },
           amountVnd: { type: 'number', example: 100000 },
           points: { type: 'integer', example: 100 },
-          exchangeRateVndPerPoint: { type: 'number', example: 1000 },
+          exchangeRateVndPerPoint: { type: 'number', example: 0.01 },
           status: { type: 'string', example: 'paid' },
           providerTransactionId: { type: 'string', nullable: true },
           paidAt: { type: 'string', format: 'date-time', nullable: true },
@@ -1914,7 +1914,7 @@ const swaggerDefinition = {
         tags: ['Spectator'],
         summary: 'Mock top-up: convert money to points',
         description:
-          'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 1000 VND = 1 point; minimum top-up is 100 points. Intended for local/demo testing and can be disabled by environment config.',
+          'Creates a paid mock payment transaction and adds points to the spectator profile. Current exchange: 1000 VND = 100000 points; minimum top-up is 100 points. Intended for demo testing.',
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1940,7 +1940,6 @@ const swaggerDefinition = {
             },
           },
           400: { description: 'points is missing or below minimum' },
-          403: { description: 'Mock top-up is disabled on this environment' },
         },
       },
     },

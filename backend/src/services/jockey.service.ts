@@ -190,7 +190,7 @@ export async function respondToInvitation(
     await createNotification({
       userId: invitation.horseOwnerId,
       type: 'invitation_declined',
-      title: 'Jockey từ chối lời mời',
+      title: 'Nài ngựa từ chối lời mời',
       message: `Kỵ sĩ đã từ chối điều khiển ${horse?.name ?? 'ngựa'} tại ${race?.name ?? 'cuộc đua'}.`,
       refModel: 'JockeyInvitation',
       refId: invitation._id,
@@ -213,7 +213,7 @@ export async function respondToInvitation(
     await createNotification({
       userId: invitation.horseOwnerId,
       type: 'invitation_accepted',
-      title: 'Jockey chấp nhận lời mời',
+      title: 'Nài ngựa chấp nhận lời mời',
       message: `${jockey?.fullName ?? 'Kỵ sĩ'} đã chấp nhận điều khiển ${horse?.name ?? 'ngựa'} tại ${race?.name ?? 'cuộc đua'}.`,
       refModel: 'JockeyInvitation',
       refId: invitation._id,
@@ -290,11 +290,11 @@ async function buildJockeyRaceDto(
         rank: r.rank,
         horse: {
           id: r.horseId.toString(),
-          name: horseMap.get(r.horseId.toString()) ?? 'Unknown',
+          name: horseMap.get(r.horseId.toString()) ?? 'Không rõ',
         },
         jockey: {
           id: r.jockeyId.toString(),
-          fullName: jockeyMap.get(r.jockeyId.toString()) ?? 'Unknown',
+          fullName: jockeyMap.get(r.jockeyId.toString()) ?? 'Không rõ',
         },
         finishTime: r.finishTime,
         prize: r.prize,

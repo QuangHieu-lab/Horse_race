@@ -136,7 +136,7 @@ RaceSchema.set('toObject', { virtuals: true });
 
 RaceSchema.pre('save', function (next) {
   if (this.isNew && this.scheduledAt <= new Date()) {
-    return next(new Error('scheduledAt must be in the future'));
+    return next(new Error('Thời gian đua phải ở tương lai'));
   }
 
   const participantErr = validateParticipants(
@@ -148,7 +148,7 @@ RaceSchema.pre('save', function (next) {
 
   const activeCount = activeParticipants(this.participants).length;
   if (this.isModified('status') && ['ready', 'ongoing'].includes(this.status) && activeCount < 2) {
-    return next(new Error('Race needs at least 2 active participants to start'));
+    return next(new Error('Cuộc đua cần ít nhất 2 ngựa đang thi đấu để bắt đầu'));
   }
 
   if (this.isModified('status') && this.status === 'cancelled' && !this.cancelledAt) {
@@ -163,7 +163,7 @@ RaceSchema.pre('save', async function (next) {
 
   const prev = await mongoose.model<IRace>('Race').findById(this._id).select('status').lean();
   if (prev && prev.status !== 'ongoing' && prev.status !== 'completed') {
-    return next(new Error('Race can only be completed from ongoing status'));
+    return next(new Error('Chỉ có thể kết thúc cuộc đua khi cuộc đua đang diễn ra'));
   }
   next();
 });

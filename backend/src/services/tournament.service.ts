@@ -37,21 +37,21 @@ function validatePredictionConfigRates(config: ITournament['predictionConfig']):
     quickRiskMultipliers.length > 0 &&
     quickRiskMultipliers.some((multiplier) => !Number.isInteger(multiplier) || multiplier < 1)
   ) {
-    throw new HttpError(400, 'Allowed risk multipliers must contain positive integers');
+    throw new HttpError(400, 'Các hệ số rủi ro cho phép phải là số nguyên dương');
   }
   const fixedPrizeTopCount = config.fixedPrizeTopCount ?? 5;
   const fixedPrizeRankRates = config.fixedPrizeRankRates ?? [50, 25, 12, 8, 5];
   if (![4, 5].includes(fixedPrizeTopCount)) {
-    throw new HttpError(400, 'Fixed prize top count must be 4 or 5');
+    throw new HttpError(400, 'Số hạng nhận giải cố định phải là 4 hoặc 5');
   }
   if (fixedPrizeRankRates.length !== fixedPrizeTopCount) {
-    throw new HttpError(400, 'Fixed prize rank rates must match fixed prize top count');
+    throw new HttpError(400, 'Số tỷ lệ giải cố định phải khớp với số hạng nhận giải');
   }
   if (fixedPrizeRankRates.some((rate) => rate < 0)) {
-    throw new HttpError(400, 'Fixed prize rank rates must contain non-negative numbers');
+    throw new HttpError(400, 'Tỷ lệ giải cố định theo hạng phải là số không âm');
   }
   if (fixedPrizeRankRates.reduce((sum, rate) => sum + rate, 0) !== 100) {
-    throw new HttpError(400, 'Fixed prize rank rates must sum to 100');
+    throw new HttpError(400, 'Tổng tỷ lệ giải cố định theo hạng phải bằng 100');
   }
 }
 
@@ -160,7 +160,7 @@ export async function updateTournamentPrizePool(id: string, prizePool: number) {
     throw new HttpError(400, 'ID giải đấu không hợp lệ');
   }
   if (!Number.isFinite(prizePool) || prizePool < 0) {
-    throw new HttpError(400, 'Prize pool must be a non-negative number');
+    throw new HttpError(400, 'Quỹ giải thưởng phải là số không âm');
   }
 
   const tournament = await Tournament.findById(id);

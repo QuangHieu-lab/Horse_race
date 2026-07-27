@@ -24,7 +24,7 @@ const PaymentTransactionSchema = new Schema<IPaymentTransaction>(
     provider: { type: String, enum: ['mock', 'fdi', 'payos'], default: 'mock', required: true },
     amountVnd: { type: Number, required: true, min: 0 },
     points: { type: Number, required: true, min: 1 },
-    exchangeRateVndPerPoint: { type: Number, required: true, min: 1 },
+    exchangeRateVndPerPoint: { type: Number, required: true, min: 0 },
     status: {
       type: String,
       enum: ['pending', 'paid', 'failed', 'expired', 'cancelled'],
