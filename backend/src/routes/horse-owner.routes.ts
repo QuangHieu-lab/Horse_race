@@ -17,6 +17,7 @@ horseOwnerRouter.get('/registrations', controller.listMyRegistrations);
 horseOwnerRouter.delete('/registrations/:id', controller.cancelRegistration);
 
 // --- API Lời mời Nài ngựa ---
+horseOwnerRouter.get('/invitations', controller.listMyInvitations);
 horseOwnerRouter.post('/invitations', controller.inviteJockey);
 
 // --- API Tìm kiếm Jockey theo tên ---

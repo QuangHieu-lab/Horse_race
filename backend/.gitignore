@@ -3,3 +3,12 @@ dist/
 .env
 *.log
 uploads/
+
+# Agent-local instructions
+AGENTS.md
+agents.md
+CLAUDE.md
+claude.md
+SKILL.md
+skill.md
+

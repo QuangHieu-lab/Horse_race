@@ -102,6 +102,13 @@ export class HorseOwnerController {
   // 3. THUÊ JOCKEY (NÀI NGỰA)
   // ==========================================================
 
+  listMyInvitations = asyncHandler(async (req: Request, res: Response) => {
+    const status = req.query.status as string | undefined;
+    const invitations = await horseOwnerService.getMyInvitations(req.user!.id, status);
+
+    res.json({ success: true, data: invitations });
+  });
+
   inviteJockey = asyncHandler(async (req: Request, res: Response) => {
     const input = req.body as InviteJockeyInput;
 

@@ -340,6 +340,42 @@ async deleteHorse(ownerId: string, horseId: string) {
 
   // --- THUÊ JOCKEY ---
 
+  /**
+   * Danh sách lời mời Chủ ngựa đã gửi.
+   *
+   * `RaceRegistration.jockeyId` chỉ được gán khi Nài ngựa chấp nhận, nên nếu chỉ
+   * đọc đơn đăng ký thì Chủ ngựa không thấy được lời mời đang chờ hoặc bị từ chối.
+   */
+  async getMyInvitations(ownerId: string, status?: string): Promise<InvitationDto[]> {
+    const query: Record<string, unknown> = {
+      horseOwnerId: new mongoose.Types.ObjectId(ownerId),
+    };
+    if (status) query.status = status;
+
+    const invitations = await JockeyInvitation.find(query)
+      .populate('horseId', 'name penaltyStatus breed age')
+      .populate('raceId', 'name scheduledAt status distance surface trackId tournamentId')
+      .populate('horseOwnerId', 'fullName')
+      .populate('jockeyId', 'fullName')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Bỏ qua lời mời mồ côi (ngựa hoặc cuộc đua đã bị xóa) — cùng cách xử lý như getMyRegistrations
+    const alive = invitations.filter((inv) => inv.raceId && inv.horseId);
+
+    return Promise.all(
+      alive.map(async (inv) => {
+        const raceExtras = await resolveInvitationRaceExtras(
+          inv.raceId as unknown as {
+            trackId?: mongoose.Types.ObjectId | null;
+            tournamentId: mongoose.Types.ObjectId;
+          },
+        );
+        return toInvitationDto(inv, raceExtras);
+      }),
+    );
+  }
+
   async inviteJockey(ownerId: string, input: InviteJockeyInput): Promise<InvitationDto> {
     const { raceId, horseId, jockeyId, message } = input;
 
