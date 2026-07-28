@@ -1,7 +1,14 @@
-import { User } from '../models/User.model.js';
+import mongoose from 'mongoose';
+import {
+  User,
+  type IJockeyProfile,
+  type IRefereeProfile,
+  type IUser,
+} from '../models/User.model.js';
 import type { UserRole } from '../types/shared.types.js';
 import { USER_ROLES } from '../types/shared.types.js';
 import { validateEmail, validatePassword } from './auth.service.js';
+import { ensureJockeyLicenseNumber } from './jockey-license.service.js';
 import { HttpError } from '../utils/http-error.js';
 import { Horse } from '../models/Horse.model.js';
 import { JockeyInvitation } from '../models/JockeyInvitation.model.js';
@@ -47,6 +54,43 @@ export interface UpdateAdminUserInput {
   certificationId?: string | null;
 }
 
+export type JockeyApplicationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface JockeyApplicationDto {
+  id: string;
+  email: string;
+  fullName: string;
+  phone?: string | null;
+  status: JockeyApplicationStatus;
+  applicationPdfUrl: string;
+  applicationPdfName: string;
+  appliedAt: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  adminNote: string | null;
+  isActive: boolean;
+}
+
+function toJockeyApplicationDto(
+  user: IUser & { _id: { toString(): string } },
+): JockeyApplicationDto {
+  const profile = user.jockeyProfile;
+  return {
+    id: user._id.toString(),
+    email: user.email,
+    fullName: user.fullName,
+    phone: user.phone ?? null,
+    status: profile?.approvalStatus ?? 'approved',
+    applicationPdfUrl: profile?.applicationPdfUrl ?? '',
+    applicationPdfName: profile?.applicationPdfName ?? 'Hồ sơ Jockey.pdf',
+    appliedAt: profile?.appliedAt ? new Date(profile.appliedAt).toISOString() : null,
+    reviewedAt: profile?.reviewedAt ? new Date(profile.reviewedAt).toISOString() : null,
+    reviewedBy: profile?.reviewedBy?.toString() ?? null,
+    adminNote: profile?.adminNote ?? null,
+    isActive: user.isActive,
+  };
+}
+
 function toAdminUserDto(user: {
   _id: { toString(): string };
   email: string;
@@ -80,19 +124,28 @@ function assertRole(role: string): asserts role is UserRole {
 
 function applyRoleProfile(user: {
   role: UserRole;
-  jockeyProfile?: unknown;
-  refereeProfile?: unknown;
+  jockeyProfile?: IJockeyProfile;
+  refereeProfile?: IRefereeProfile;
 }, input: {
   licenseNumber?: string | null;
   licenseExpiry?: string | null;
   certificationId?: string | null;
 } = {}) {
   if (user.role === 'jockey') {
+    const currentProfile = user.jockeyProfile;
     user.jockeyProfile = {
-      licenseNumber: input.licenseNumber?.trim() || undefined,
-      licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : null,
-      isSuspended: false,
-      penaltyStatus: {
+      ...currentProfile,
+      licenseNumber:
+        input.licenseNumber !== undefined
+          ? input.licenseNumber?.trim() || undefined
+          : currentProfile?.licenseNumber,
+      licenseExpiry:
+        input.licenseExpiry !== undefined
+          ? input.licenseExpiry ? new Date(input.licenseExpiry) : null
+          : currentProfile?.licenseExpiry ?? null,
+      approvalStatus: currentProfile?.approvalStatus ?? 'approved',
+      isSuspended: currentProfile?.isSuspended ?? false,
+      penaltyStatus: currentProfile?.penaltyStatus ?? {
         isBanned: false,
         bannedUntil: null,
         currentViolationId: null,
@@ -124,6 +177,55 @@ export async function listUsers(): Promise<AdminUserDto[]> {
   return users.map(toAdminUserDto);
 }
 
+export async function listJockeyApplications(
+  status?: JockeyApplicationStatus,
+): Promise<JockeyApplicationDto[]> {
+  if (status && !['pending', 'approved', 'rejected'].includes(status)) {
+    throw new HttpError(400, 'Trạng thái hồ sơ Jockey không hợp lệ');
+  }
+
+  const query: Record<string, unknown> = {
+    role: 'jockey',
+    'jockeyProfile.applicationPdfUrl': { $exists: true, $ne: '' },
+  };
+  if (status) query['jockeyProfile.approvalStatus'] = status;
+
+  const users = await User.find(query).sort({ 'jockeyProfile.appliedAt': -1 });
+  return users.map((user) => toJockeyApplicationDto(user));
+}
+
+export async function reviewJockeyApplication(
+  actorId: string,
+  userId: string,
+  status: Exclude<JockeyApplicationStatus, 'pending'>,
+  adminNote?: string,
+): Promise<JockeyApplicationDto> {
+  if (!mongoose.isValidObjectId(userId)) {
+    throw new HttpError(400, 'ID hồ sơ Jockey không hợp lệ');
+  }
+  if (!['approved', 'rejected'].includes(status)) {
+    throw new HttpError(400, 'Trạng thái phải là approved hoặc rejected');
+  }
+
+  const user = await User.findById(userId);
+  if (!user || user.role !== 'jockey' || !user.jockeyProfile?.applicationPdfUrl) {
+    throw new HttpError(404, 'Không tìm thấy hồ sơ đăng ký Jockey');
+  }
+  if (user.jockeyProfile.approvalStatus !== 'pending') {
+    throw new HttpError(409, 'Hồ sơ Jockey này đã được xử lý');
+  }
+
+  user.jockeyProfile.approvalStatus = status;
+  user.jockeyProfile.reviewedAt = new Date();
+  user.jockeyProfile.reviewedBy = new mongoose.Types.ObjectId(actorId);
+  user.jockeyProfile.adminNote = adminNote?.trim() || null;
+  user.isActive = status === 'approved';
+  ensureJockeyLicenseNumber(user);
+  await user.save();
+
+  return toJockeyApplicationDto(user);
+}
+
 export async function createUser(input: CreateAdminUserInput): Promise<AdminUserDto> {
   validateEmail(input.email);
   validatePassword(input.password);
@@ -146,6 +248,7 @@ export async function createUser(input: CreateAdminUserInput): Promise<AdminUser
     isActive: true,
   });
   applyRoleProfile(user, input);
+  ensureJockeyLicenseNumber(user);
   await user.save();
 
   return toAdminUserDto(user);
@@ -193,6 +296,7 @@ export async function updateUser(
     applyRoleProfile(user, input);
   }
 
+  ensureJockeyLicenseNumber(user);
   await user.save();
   return toAdminUserDto(user);
 }

@@ -6,6 +6,29 @@ import * as resultService from '../services/result.service.js';
 import { HttpError } from '../utils/http-error.js';
 
 export class AdminController {
+  listJockeyApplications = asyncHandler(async (req: Request, res: Response) => {
+    const status = req.query.status as adminService.JockeyApplicationStatus | undefined;
+    const applications = await adminService.listJockeyApplications(status);
+    res.json({ applications });
+  });
+
+  reviewJockeyApplication = asyncHandler(async (req: Request, res: Response) => {
+    const { status, adminNote } = req.body as {
+      status?: 'approved' | 'rejected';
+      adminNote?: string;
+    };
+    if (!status || !['approved', 'rejected'].includes(status)) {
+      throw new HttpError(400, 'status phải là approved hoặc rejected');
+    }
+    const application = await adminService.reviewJockeyApplication(
+      req.user!.id,
+      req.params.id as string,
+      status,
+      adminNote,
+    );
+    res.json({ application });
+  });
+
   listUsers = asyncHandler(async (_req: Request, res: Response) => {
     const users = await adminService.listUsers();
     res.json({ users });

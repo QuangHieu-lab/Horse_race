@@ -7,7 +7,9 @@ import { HttpError } from '../utils/http-error.js';
 // Thư mục lưu file tải lên (tạo nếu chưa có)
 export const UPLOAD_ROOT = path.join(process.cwd(), 'uploads');
 const HORSE_PDF_DIR = path.join(UPLOAD_ROOT, 'horses');
+const JOCKEY_PDF_DIR = path.join(UPLOAD_ROOT, 'jockey-applications');
 fs.mkdirSync(HORSE_PDF_DIR, { recursive: true });
+fs.mkdirSync(JOCKEY_PDF_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, HORSE_PDF_DIR),
@@ -46,4 +48,45 @@ export function runHorsePdfUpload(req: Request, res: Response): Promise<void> {
       reject(new HttpError(400, 'Tải file thất bại'));
     });
   });
+}
+
+const jockeyPdfStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, JOCKEY_PDF_DIR),
+  filename: (_req, _file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `jockey-application-${unique}.pdf`);
+  },
+});
+
+const uploadJockeyApplicationPdf = multer({
+  storage: jockeyPdfStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const isPdf = file.mimetype === 'application/pdf' && /\.pdf$/i.test(file.originalname);
+    if (!isPdf) {
+      cb(new HttpError(400, 'Chỉ chấp nhận file PDF'));
+      return;
+    }
+    cb(null, true);
+  },
+}).single('file');
+
+/** Nhận hồ sơ đăng ký Jockey dạng PDF, tối đa 10 MB, field name = "file". */
+export function runJockeyApplicationPdfUpload(req: Request, res: Response): Promise<void> {
+  return new Promise((resolve, reject) => {
+    uploadJockeyApplicationPdf(req, res, (err: unknown) => {
+      if (!err) return resolve();
+      if (err instanceof HttpError) return reject(err);
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') return reject(new HttpError(400, 'File vượt quá 10MB'));
+        return reject(new HttpError(400, err.message));
+      }
+      reject(new HttpError(400, 'Tải file thất bại'));
+    });
+  });
+}
+
+export async function removeUploadedFile(filePath?: string): Promise<void> {
+  if (!filePath) return;
+  await fs.promises.unlink(filePath).catch(() => undefined);
 }

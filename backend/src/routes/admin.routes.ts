@@ -4,6 +4,8 @@ import { AdminController } from '../controllers/admin.controller.js';
 export const adminRouter = Router();
 const adminController = new AdminController();
 
+adminRouter.get('/jockey-applications', adminController.listJockeyApplications);
+adminRouter.patch('/jockey-applications/:id', adminController.reviewJockeyApplication);
 adminRouter.get('/users', adminController.listUsers);
 adminRouter.post('/users', adminController.createUser);
 adminRouter.patch('/users/:id', adminController.updateUser);

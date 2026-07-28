@@ -7,6 +7,13 @@ import { USER_ROLES } from '../types/shared.types.js';
 export interface IJockeyProfile {
   licenseNumber?: string;
   licenseExpiry?: Date | null;
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  applicationPdfUrl?: string;
+  applicationPdfName?: string;
+  appliedAt?: Date | null;
+  reviewedAt?: Date | null;
+  reviewedBy?: mongoose.Types.ObjectId | null;
+  adminNote?: string | null;
   isSuspended: boolean;
   penaltyStatus: {
     isBanned: boolean;
@@ -54,6 +61,17 @@ const JockeyProfileSchema = new Schema<IJockeyProfile>(
   {
     licenseNumber: { type: String, trim: true },
     licenseExpiry: { type: Date, default: null },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved',
+    },
+    applicationPdfUrl: { type: String, trim: true },
+    applicationPdfName: { type: String, trim: true },
+    appliedAt: { type: Date, default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    adminNote: { type: String, trim: true, default: null },
     isSuspended: { type: Boolean, default: false },
     penaltyStatus: {
       isBanned: { type: Boolean, default: false },
@@ -107,6 +125,7 @@ UserSchema.methods.comparePassword = function (plain: string): Promise<boolean> 
 
 UserSchema.index({ role: 1, isActive: 1 });
 UserSchema.index({ 'jockeyProfile.licenseNumber': 1 }, { sparse: true });
+UserSchema.index({ role: 1, 'jockeyProfile.approvalStatus': 1, 'jockeyProfile.appliedAt': -1 });
 
 UserSchema.post('save', async function (doc) {
   if (doc.role === 'admin') return;
