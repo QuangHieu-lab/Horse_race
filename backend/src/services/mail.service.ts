@@ -20,6 +20,9 @@ export async function sendPasswordResetEmail(input: {
     host: env.smtp.host,
     port: env.smtp.port,
     secure: env.smtp.port === 465,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
     auth: {
       user: env.smtp.user,
       pass: env.smtp.pass,
@@ -60,11 +63,23 @@ export async function sendPasswordResetEmail(input: {
     </div>
   `;
 
-  await transporter.sendMail({
-    from: env.smtp.from,
-    to: input.to,
-    subject,
-    text,
-    html,
-  });
+  try {
+    await transporter.sendMail({
+      from: env.smtp.from,
+      to: input.to,
+      subject,
+      text,
+      html,
+    });
+  } catch (error) {
+    console.error('Password reset email failed', {
+      to: input.to,
+      smtpHost: env.smtp.host,
+      smtpPort: env.smtp.port,
+      smtpUser: env.smtp.user,
+      mailFrom: env.smtp.from,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new HttpError(500, 'Không gửi được email đặt lại mật khẩu. Vui lòng kiểm tra cấu hình SMTP.');
+  }
 }
