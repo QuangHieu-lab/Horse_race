@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
+import dns from 'node:dns/promises';
 import { env } from '../config/env.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -17,15 +18,21 @@ export async function sendPasswordResetEmail(input: {
 }): Promise<void> {
   assertSmtpConfigured();
 
+  const smtpHost = env.smtp.host;
+  const [smtpIPv4] = await dns.resolve4(smtpHost);
+  const connectionHost = smtpIPv4 || smtpHost;
+
   const transporter = nodemailer.createTransport({
-    host: env.smtp.host,
+    host: connectionHost,
     port: env.smtp.port,
     secure: env.smtp.port === 465,
-    family: 4,
     dnsTimeout: 10_000,
     connectionTimeout: 15_000,
     greetingTimeout: 15_000,
     socketTimeout: 20_000,
+    tls: {
+      servername: smtpHost,
+    },
     auth: {
       user: env.smtp.user,
       pass: env.smtp.pass,
@@ -77,7 +84,8 @@ export async function sendPasswordResetEmail(input: {
   } catch (error) {
     console.error('Password reset email failed', {
       to: input.to,
-      smtpHost: env.smtp.host,
+      smtpHost,
+      connectionHost,
       smtpPort: env.smtp.port,
       smtpUser: env.smtp.user,
       mailFrom: env.smtp.from,
