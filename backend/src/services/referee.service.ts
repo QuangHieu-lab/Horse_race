@@ -12,6 +12,8 @@ import { createNotification, createNotifications, type NotificationInput } from 
 export interface RefereeRaceDto {
   id: string;
   name: string;
+  tournamentId: string;
+  tournamentName: string;
   round: number;
   scheduledAt: string;
   status: string;
@@ -206,6 +208,7 @@ export async function getRefereeDashboard(refereeId: string) {
 
 export async function listRefereeRaces(refereeId: string): Promise<RefereeRaceDto[]> {
   const races = await Race.find({ refereeId: new mongoose.Types.ObjectId(refereeId) })
+    .populate('tournamentId', 'name')
     .sort({ scheduledAt: -1 })
     .lean();
 
@@ -215,9 +218,15 @@ export async function listRefereeRaces(refereeId: string): Promise<RefereeRaceDt
 
   return races.map((race) => {
     const result = resultMap.get(race._id.toString());
+    const tournament = race.tournamentId as unknown as {
+      _id: mongoose.Types.ObjectId;
+      name: string;
+    };
     return {
       id: race._id.toString(),
       name: race.name,
+      tournamentId: tournament._id.toString(),
+      tournamentName: tournament.name,
       round: race.round,
       scheduledAt: race.scheduledAt.toISOString(),
       status: race.status,

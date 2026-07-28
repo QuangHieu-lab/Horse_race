@@ -23,6 +23,7 @@ function toRegistrationDto(reg: {
     round: number;
     status: string;
     scheduledAt?: Date;
+    tournamentId: { _id: mongoose.Types.ObjectId; name: string };
   };
   ownerId?: { _id: mongoose.Types.ObjectId; fullName: string } | null;
   jockeyId?: { _id: mongoose.Types.ObjectId; fullName: string } | null;
@@ -50,6 +51,10 @@ function toRegistrationDto(reg: {
       round: reg.raceId.round,
       status: reg.raceId.status as RegistrationDto['race']['status'],
       scheduledAt: reg.raceId.scheduledAt?.toISOString(),
+      tournament: {
+        id: reg.raceId.tournamentId._id.toString(),
+        name: reg.raceId.tournamentId.name,
+      },
     },
     owner: reg.ownerId
       ? { id: reg.ownerId._id.toString(), fullName: reg.ownerId.fullName }
@@ -74,7 +79,11 @@ export async function listRegistrations(
   if (status) filter.status = status;
 
   const items = await RaceRegistration.find(filter)
-    .populate('raceId', 'name round status scheduledAt')
+    .populate({
+      path: 'raceId',
+      select: 'name round status scheduledAt tournamentId',
+      populate: { path: 'tournamentId', select: 'name' },
+    })
     .populate('horseId', 'name healthStatus breed age profilePdfUrl profilePdfName')
     .populate('ownerId', 'fullName')
     .populate('jockeyId', 'fullName')
@@ -123,7 +132,11 @@ export async function updateRegistrationStatus(
   });
 
   const populated = await RaceRegistration.findById(reg._id)
-    .populate('raceId', 'name round status scheduledAt')
+    .populate({
+      path: 'raceId',
+      select: 'name round status scheduledAt tournamentId',
+      populate: { path: 'tournamentId', select: 'name' },
+    })
     .populate('horseId', 'name healthStatus breed age profilePdfUrl profilePdfName')
     .populate('ownerId', 'fullName')
     .populate('jockeyId', 'fullName')

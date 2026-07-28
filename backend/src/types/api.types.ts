@@ -309,6 +309,7 @@ export interface RegistrationDto {
     round: number;
     status: RaceStatus;
     scheduledAt?: string;
+    tournament: NamedEntityDto;
   };
   owner?: UserSummaryDto | null;        // Chủ ngựa đã nộp đơn
   jockey?: UserSummaryDto | null;

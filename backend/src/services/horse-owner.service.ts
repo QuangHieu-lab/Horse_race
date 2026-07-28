@@ -98,6 +98,10 @@ function toRegistrationDto(reg: any): RegistrationDto {
       round: reg.raceId.round,
       status: reg.raceId.status,
       scheduledAt: reg.raceId.scheduledAt?.toISOString(),
+      tournament: {
+        id: reg.raceId.tournamentId._id.toString(),
+        name: reg.raceId.tournamentId.name,
+      },
     },
     jockey: reg.jockeyId ? {
       id: reg.jockeyId._id.toString(),
@@ -286,7 +290,11 @@ async deleteHorse(ownerId: string, horseId: string) {
 
     // Populate thủ công để DTO mapper có đủ dữ liệu
     const populatedReg = await RaceRegistration.findById(registration._id)
-      .populate('raceId', 'name round status scheduledAt')
+      .populate({
+        path: 'raceId',
+        select: 'name round status scheduledAt tournamentId',
+        populate: { path: 'tournamentId', select: 'name' },
+      })
       .populate('horseId', 'name healthStatus')
       .lean();
 
@@ -298,7 +306,11 @@ async deleteHorse(ownerId: string, horseId: string) {
     if (status) query.status = status;
 
     const registrations = await RaceRegistration.find(query)
-      .populate('raceId', 'name round scheduledAt status')
+      .populate({
+        path: 'raceId',
+        select: 'name round scheduledAt status tournamentId',
+        populate: { path: 'tournamentId', select: 'name' },
+      })
       .populate('horseId', 'name healthStatus')
       .populate('jockeyId', 'fullName')
       .populate('processedBy', 'fullName') // Thêm dòng này để lấy tên Admin

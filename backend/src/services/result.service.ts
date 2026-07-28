@@ -155,18 +155,32 @@ export async function publishRaceResult(raceId: string, adminId: string): Promis
 }
 
 export async function listPublishQueue(): Promise<
-  Array<{ raceId: string; raceName: string; confirmedAt: string | null; publishedAt: string | null }>
+  Array<{
+    raceId: string;
+    raceName: string;
+    tournamentId: string;
+    tournamentName: string;
+    confirmedAt: string | null;
+    publishedAt: string | null;
+  }>
 > {
   const results = await Result.find({ confirmedAt: { $ne: null } })
     .populate('raceId', 'name')
+    .populate('tournamentId', 'name')
     .sort({ confirmedAt: -1 })
     .lean();
 
   return results.map((r) => {
     const race = r.raceId as unknown as { _id: mongoose.Types.ObjectId; name: string };
+    const tournament = r.tournamentId as unknown as {
+      _id: mongoose.Types.ObjectId;
+      name: string;
+    };
     return {
       raceId: race._id.toString(),
       raceName: race.name,
+      tournamentId: tournament._id.toString(),
+      tournamentName: tournament.name,
       confirmedAt: r.confirmedAt?.toISOString() ?? null,
       publishedAt: r.publishedAt?.toISOString() ?? null,
     };

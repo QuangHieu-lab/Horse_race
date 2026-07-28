@@ -169,8 +169,9 @@ RaceSchema.pre('save', async function (next) {
 });
 
 // ─── Đồng bộ trạng thái giải đấu theo trạng thái trận đua ────────────────────
-// Bắt đầu đua (ongoing) → giải "Live"; đua xong (completed/cancelled) và không
-// còn trận nào đang chạy → giải trở lại "Registration" (published).
+// Trọng tài bắt đầu điều hành (ready/ongoing) → giải "Live"; đua xong
+// (completed/cancelled) và không còn trận nào ready/ongoing → giải trở lại
+// "Registration" (published).
 // Không đụng tới giải đã 'completed' (admin tự bấm hoàn tất).
 async function syncTournamentStatusForRace(
   tournamentId: mongoose.Types.ObjectId,
@@ -180,7 +181,7 @@ async function syncTournamentStatusForRace(
   const tour = await Tournament.findById(tournamentId).select('status').lean();
   if (!tour || tour.status === 'completed') return;
 
-  if (raceStatus === 'ongoing') {
+  if (raceStatus === 'ready' || raceStatus === 'ongoing') {
     if (tour.status !== 'ongoing') {
       await Tournament.updateOne({ _id: tournamentId }, { $set: { status: 'ongoing' } });
     }
@@ -189,8 +190,11 @@ async function syncTournamentStatusForRace(
 
   if (raceStatus === 'completed' || raceStatus === 'cancelled') {
     const RaceModel = mongoose.models.Race as mongoose.Model<IRace>;
-    const stillOngoing = await RaceModel.countDocuments({ tournamentId, status: 'ongoing' });
-    if (stillOngoing === 0 && tour.status === 'ongoing') {
+    const stillActive = await RaceModel.countDocuments({
+      tournamentId,
+      status: { $in: ['ready', 'ongoing'] },
+    });
+    if (stillActive === 0 && tour.status === 'ongoing') {
       await Tournament.updateOne({ _id: tournamentId }, { $set: { status: 'published' } });
     }
   }
