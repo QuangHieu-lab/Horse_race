@@ -36,15 +36,15 @@ export async function sendPasswordResetEmail(input: {
   resetUrl: string;
   expiresMinutes: number;
 }): Promise<void> {
-  const subject = 'CANH BAO: Dat lai mat khau WDP Horse Race';
+  const subject = 'CẢNH BÁO: Đặt lại mật khẩu WDP Horse Race';
   const text = [
-    `Xin chao ${input.fullName},`,
+    `Xin chào ${input.fullName},`,
     '',
-    'Ban vua yeu cau dat lai mat khau cho tai khoan WDP Horse Race.',
-    `Link co hieu luc trong ${input.expiresMinutes} phut:`,
+    'Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản WDP Horse Race.',
+    `Liên kết có hiệu lực trong ${input.expiresMinutes} phút:`,
     input.resetUrl,
     '',
-    'Neu ban khong yeu cau, vui long bo qua email nay.',
+    'Nếu bạn không yêu cầu, vui lòng bỏ qua email này.',
   ].join('\n');
 
   const html = `
@@ -52,19 +52,19 @@ export async function sendPasswordResetEmail(input: {
       <div style="max-width:620px;margin:0 auto;background:#ffffff;border:3px solid #c0380a;border-radius:18px;overflow:hidden;box-shadow:0 18px 44px rgba(83,30,8,.18)">
         <div style="background:#c0380a;color:#fff;padding:22px 26px">
           <div style="font-size:13px;font-weight:800;letter-spacing:.12em;text-transform:uppercase">WDP Horse Race</div>
-          <h1 style="margin:8px 0 0;font-size:26px;line-height:1.25">YEU CAU DAT LAI MAT KHAU</h1>
+          <h1 style="margin:8px 0 0;font-size:26px;line-height:1.25">YÊU CẦU ĐẶT LẠI MẬT KHẨU</h1>
         </div>
         <div style="padding:28px 26px">
-          <p style="font-size:16px;line-height:1.7;margin:0 0 12px">Xin chao <strong>${input.fullName}</strong>,</p>
-          <p style="font-size:16px;line-height:1.7;margin:0 0 18px">He thong nhan duoc yeu cau dat lai mat khau cho tai khoan cua ban. Bam nut ben duoi de tao mat khau moi.</p>
+          <p style="font-size:16px;line-height:1.7;margin:0 0 12px">Xin chào <strong>${input.fullName}</strong>,</p>
+          <p style="font-size:16px;line-height:1.7;margin:0 0 18px">Hệ thống đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Bấm nút bên dưới để tạo mật khẩu mới.</p>
           <div style="margin:24px 0;text-align:center">
-            <a href="${input.resetUrl}" style="display:inline-block;background:#c0380a;color:#fff;text-decoration:none;font-weight:900;font-size:16px;letter-spacing:.04em;padding:16px 26px;border-radius:999px">DAT LAI MAT KHAU</a>
+            <a href="${input.resetUrl}" style="display:inline-block;background:#c0380a;color:#fff;text-decoration:none;font-weight:900;font-size:16px;letter-spacing:.04em;padding:16px 26px;border-radius:999px">ĐẶT LẠI MẬT KHẨU</a>
           </div>
           <div style="background:#fff0d6;border-left:6px solid #ad6400;padding:14px 16px;border-radius:10px;margin:20px 0">
-            <strong style="display:block;margin-bottom:4px">LUU Y QUAN TRONG</strong>
-            Link nay chi co hieu luc trong <strong>${input.expiresMinutes} phut</strong>. Neu ban khong yeu cau, hay bo qua email nay.
+            <strong style="display:block;margin-bottom:4px">LƯU Ý QUAN TRỌNG</strong>
+            Liên kết này chỉ có hiệu lực trong <strong>${input.expiresMinutes} phút</strong>. Nếu bạn không yêu cầu, hãy bỏ qua email này.
           </div>
-          <p style="font-size:13px;line-height:1.6;color:#74574b;margin:18px 0 0">Neu nut khong mo duoc, copy link nay vao trinh duyet:<br><a href="${input.resetUrl}" style="color:#c0380a;word-break:break-all">${input.resetUrl}</a></p>
+          <p style="font-size:13px;line-height:1.6;color:#74574b;margin:18px 0 0">Nếu nút không mở được, hãy sao chép liên kết này vào trình duyệt:<br><a href="${input.resetUrl}" style="color:#c0380a;word-break:break-all">${input.resetUrl}</a></p>
         </div>
       </div>
     </div>
