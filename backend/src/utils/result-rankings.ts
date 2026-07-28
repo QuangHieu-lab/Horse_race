@@ -53,10 +53,10 @@ export function disqualifiedHorseIdsFromViolations(
 ): Set<string> {
   const ids = new Set<string>();
   for (const v of violations) {
-    // Chỉ loại ngựa khỏi bảng xếp hạng nếu lỗi đó nhắm vào ngựa (horseId tồn tại)
-    // và hình phạt là tước quyền (disqualify/disqualification)
+    // Cảnh cáo vẫn được nhận thưởng. Từ hủy kết quả trở lên thì ngựa bị loại
+    // khỏi xếp hạng nhận thưởng của riêng cuộc đua đó.
     if (
-      (v.penaltyApplied === 'disqualify' || v.penaltyApplied === 'disqualification') && 
+      ['result_void', 'time_ban', 'permanent_ban', 'disqualify', 'disqualification'].includes(v.penaltyApplied ?? '') &&
       v.horseId
     ) {
       ids.add(v.horseId.toString());
@@ -65,4 +65,4 @@ export function disqualifiedHorseIdsFromViolations(
   return ids;
 }
 
-export const PENALTY_AFFECTS_RANKING: PenaltyApplied[] = ['demote', 'disqualify', 'disqualification'];
+export const PENALTY_AFFECTS_RANKING: PenaltyApplied[] = ['result_void', 'time_ban', 'permanent_ban'];

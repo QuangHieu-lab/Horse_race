@@ -1,15 +1,6 @@
-// Bộ luật vi phạm chuẩn, tách theo đối tượng bị lập biên bản (ngựa / nài ngựa),
-// dựa trên các lỗi phổ biến trong đua ngựa chuyên nghiệp.
-//
-// Hình thức xử phạt (penaltyApplied) khớp với logic BE hiện tại:
-//   - warning        : cảnh cáo, chỉ ghi biên bản, không đổi kết quả
-//   - demote         : hạ bậc ngựa vi phạm xuống ngay sau "ngựa bị ảnh hưởng" (cần affectedHorseId)
-//   - disqualify     : tước quyền — loại ngựa khỏi bảng xếp hạng (prize = 0)
-//   - time_ban       : cấm thi đấu có thời hạn (banDurationDays > 0)
-//   - permanent_ban  : cấm thi đấu vô thời hạn
-// Riêng luật có chữ "doping" trong tên/mô tả sẽ được BE xử lý như DQ + cấm chủ/ngựa/nài.
-//
-// Dùng chung cho seed.ts và script migrate DB để tránh lệch dữ liệu.
+// Bộ luật vi phạm chuẩn. Hệ thống chỉ dùng 4 hình phạt:
+// low -> warning, medium -> result_void, high -> time_ban, critical -> permanent_ban.
+// warning vẫn được nhận thưởng; các hình phạt từ result_void trở lên không nhận thưởng trong cuộc đua đó.
 
 export interface ViolationRuleSeed {
   code: string;
@@ -18,132 +9,98 @@ export interface ViolationRuleSeed {
   category: 'race_conduct' | 'medical' | 'equipment' | 'administrative';
   severity: 'low' | 'medium' | 'high' | 'critical';
   appliesTo: 'horse' | 'jockey' | 'both';
-  penaltyApplied: 'warning' | 'demote' | 'disqualify' | 'disqualification' | 'restart' | 'time_ban' | 'permanent_ban';
+  penaltyApplied: 'warning' | 'result_void' | 'time_ban' | 'permanent_ban';
+  requiresBanDuration: boolean;
   banDurationDays: number;
 }
 
 export const VIOLATION_RULES: ViolationRuleSeed[] = [
-  // ─── Lỗi của NÀI NGỰA (jockey) ───────────────────────────────────────────
   {
-    code: 'JCK-01',
-    name: 'Chèn ép / cản trở đối thủ (Interference)',
-    description: 'Nài điều khiển ngựa tạt đầu, lấn làn, cản trở ngựa khác một cách bất hợp lệ — hạ bậc xuống sau ngựa bị ảnh hưởng.',
-    category: 'race_conduct',
-    severity: 'high',
+    code: 'JCK-03',
+    name: 'Sử dụng roi quá mức',
+    description: 'Nài ngựa sử dụng roi vượt quá số lần hoặc sai cách thức cho phép. Áp dụng cảnh cáo, kết quả và thưởng vẫn được giữ nguyên.',
+    category: 'equipment',
+    severity: 'low',
     appliesTo: 'jockey',
-    penaltyApplied: 'demote',
+    penaltyApplied: 'warning',
+    requiresBanDuration: false,
+    banDurationDays: 0,
+  },
+  {
+    code: 'HRS-04',
+    name: 'Trang bị ngựa không hợp lệ mức nhẹ',
+    description: 'Trang bị ngựa có sai sót nhẹ nhưng không tạo lợi thế thi đấu rõ rệt. Áp dụng cảnh cáo.',
+    category: 'equipment',
+    severity: 'low',
+    appliesTo: 'horse',
+    penaltyApplied: 'warning',
+    requiresBanDuration: false,
+    banDurationDays: 0,
+  },
+  {
+    code: 'JCK-05',
+    name: 'Sai trọng lượng khi cân',
+    description: 'Trọng lượng cân trước hoặc sau đua không đúng quy định. Kết quả của cuộc đua hiện tại bị hủy, nhưng không cấm các cuộc đua sau.',
+    category: 'administrative',
+    severity: 'medium',
+    appliesTo: 'jockey',
+    penaltyApplied: 'result_void',
+    requiresBanDuration: false,
+    banDurationDays: 0,
+  },
+  {
+    code: 'HRS-02',
+    name: 'Không đạt kiểm tra thú y sau đua',
+    description: 'Ngựa không đạt kiểm tra thú y sau đua ở mức ảnh hưởng đến tính hợp lệ của kết quả. Hủy kết quả của riêng cuộc đua hiện tại.',
+    category: 'medical',
+    severity: 'medium',
+    appliesTo: 'horse',
+    penaltyApplied: 'result_void',
+    requiresBanDuration: false,
     banDurationDays: 0,
   },
   {
     code: 'JCK-02',
-    name: 'Lái ẩu nguy hiểm (Dangerous riding)',
-    description: 'Điều khiển ẩu, cố ý gây va chạm nguy hiểm cho nài và ngựa khác — tước quyền thi đấu.',
-    category: 'race_conduct',
-    severity: 'critical',
-    appliesTo: 'jockey',
-    penaltyApplied: 'disqualify',
-    banDurationDays: 365,
-  },
-  {
-    code: 'JCK-03',
-    name: 'Sử dụng roi quá mức (Excessive whip)',
-    description: 'Quất roi vượt quá số lần / sai cách thức cho phép — cảnh cáo.',
-    category: 'equipment',
-    severity: 'low',
-    appliesTo: 'jockey',
-    penaltyApplied: 'warning',
-    banDurationDays: 0,
-  },
-  {
-    code: 'JCK-04',
-    name: 'Không nỗ lực về đích (Non-trying)',
-    description: 'Không điều khiển ngựa thi đấu hết khả năng (ghì cương, dìu ngựa để dàn xếp kết quả) — tước quyền.',
+    name: 'Lái ẩu gây nguy hiểm',
+    description: 'Nài ngựa điều khiển nguy hiểm, gây va chạm hoặc rủi ro an toàn nghiêm trọng. Hủy kết quả cuộc đua hiện tại và cấm thi đấu có thời hạn.',
     category: 'race_conduct',
     severity: 'high',
-    appliesTo: 'jockey',
-    penaltyApplied: 'disqualify',
-    banDurationDays: 365,
-  },
-  {
-    code: 'JCK-05',
-    name: 'Sai trọng lượng khi cân (Weight breach)',
-    description: 'Trọng lượng cân trước/sau đua không đúng quy định (thiếu/thừa chì, không cân lại) — tước quyền.',
-    category: 'administrative',
-    severity: 'high',
-    appliesTo: 'jockey',
-    penaltyApplied: 'disqualify',
-    banDurationDays: 365,
-  },
-  {
-    code: 'JCK-07',
-    name: 'Hành vi phản thể thao nghiêm trọng (Serious misconduct)',
-    description: 'Cố ý gian lận, thông đồng dàn xếp hoặc hành vi phi thể thao nghiêm trọng — cấm thi đấu 14 ngày.',
-    category: 'race_conduct',
-    severity: 'critical',
     appliesTo: 'jockey',
     penaltyApplied: 'time_ban',
+    requiresBanDuration: true,
     banDurationDays: 14,
-  },
-
-  // ─── Lỗi của NGỰA (horse) ────────────────────────────────────────────────
-  {
-    code: 'HRS-01',
-    name: 'Dương tính chất cấm (Doping)',
-    description: 'Mẫu xét nghiệm phát hiện chất cấm / doping — tước quyền và cấm thi đấu (áp dụng cả chủ, ngựa, nài).',
-    category: 'medical',
-    severity: 'critical',
-    appliesTo: 'horse',
-    penaltyApplied: 'disqualify',
-    banDurationDays: 365,
-  },
-  {
-    code: 'HRS-02',
-    name: 'Không đạt kiểm tra thú y (Failed vet check)',
-    description: 'Ngựa không đủ điều kiện sức khỏe / khập khiễng khi kiểm tra trước đua — tước quyền.',
-    category: 'medical',
-    severity: 'high',
-    appliesTo: 'horse',
-    penaltyApplied: 'disqualify',
-    banDurationDays: 365,
   },
   {
     code: 'HRS-03',
-    name: 'Xuất huyết phổi khi đua (EIPH / Bleeding)',
-    description: 'Ngựa bị chảy máu phổi khi thi đấu — buộc nghỉ thi đấu 14 ngày để hồi phục.',
+    name: 'Vấn đề sức khỏe cần đình chỉ',
+    description: 'Ngựa gặp vấn đề sức khỏe cần nghỉ thi đấu để kiểm tra và hồi phục. Hủy kết quả cuộc đua hiện tại và cấm thi đấu có thời hạn.',
     category: 'medical',
-    severity: 'medium',
+    severity: 'high',
     appliesTo: 'horse',
     penaltyApplied: 'time_ban',
+    requiresBanDuration: true,
     banDurationDays: 14,
   },
   {
-    code: 'HRS-04',
-    name: 'Trang bị ngựa không hợp lệ (Illegal equipment)',
-    description: 'Móng sắt / bịt mắt / yên cương không đúng khai báo hoặc không hợp lệ — cảnh cáo.',
-    category: 'equipment',
-    severity: 'low',
-    appliesTo: 'horse',
-    penaltyApplied: 'warning',
-    banDurationDays: 0,
-  },
-  {
-    code: 'HRS-05',
-    name: 'Mất kiểm soát ở cổng xuất phát (Barrier misbehaviour)',
-    description: 'Ngựa lồng lộn, húc cổng, gây mất an toàn ở khu xuất phát — cảnh cáo.',
+    code: 'JCK-07',
+    name: 'Gian lận hoặc dàn xếp kết quả',
+    description: 'Nài ngựa có hành vi gian lận, thông đồng hoặc dàn xếp kết quả. Hủy kết quả cuộc đua hiện tại và cấm thi đấu vô thời hạn.',
     category: 'race_conduct',
-    severity: 'medium',
-    appliesTo: 'horse',
-    penaltyApplied: 'warning',
+    severity: 'critical',
+    appliesTo: 'jockey',
+    penaltyApplied: 'permanent_ban',
+    requiresBanDuration: false,
     banDurationDays: 0,
   },
   {
-    code: 'HRS-06',
-    name: 'Vi phạm y tế nghiêm trọng (Serious medical breach)',
-    description: 'Doping tái phạm hoặc vi phạm quy định y tế nghiêm trọng khác — cấm thi đấu vô thời hạn.',
+    code: 'HRS-01',
+    name: 'Dương tính chất cấm',
+    description: 'Mẫu xét nghiệm của ngựa phát hiện chất cấm hoặc doping. Hủy kết quả cuộc đua hiện tại và cấm thi đấu vô thời hạn.',
     category: 'medical',
     severity: 'critical',
     appliesTo: 'horse',
     penaltyApplied: 'permanent_ban',
+    requiresBanDuration: false,
     banDurationDays: 0,
   },
 ];

@@ -614,7 +614,9 @@ const swaggerDefinition = {
             enum: ['low', 'medium', 'high', 'critical'],
             example: 'high'
           },
-          penaltyApplied: { type: 'string', example: 'Tước quyền thi đấu 2 chặng' },
+          penaltyApplied: { type: 'string', enum: ['warning', 'result_void', 'time_ban', 'permanent_ban'], example: 'result_void' },
+          requiresBanDuration: { type: 'boolean', example: false },
+          banDurationDays: { type: 'number', example: 0 },
         },
       },
       ViolationRuleDto: {
@@ -638,7 +640,7 @@ const swaggerDefinition = {
           ruleId: { type: 'string', description: 'ID của luật vi phạm' },
           horseId: { type: 'string', description: 'ID ngựa bị phạt nếu áp dụng cho horse hoặc both' },
           jockeyId: { type: 'string', description: 'ID jockey bị phạt nếu áp dụng cho jockey hoặc both' },
-          affectedHorseId: { type: 'string', description: 'Required for demote: horse that was affected by the violation' },
+          affectedHorseId: { type: 'string', description: 'Legacy field, not required by the current four-penalty model' },
           target: {
             type: 'string',
             enum: ['horse', 'jockey', 'both'],

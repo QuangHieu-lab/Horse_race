@@ -41,6 +41,7 @@ export interface PenaltyDetailDto {
     description: string;
     category: string;
     severity: string;
+    requiresBanDuration?: boolean;
     banDurationDays: number;
   } | null;
   race: {
