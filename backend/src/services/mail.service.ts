@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import { env } from '../config/env.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -20,6 +21,8 @@ export async function sendPasswordResetEmail(input: {
     host: env.smtp.host,
     port: env.smtp.port,
     secure: env.smtp.port === 465,
+    family: 4,
+    dnsTimeout: 10_000,
     connectionTimeout: 15_000,
     greetingTimeout: 15_000,
     socketTimeout: 20_000,
@@ -27,7 +30,7 @@ export async function sendPasswordResetEmail(input: {
       user: env.smtp.user,
       pass: env.smtp.pass,
     },
-  });
+  } as SMTPTransport.Options);
 
   const subject = 'CANH BAO: Dat lai mat khau WDP Horse Race';
   const text = [
