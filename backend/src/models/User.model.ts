@@ -35,6 +35,8 @@ export interface IUser {
   phone?: string;
   avatarUrl?: string;
   isActive: boolean;
+  passwordResetTokenHash?: string | null;
+  passwordResetExpiresAt?: Date | null;
   penaltyStatus: IPenaltyStatus;
   jockeyProfile?: IJockeyProfile;
   refereeProfile?: IRefereeProfile;
@@ -79,6 +81,8 @@ const UserSchema = new Schema<IUser, UserModel, IUserMethods>(
     phone: { type: String, trim: true },
     avatarUrl: { type: String },
     isActive: { type: Boolean, default: true },
+    passwordResetTokenHash: { type: String, select: false, default: null },
+    passwordResetExpiresAt: { type: Date, select: false, default: null },
     penaltyStatus: {
       isBanned: { type: Boolean, default: false },
       bannedUntil: { type: Date, default: null },

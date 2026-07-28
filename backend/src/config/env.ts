@@ -24,6 +24,15 @@ export const env = {
   corsOrigins: parseCorsOrigins(corsRaw),
   jwtSecret: required('JWT_SECRET', 'horse-racing-dev-secret-change-in-production'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
+  passwordResetUrl: process.env.PASSWORD_RESET_URL ?? 'http://localhost:5173/reset-password',
+  passwordResetExpiresMinutes: Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES) || 15,
+  smtp: {
+    host: process.env.SMTP_HOST ?? '',
+    port: Number(process.env.SMTP_PORT) || 465,
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+    from: process.env.MAIL_FROM ?? process.env.SMTP_USER ?? '',
+  },
   allowMockTopUp: process.env.ALLOW_MOCK_TOPUP === 'true' || (process.env.NODE_ENV ?? 'development') !== 'production',
   payos: {
     clientId: process.env.PAYOS_CLIENT_ID ?? '',

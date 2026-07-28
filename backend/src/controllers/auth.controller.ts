@@ -51,4 +51,24 @@ export class AuthController {
     const result = await authService.changePassword(req.user!.id, oldPassword, newPassword);
     res.json(result);
   });
+
+  forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+    const { email } = req.body as { email?: string };
+    if (!email) {
+      res.status(400).json({ message: 'Email là bắt buộc', statusCode: 400 });
+      return;
+    }
+    const result = await authService.requestPasswordReset(email);
+    res.json(result);
+  });
+
+  resetPassword = asyncHandler(async (req: Request, res: Response) => {
+    const { token, newPassword } = req.body as { token?: string; newPassword?: string };
+    if (!token || !newPassword) {
+      res.status(400).json({ message: 'Token và mật khẩu mới là bắt buộc', statusCode: 400 });
+      return;
+    }
+    const result = await authService.resetPassword(token, newPassword);
+    res.json(result);
+  });
 }

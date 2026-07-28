@@ -1,11 +1,13 @@
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import mongoose from 'mongoose';
+import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 import { User, type IUser } from '../models/User.model.js';
 import type { UserRole } from '../types/shared.types.js';
 import type { PenaltyStatusDto } from '../types/api.types.js';
 import { toPenaltyStatusDto } from '../utils/penalty-status.util.js';
 import { HttpError } from '../utils/http-error.js';
+import { sendPasswordResetEmail } from './mail.service.js';
 
 export interface AuthUserDto {
   id: string;
@@ -182,6 +184,65 @@ export async function changePassword(
   user.passwordHash = newPassword;
   await user.save();
   return { message: 'Đổi mật khẩu thành công' };
+}
+
+function hashPasswordResetToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function buildPasswordResetUrl(token: string): string {
+  const url = new URL(env.passwordResetUrl);
+  url.searchParams.set('token', token);
+  return url.toString();
+}
+
+export async function requestPasswordReset(emailInput: string): Promise<{ message: string }> {
+  validateEmail(emailInput);
+  const email = emailInput.trim().toLowerCase();
+  const publicMessage = 'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi link đặt lại mật khẩu.';
+  const user = await User.findOne({ email }).select('+passwordResetTokenHash +passwordResetExpiresAt');
+  if (!user || !user.isActive) {
+    return { message: publicMessage };
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  user.passwordResetTokenHash = hashPasswordResetToken(token);
+  user.passwordResetExpiresAt = new Date(Date.now() + env.passwordResetExpiresMinutes * 60 * 1000);
+  await user.save();
+
+  await sendPasswordResetEmail({
+    to: user.email,
+    fullName: user.fullName,
+    resetUrl: buildPasswordResetUrl(token),
+    expiresMinutes: env.passwordResetExpiresMinutes,
+  });
+
+  return { message: publicMessage };
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  if (!token || token.length < 32) {
+    throw new HttpError(400, 'Link đặt lại mật khẩu không hợp lệ');
+  }
+  validatePassword(newPassword);
+
+  const tokenHash = hashPasswordResetToken(token);
+  const user = await User.findOne({
+    passwordResetTokenHash: tokenHash,
+    passwordResetExpiresAt: { $gt: new Date() },
+    isActive: true,
+  }).select('+passwordHash +passwordResetTokenHash +passwordResetExpiresAt');
+
+  if (!user) {
+    throw new HttpError(400, 'Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+  }
+
+  user.passwordHash = newPassword;
+  user.passwordResetTokenHash = null;
+  user.passwordResetExpiresAt = null;
+  await user.save();
+
+  return { message: 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới.' };
 }
 
 export function verifyToken(token: string): JwtPayload {
