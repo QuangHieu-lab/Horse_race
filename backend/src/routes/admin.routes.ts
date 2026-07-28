@@ -6,6 +6,8 @@ const adminController = new AdminController();
 
 adminRouter.get('/jockey-applications', adminController.listJockeyApplications);
 adminRouter.patch('/jockey-applications/:id', adminController.reviewJockeyApplication);
+adminRouter.get('/owner-applications', adminController.listOwnerApplications);
+adminRouter.patch('/owner-applications/:id', adminController.reviewOwnerApplication);
 adminRouter.get('/users', adminController.listUsers);
 adminRouter.post('/users', adminController.createUser);
 adminRouter.patch('/users/:id', adminController.updateUser);

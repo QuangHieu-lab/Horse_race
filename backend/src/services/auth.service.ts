@@ -92,6 +92,13 @@ export async function login(email: string, password: string): Promise<AuthRespon
       const note = user.jockeyProfile.adminNote?.trim();
       throw new HttpError(403, note ? `Hồ sơ Jockey đã bị từ chối: ${note}` : 'Hồ sơ Jockey đã bị từ chối');
     }
+    if (user.role === 'horse_owner' && user.ownerProfile?.approvalStatus === 'pending') {
+      throw new HttpError(403, 'Hồ sơ Chủ ngựa đang chờ quản trị viên xét duyệt');
+    }
+    if (user.role === 'horse_owner' && user.ownerProfile?.approvalStatus === 'rejected') {
+      const note = user.ownerProfile.adminNote?.trim();
+      throw new HttpError(403, note ? `Hồ sơ Chủ ngựa đã bị từ chối: ${note}` : 'Hồ sơ Chủ ngựa đã bị từ chối');
+    }
     throw new HttpError(403, 'Tài khoản đã bị vô hiệu hóa');
   }
   const dto = toUserDto(user);
@@ -110,7 +117,7 @@ export interface RegisterJockeyInput extends RegisterInput {
   applicationPdfName: string;
 }
 
-export interface JockeyApplicationResponse {
+export interface RegistrationApplicationResponse {
   message: string;
   approvalRequired: true;
   applicationStatus: 'pending';
@@ -144,7 +151,7 @@ export async function registerSpectator(input: RegisterInput): Promise<AuthRespo
 
 export async function registerJockeyApplication(
   input: RegisterJockeyInput,
-): Promise<JockeyApplicationResponse> {
+): Promise<RegistrationApplicationResponse> {
   validateEmail(input.email);
   validatePassword(input.password);
   const fullName = input.fullName.trim();
@@ -224,6 +231,75 @@ export async function registerJockeyApplication(
 
   return {
     message: 'Đã gửi hồ sơ Jockey. Bạn có thể đăng nhập sau khi quản trị viên phê duyệt.',
+    approvalRequired: true,
+    applicationStatus: 'pending',
+  };
+}
+
+export async function registerOwnerApplication(
+  input: RegisterJockeyInput,
+): Promise<RegistrationApplicationResponse> {
+  validateEmail(input.email);
+  validatePassword(input.password);
+  const fullName = input.fullName.trim();
+  if (!fullName) {
+    throw new HttpError(400, 'Họ tên là bắt buộc');
+  }
+  if (!input.applicationPdfUrl || !input.applicationPdfName) {
+    throw new HttpError(400, 'Hồ sơ PDF của Chủ ngựa là bắt buộc');
+  }
+
+  const email = input.email.trim().toLowerCase();
+  const existing = await User.findOne({ email }).select('+passwordHash');
+  if (existing) {
+    const canReapply =
+      existing.role === 'horse_owner' &&
+      !existing.isActive &&
+      existing.ownerProfile?.approvalStatus === 'rejected';
+
+    if (!canReapply) {
+      if (existing.role === 'horse_owner' && existing.ownerProfile?.approvalStatus === 'pending') {
+        throw new HttpError(409, 'Hồ sơ Chủ ngựa của email này đang chờ xét duyệt');
+      }
+      throw new HttpError(409, 'Email đã được sử dụng');
+    }
+
+    existing.passwordHash = input.password;
+    existing.fullName = fullName;
+    existing.phone = input.phone?.trim() || undefined;
+    existing.isActive = false;
+    existing.ownerProfile = {
+      approvalStatus: 'pending',
+      applicationPdfUrl: input.applicationPdfUrl,
+      applicationPdfName: input.applicationPdfName,
+      appliedAt: new Date(),
+      reviewedAt: null,
+      reviewedBy: null,
+      adminNote: null,
+    };
+    await existing.save();
+  } else {
+    await User.create({
+      email,
+      passwordHash: input.password,
+      role: 'horse_owner',
+      fullName,
+      phone: input.phone?.trim() || undefined,
+      isActive: false,
+      ownerProfile: {
+        approvalStatus: 'pending',
+        applicationPdfUrl: input.applicationPdfUrl,
+        applicationPdfName: input.applicationPdfName,
+        appliedAt: new Date(),
+        reviewedAt: null,
+        reviewedBy: null,
+        adminNote: null,
+      },
+    });
+  }
+
+  return {
+    message: 'Đã gửi hồ sơ Chủ ngựa. Bạn có thể đăng nhập sau khi quản trị viên phê duyệt.',
     approvalRequired: true,
     applicationStatus: 'pending',
   };

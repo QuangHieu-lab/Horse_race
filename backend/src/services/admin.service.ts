@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import {
   User,
   type IJockeyProfile,
+  type IOwnerProfile,
   type IRefereeProfile,
   type IUser,
 } from '../models/User.model.js';
@@ -55,6 +56,7 @@ export interface UpdateAdminUserInput {
 }
 
 export type JockeyApplicationStatus = 'pending' | 'approved' | 'rejected';
+export type OwnerApplicationStatus = 'pending' | 'approved' | 'rejected';
 
 export interface JockeyApplicationDto {
   id: string;
@@ -62,6 +64,21 @@ export interface JockeyApplicationDto {
   fullName: string;
   phone?: string | null;
   status: JockeyApplicationStatus;
+  applicationPdfUrl: string;
+  applicationPdfName: string;
+  appliedAt: string | null;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  adminNote: string | null;
+  isActive: boolean;
+}
+
+export interface OwnerApplicationDto {
+  id: string;
+  email: string;
+  fullName: string;
+  phone?: string | null;
+  status: OwnerApplicationStatus;
   applicationPdfUrl: string;
   applicationPdfName: string;
   appliedAt: string | null;
@@ -83,6 +100,26 @@ function toJockeyApplicationDto(
     status: profile?.approvalStatus ?? 'approved',
     applicationPdfUrl: profile?.applicationPdfUrl ?? '',
     applicationPdfName: profile?.applicationPdfName ?? 'Hồ sơ Jockey.pdf',
+    appliedAt: profile?.appliedAt ? new Date(profile.appliedAt).toISOString() : null,
+    reviewedAt: profile?.reviewedAt ? new Date(profile.reviewedAt).toISOString() : null,
+    reviewedBy: profile?.reviewedBy?.toString() ?? null,
+    adminNote: profile?.adminNote ?? null,
+    isActive: user.isActive,
+  };
+}
+
+function toOwnerApplicationDto(
+  user: IUser & { _id: { toString(): string } },
+): OwnerApplicationDto {
+  const profile = user.ownerProfile;
+  return {
+    id: user._id.toString(),
+    email: user.email,
+    fullName: user.fullName,
+    phone: user.phone ?? null,
+    status: profile?.approvalStatus ?? 'approved',
+    applicationPdfUrl: profile?.applicationPdfUrl ?? '',
+    applicationPdfName: profile?.applicationPdfName ?? 'Hồ sơ Chủ ngựa.pdf',
     appliedAt: profile?.appliedAt ? new Date(profile.appliedAt).toISOString() : null,
     reviewedAt: profile?.reviewedAt ? new Date(profile.reviewedAt).toISOString() : null,
     reviewedBy: profile?.reviewedBy?.toString() ?? null,
@@ -125,6 +162,7 @@ function assertRole(role: string): asserts role is UserRole {
 function applyRoleProfile(user: {
   role: UserRole;
   jockeyProfile?: IJockeyProfile;
+  ownerProfile?: IOwnerProfile;
   refereeProfile?: IRefereeProfile;
 }, input: {
   licenseNumber?: string | null;
@@ -153,6 +191,22 @@ function applyRoleProfile(user: {
       },
     };
     user.refereeProfile = undefined;
+    user.ownerProfile = undefined;
+    return;
+  }
+
+  if (user.role === 'horse_owner') {
+    user.ownerProfile = {
+      approvalStatus: user.ownerProfile?.approvalStatus ?? 'approved',
+      applicationPdfUrl: user.ownerProfile?.applicationPdfUrl,
+      applicationPdfName: user.ownerProfile?.applicationPdfName,
+      appliedAt: user.ownerProfile?.appliedAt ?? null,
+      reviewedAt: user.ownerProfile?.reviewedAt ?? null,
+      reviewedBy: user.ownerProfile?.reviewedBy ?? null,
+      adminNote: user.ownerProfile?.adminNote ?? null,
+    };
+    user.jockeyProfile = undefined;
+    user.refereeProfile = undefined;
     return;
   }
 
@@ -161,10 +215,12 @@ function applyRoleProfile(user: {
       certificationId: input.certificationId?.trim() || undefined,
     };
     user.jockeyProfile = undefined;
+    user.ownerProfile = undefined;
     return;
   }
 
   user.jockeyProfile = undefined;
+  user.ownerProfile = undefined;
   user.refereeProfile = undefined;
 }
 
@@ -224,6 +280,54 @@ export async function reviewJockeyApplication(
   await user.save();
 
   return toJockeyApplicationDto(user);
+}
+
+export async function listOwnerApplications(
+  status?: OwnerApplicationStatus,
+): Promise<OwnerApplicationDto[]> {
+  if (status && !['pending', 'approved', 'rejected'].includes(status)) {
+    throw new HttpError(400, 'Trạng thái hồ sơ Chủ ngựa không hợp lệ');
+  }
+
+  const query: Record<string, unknown> = {
+    role: 'horse_owner',
+    'ownerProfile.applicationPdfUrl': { $exists: true, $ne: '' },
+  };
+  if (status) query['ownerProfile.approvalStatus'] = status;
+
+  const users = await User.find(query).sort({ 'ownerProfile.appliedAt': -1 });
+  return users.map((user) => toOwnerApplicationDto(user));
+}
+
+export async function reviewOwnerApplication(
+  actorId: string,
+  userId: string,
+  status: Exclude<OwnerApplicationStatus, 'pending'>,
+  adminNote?: string,
+): Promise<OwnerApplicationDto> {
+  if (!mongoose.isValidObjectId(userId)) {
+    throw new HttpError(400, 'ID hồ sơ Chủ ngựa không hợp lệ');
+  }
+  if (!['approved', 'rejected'].includes(status)) {
+    throw new HttpError(400, 'Trạng thái phải là approved hoặc rejected');
+  }
+
+  const user = await User.findById(userId);
+  if (!user || user.role !== 'horse_owner' || !user.ownerProfile?.applicationPdfUrl) {
+    throw new HttpError(404, 'Không tìm thấy hồ sơ đăng ký Chủ ngựa');
+  }
+  if (user.ownerProfile.approvalStatus !== 'pending') {
+    throw new HttpError(409, 'Hồ sơ Chủ ngựa này đã được xử lý');
+  }
+
+  user.ownerProfile.approvalStatus = status;
+  user.ownerProfile.reviewedAt = new Date();
+  user.ownerProfile.reviewedBy = new mongoose.Types.ObjectId(actorId);
+  user.ownerProfile.adminNote = adminNote?.trim() || null;
+  user.isActive = status === 'approved';
+  await user.save();
+
+  return toOwnerApplicationDto(user);
 }
 
 export async function createUser(input: CreateAdminUserInput): Promise<AdminUserDto> {

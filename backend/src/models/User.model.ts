@@ -23,6 +23,16 @@ export interface IJockeyProfile {
   };
 }
 
+export interface IOwnerProfile {
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  applicationPdfUrl?: string;
+  applicationPdfName?: string;
+  appliedAt?: Date | null;
+  reviewedAt?: Date | null;
+  reviewedBy?: mongoose.Types.ObjectId | null;
+  adminNote?: string | null;
+}
+
 export interface IRefereeProfile {
   certificationId?: string;
 }
@@ -45,6 +55,7 @@ export interface IUser {
   passwordResetTokenHash?: string | null;
   passwordResetExpiresAt?: Date | null;
   penaltyStatus: IPenaltyStatus;
+  ownerProfile?: IOwnerProfile;
   jockeyProfile?: IJockeyProfile;
   refereeProfile?: IRefereeProfile;
   createdAt: Date;
@@ -90,6 +101,23 @@ const RefereeProfileSchema = new Schema<IRefereeProfile>(
   { _id: false },
 );
 
+const OwnerProfileSchema = new Schema<IOwnerProfile>(
+  {
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved',
+    },
+    applicationPdfUrl: { type: String, trim: true },
+    applicationPdfName: { type: String, trim: true },
+    appliedAt: { type: Date, default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    adminNote: { type: String, trim: true, default: null },
+  },
+  { _id: false },
+);
+
 const UserSchema = new Schema<IUser, UserModel, IUserMethods>(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -107,6 +135,7 @@ const UserSchema = new Schema<IUser, UserModel, IUserMethods>(
       currentViolationId: { type: Schema.Types.ObjectId, ref: 'Result', default: null },
       reason: { type: String, default: null },
     },
+    ownerProfile: { type: OwnerProfileSchema, default: undefined },
     jockeyProfile: { type: JockeyProfileSchema, default: undefined },
     refereeProfile: { type: RefereeProfileSchema, default: undefined },
   },
@@ -126,6 +155,7 @@ UserSchema.methods.comparePassword = function (plain: string): Promise<boolean> 
 UserSchema.index({ role: 1, isActive: 1 });
 UserSchema.index({ 'jockeyProfile.licenseNumber': 1 }, { sparse: true });
 UserSchema.index({ role: 1, 'jockeyProfile.approvalStatus': 1, 'jockeyProfile.appliedAt': -1 });
+UserSchema.index({ role: 1, 'ownerProfile.approvalStatus': 1, 'ownerProfile.appliedAt': -1 });
 
 UserSchema.post('save', async function (doc) {
   if (doc.role === 'admin') return;

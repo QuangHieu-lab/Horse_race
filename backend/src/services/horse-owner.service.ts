@@ -171,6 +171,10 @@ export class HorseOwnerService {
   // --- QUẢN LÝ NGỰA ---
 
   async createHorse(ownerId: string, input: CreateHorseInput): Promise<HorseDto> {
+    if (!input.profilePdfUrl?.trim() || !input.profilePdfName?.trim()) {
+      throw new HttpError(400, 'Hồ sơ PDF của ngựa là bắt buộc để quản trị viên xét duyệt');
+    }
+
     const horse = await Horse.create({
       ...input,
       ownerId: new mongoose.Types.ObjectId(ownerId),

@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import {
   removeUploadedFile,
-  runJockeyApplicationPdfUpload,
+  runAccountApplicationPdfUpload,
 } from '../middleware/upload.middleware.js';
 import * as authService from '../services/auth.service.js';
 import { HttpError } from '../utils/http-error.js';
@@ -20,7 +20,7 @@ export class AuthController {
 
   register = asyncHandler(async (req: Request, res: Response) => {
     if (req.is('multipart/form-data')) {
-      await runJockeyApplicationPdfUpload(req, res);
+      await runAccountApplicationPdfUpload(req, res);
     }
 
     const { email, password, fullName, phone, role = 'spectator' } = req.body as {
@@ -28,8 +28,9 @@ export class AuthController {
       password?: string;
       fullName?: string;
       phone?: string;
-      role?: 'spectator' | 'jockey';
+      role?: 'spectator' | 'jockey' | 'horse_owner';
     };
+
     if (!email || !password || !fullName) {
       await removeUploadedFile(req.file?.path);
       res.status(400).json({
@@ -39,19 +40,42 @@ export class AuthController {
       return;
     }
 
-    if (!['spectator', 'jockey'].includes(role)) {
+    if (!['spectator', 'jockey', 'horse_owner'].includes(role)) {
       await removeUploadedFile(req.file?.path);
-      throw new HttpError(400, 'Chỉ hỗ trợ đăng ký tài khoản Khán giả hoặc Jockey');
+      throw new HttpError(400, 'Chỉ hỗ trợ đăng ký tài khoản Khán giả, Jockey hoặc Chủ ngựa');
     }
 
     if (role === 'jockey') {
       if (!req.file) throw new HttpError(400, 'Hồ sơ PDF của Jockey là bắt buộc');
       const forwardedProtocol = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
       const protocol = forwardedProtocol || req.protocol;
-      const applicationPdfUrl = `${protocol}://${req.get('host')}/uploads/jockey-applications/${req.file.filename}`;
+      const applicationPdfUrl = `${protocol}://${req.get('host')}/uploads/account-applications/${req.file.filename}`;
 
       try {
         const result = await authService.registerJockeyApplication({
+          email,
+          password,
+          fullName,
+          phone,
+          applicationPdfUrl,
+          applicationPdfName: req.file.originalname,
+        });
+        res.status(202).json(result);
+      } catch (error) {
+        await removeUploadedFile(req.file.path);
+        throw error;
+      }
+      return;
+    }
+
+    if (role === 'horse_owner') {
+      if (!req.file) throw new HttpError(400, 'Hồ sơ PDF của Chủ ngựa là bắt buộc');
+      const forwardedProtocol = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
+      const protocol = forwardedProtocol || req.protocol;
+      const applicationPdfUrl = `${protocol}://${req.get('host')}/uploads/account-applications/${req.file.filename}`;
+
+      try {
+        const result = await authService.registerOwnerApplication({
           email,
           password,
           fullName,
