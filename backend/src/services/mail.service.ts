@@ -10,35 +10,18 @@ function assertSmtpConfigured(): void {
   }
 }
 
+function assertResendConfigured(): void {
+  if (!env.resend.apiKey || !env.smtp.from) {
+    throw new HttpError(500, 'Chưa cấu hình Resend để gửi email đặt lại mật khẩu');
+  }
+}
+
 export async function sendPasswordResetEmail(input: {
   to: string;
   fullName: string;
   resetUrl: string;
   expiresMinutes: number;
 }): Promise<void> {
-  assertSmtpConfigured();
-
-  const smtpHost = env.smtp.host;
-  const [smtpIPv4] = await dns.resolve4(smtpHost);
-  const connectionHost = smtpIPv4 || smtpHost;
-
-  const transporter = nodemailer.createTransport({
-    host: connectionHost,
-    port: env.smtp.port,
-    secure: env.smtp.port === 465,
-    dnsTimeout: 10_000,
-    connectionTimeout: 15_000,
-    greetingTimeout: 15_000,
-    socketTimeout: 20_000,
-    tls: {
-      servername: smtpHost,
-    },
-    auth: {
-      user: env.smtp.user,
-      pass: env.smtp.pass,
-    },
-  } as SMTPTransport.Options);
-
   const subject = 'CANH BAO: Dat lai mat khau WDP Horse Race';
   const text = [
     `Xin chao ${input.fullName},`,
@@ -73,16 +56,103 @@ export async function sendPasswordResetEmail(input: {
     </div>
   `;
 
-  try {
-    await transporter.sendMail({
-      from: env.smtp.from,
+  if (env.resend.apiKey) {
+    await sendWithResend({
       to: input.to,
       subject,
       text,
       html,
     });
+    return;
+  }
+
+  await sendWithSmtp({
+    to: input.to,
+    subject,
+    text,
+    html,
+  });
+}
+
+async function sendWithResend(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<void> {
+  assertResendConfigured();
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.resend.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: env.smtp.from,
+        to: [input.to],
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Resend API ${response.status}: ${body}`);
+    }
   } catch (error) {
     console.error('Password reset email failed', {
+      provider: 'resend',
+      to: input.to,
+      mailFrom: env.smtp.from,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new HttpError(500, 'Không gửi được email đặt lại mật khẩu. Vui lòng kiểm tra cấu hình Resend.');
+  }
+}
+
+async function sendWithSmtp(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<void> {
+  assertSmtpConfigured();
+
+  const smtpHost = env.smtp.host;
+  const [smtpIPv4] = await dns.resolve4(smtpHost);
+  const connectionHost = smtpIPv4 || smtpHost;
+
+  const transporter = nodemailer.createTransport({
+    host: connectionHost,
+    port: env.smtp.port,
+    secure: env.smtp.port === 465,
+    dnsTimeout: 10_000,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
+    tls: {
+      servername: smtpHost,
+    },
+    auth: {
+      user: env.smtp.user,
+      pass: env.smtp.pass,
+    },
+  } as SMTPTransport.Options);
+
+  try {
+    await transporter.sendMail({
+      from: env.smtp.from,
+      to: input.to,
+      subject: input.subject,
+      text: input.text,
+      html: input.html,
+    });
+  } catch (error) {
+    console.error('Password reset email failed', {
+      provider: 'smtp',
       to: input.to,
       smtpHost,
       connectionHost,
