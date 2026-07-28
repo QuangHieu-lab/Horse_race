@@ -16,6 +16,20 @@ function assertResendConfigured(): void {
   }
 }
 
+function assertBrevoConfigured(): void {
+  if (!env.brevo.apiKey || !env.smtp.from) {
+    throw new HttpError(500, 'Chưa cấu hình Brevo để gửi email đặt lại mật khẩu');
+  }
+}
+
+function parseMailFrom(raw: string): { name?: string; email: string } {
+  const match = raw.match(/^(.*?)\s*<([^>]+)>$/);
+  if (!match) return { email: raw.trim() };
+  const [, rawName = '', rawEmail = ''] = match;
+  const name = rawName.trim().replace(/^"|"$/g, '');
+  return { name: name || undefined, email: rawEmail.trim() };
+}
+
 export async function sendPasswordResetEmail(input: {
   to: string;
   fullName: string;
@@ -56,6 +70,16 @@ export async function sendPasswordResetEmail(input: {
     </div>
   `;
 
+  if (env.brevo.apiKey) {
+    await sendWithBrevo({
+      to: input.to,
+      subject,
+      text,
+      html,
+    });
+    return;
+  }
+
   if (env.resend.apiKey) {
     await sendWithResend({
       to: input.to,
@@ -72,6 +96,48 @@ export async function sendPasswordResetEmail(input: {
     text,
     html,
   });
+}
+
+async function sendWithBrevo(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<void> {
+  assertBrevoConfigured();
+
+  const sender = parseMailFrom(env.smtp.from);
+
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Api-Key': env.brevo.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender,
+        to: [{ email: input.to }],
+        subject: input.subject,
+        textContent: input.text,
+        htmlContent: input.html,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Brevo API ${response.status}: ${body}`);
+    }
+  } catch (error) {
+    console.error('Password reset email failed', {
+      provider: 'brevo',
+      to: input.to,
+      mailFrom: env.smtp.from,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new HttpError(500, 'Không gửi được email đặt lại mật khẩu. Vui lòng kiểm tra cấu hình Brevo.');
+  }
 }
 
 async function sendWithResend(input: {

@@ -36,6 +36,9 @@ export const env = {
   resend: {
     apiKey: process.env.RESEND_API_KEY ?? '',
   },
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY ?? '',
+  },
   allowMockTopUp: process.env.ALLOW_MOCK_TOPUP === 'true' || (process.env.NODE_ENV ?? 'development') !== 'production',
   payos: {
     clientId: process.env.PAYOS_CLIENT_ID ?? '',
