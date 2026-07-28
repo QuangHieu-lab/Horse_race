@@ -13,6 +13,7 @@ import type {
   ProductDto,
   RedemptionDto,
   HorseLeaderboardItemDto,
+  JockeyLeaderboardItemDto,
   SpectatorPointsDto,
   SpectatorRaceDto,
   TournamentDto,
@@ -336,6 +337,96 @@ export async function listHorseLeaderboard(limit = 10): Promise<HorseLeaderboard
       latestRaceName: item.latestRaceName,
     };
   });
+}
+
+export async function listJockeyLeaderboard(limit = 10): Promise<JockeyLeaderboardItemDto[]> {
+  const normalizedLimit = Math.min(50, Math.max(1, Math.floor(limit)));
+  const publishedResults = await Result.find({ publishedAt: { $ne: null } })
+    .select('raceId rankings publishedAt')
+    .lean();
+
+  if (publishedResults.length === 0) return [];
+
+  const races = await Race.find({ _id: { $in: publishedResults.map((result) => result.raceId) } })
+    .select('name participants')
+    .lean();
+  const raceById = new Map(races.map((race) => [race._id.toString(), race]));
+
+  const stats = new Map<
+    string,
+    {
+      jockeyId: mongoose.Types.ObjectId;
+      firstPlaceWins: number;
+      totalPublishedRaces: number;
+      latestWinAt: Date | null;
+      latestRaceName: string | null;
+    }
+  >();
+
+  for (const result of publishedResults) {
+    const race = raceById.get(result.raceId.toString());
+    if (!race) continue;
+
+    const disqualifiedHorseIds = new Set(
+      race.participants
+        .filter((participant) => participant.isDisqualified)
+        .map((participant) => participant.horseId.toString()),
+    );
+    const countedJockeyIds = new Set<string>();
+
+    for (const ranking of result.rankings) {
+      if (disqualifiedHorseIds.has(ranking.horseId.toString())) continue;
+      const jockeyId = ranking.jockeyId.toString();
+      if (countedJockeyIds.has(jockeyId)) continue;
+      countedJockeyIds.add(jockeyId);
+
+      const current = stats.get(jockeyId) ?? {
+        jockeyId: ranking.jockeyId,
+        firstPlaceWins: 0,
+        totalPublishedRaces: 0,
+        latestWinAt: null,
+        latestRaceName: null,
+      };
+      current.totalPublishedRaces += 1;
+
+      if (ranking.rank === 1) {
+        current.firstPlaceWins += 1;
+        if (!current.latestWinAt || (result.publishedAt && result.publishedAt > current.latestWinAt)) {
+          current.latestWinAt = result.publishedAt ?? null;
+          current.latestRaceName = race.name;
+        }
+      }
+
+      stats.set(jockeyId, current);
+    }
+  }
+
+  const rankedStats = [...stats.values()]
+    .filter((item) => item.firstPlaceWins > 0)
+    .sort((a, b) => {
+      if (b.firstPlaceWins !== a.firstPlaceWins) return b.firstPlaceWins - a.firstPlaceWins;
+      const bWinRate = b.firstPlaceWins / Math.max(1, b.totalPublishedRaces);
+      const aWinRate = a.firstPlaceWins / Math.max(1, a.totalPublishedRaces);
+      if (bWinRate !== aWinRate) return bWinRate - aWinRate;
+      return (b.latestWinAt?.getTime() ?? 0) - (a.latestWinAt?.getTime() ?? 0);
+    })
+    .slice(0, normalizedLimit);
+
+  const jockeys = await User.find({ _id: { $in: rankedStats.map((item) => item.jockeyId) } })
+    .select('fullName')
+    .lean();
+  const jockeyNameById = new Map(jockeys.map((jockey) => [jockey._id.toString(), jockey.fullName]));
+
+  return rankedStats.map((item, index) => ({
+    rank: index + 1,
+    jockeyId: item.jockeyId.toString(),
+    jockeyName: jockeyNameById.get(item.jockeyId.toString()) ?? 'Không rõ',
+    firstPlaceWins: item.firstPlaceWins,
+    totalPublishedRaces: item.totalPublishedRaces,
+    winRate: Number(((item.firstPlaceWins / Math.max(1, item.totalPublishedRaces)) * 100).toFixed(2)),
+    latestWinAt: item.latestWinAt?.toISOString() ?? null,
+    latestRaceName: item.latestRaceName,
+  }));
 }
 
 export async function listSpectatorRaces(

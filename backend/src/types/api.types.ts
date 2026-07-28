@@ -202,6 +202,17 @@ export interface HorseLeaderboardItemDto {
   latestRaceName: string | null;
 }
 
+export interface JockeyLeaderboardItemDto {
+  rank: number;
+  jockeyId: string;
+  jockeyName: string;
+  firstPlaceWins: number;
+  totalPublishedRaces: number;
+  winRate: number;
+  latestWinAt: string | null;
+  latestRaceName: string | null;
+}
+
 export interface PredictedRankDto {
   rank: number;
   horseId: string;
