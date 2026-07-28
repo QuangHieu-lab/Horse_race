@@ -42,10 +42,7 @@ export type ProtestStatus = 'pending' | 'upheld' | 'dismissed';
 
 export type PenaltyApplied = 
   | 'warning' 
-  | 'demote'           // Hạ bậc
-  | 'disqualify'       // Tước quyền (Dùng cho Result)
-  | 'disqualification' // Tước quyền (Dùng cho ViolationRule)
-  | 'restart'          // Đua lại
+  | 'result_void'      // Hủy kết quả của riêng cuộc đua hiện tại
   | 'time_ban'         // Cấm thi đấu có thời hạn
   | 'permanent_ban';   // Cấm thi đấu vĩnh viễn
 
@@ -145,10 +142,7 @@ export type PointsRefModel = 'Prediction' | 'Redemption' | 'PredictionPool' | 'R
 
 export const PENALTY_APPLIED: readonly PenaltyApplied[] = [
   'warning',
-  'demote',
-  'disqualify',
-  'disqualification',
-  'restart',
+  'result_void',
   'time_ban',
   'permanent_ban'
 ] as const;

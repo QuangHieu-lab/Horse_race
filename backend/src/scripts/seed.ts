@@ -477,7 +477,7 @@ async function seed(): Promise<void> {
       createdBy: admin._id,
     })),
   );
-  const ruleObstruction = rules.find((rule) => rule.code === 'JCK-01')!;
+  const ruleWeightBreach = rules.find((rule) => rule.code === 'JCK-05')!;
   const ruleDangerousRiding = rules.find((rule) => rule.code === 'JCK-02')!;
   const ruleBleeding = rules.find((rule) => rule.code === 'HRS-03')!;
 
@@ -1405,18 +1405,17 @@ async function seed(): Promise<void> {
   console.log(' 🚀 DỮ LIỆU ĐỂ TEST API TRỌNG TÀI (REFEREE) TRÊN POSTMAN');
   console.log('======================================================');
 
-  console.log(`\n🔴 1. TEST TỤT HẠNG TRỰC TIẾP (Ngựa B đang hạng 1 -> hạ xuống sau ngựa A bị ảnh hưởng)`);
+  console.log(`\n🔴 1. TEST HỦY KẾT QUẢ MỘT TRẬN (không cấm thi đấu các trận sau)`);
   console.log(`POST /api/referee/races/${raceDraft._id}/penalize`);
   console.log(JSON.stringify({
     horseId: horseB._id.toString(),
     jockeyId: jockey2._id.toString(),
-    ruleId: ruleObstruction._id.toString(),
+    ruleId: ruleWeightBreach._id.toString(),
     target: "jockey",
-    affectedHorseId: horseA._id.toString(),
-    notes: "Nài ngựa B chèn ép ở khúc cua cuối, hạ ngựa B xuống sau ngựa A theo lỗi JCK-01"
+    notes: "Nài ngựa B sai trọng lượng khi cân, hủy kết quả của riêng trận này theo lỗi JCK-05"
   }, null, 2));
 
-  console.log(`\n🔴 2. TEST TƯỚC QUYỀN THI ĐẤU (ghi nhận lỗi disqualify bằng endpoint penalize)`);
+  console.log(`\n🔴 2. TEST CẤM CÓ THỜI HẠN (hủy kết quả trận hiện tại và cấm thi đấu 14 ngày đua)`);
   console.log(`POST /api/referee/races/${raceDraft._id}/penalize`);
   console.log(JSON.stringify({
     horseId: horseC._id.toString(),
