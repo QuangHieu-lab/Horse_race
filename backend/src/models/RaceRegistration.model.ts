@@ -50,23 +50,23 @@ RaceRegistrationSchema.index({ raceId: 1, status: 1 });
 
 RaceRegistrationSchema.pre('save', async function (next) {
   const horse = await Horse.findById(this.horseId);
-  if (!horse) return next(new Error('Horse not found'));
+  if (!horse) return next(new Error('Không tìm thấy ngựa'));
   if (horse.ownerId.toString() !== this.ownerId.toString()) {
     return next(new Error('Chủ đăng ký phải là chủ sở hữu của ngựa'));
   }
   if (['pending', 'approved'].includes(this.status) && isPenaltyActive(horse.penaltyStatus)) {
-    return next(new Error('Horse is banned from competition'));
+    return next(new Error('Ngựa đang bị cấm thi đấu'));
   }
   const owner = await User.findById(this.ownerId).select('role isActive penaltyStatus').lean();
   if (!owner?.isActive || owner.role !== 'horse_owner') {
     return next(new Error('Chủ ngựa phải là tài khoản đang hoạt động'));
   }
   if (['pending', 'approved'].includes(this.status) && isPenaltyActive(owner.penaltyStatus)) {
-    return next(new Error('Horse owner is banned from competition'));
+    return next(new Error('Chủ ngựa đang bị cấm thi đấu'));
   }
   if (this.isNew || this.isModified('status')) {
     if (['pending', 'approved'].includes(this.status) && horse.healthStatus !== 'fit') {
-      return next(new Error('Only fit horses can register for a race'));
+      return next(new Error('Chỉ ngựa đủ điều kiện sức khỏe mới được đăng ký cuộc đua'));
     }
   }
 
@@ -81,8 +81,8 @@ RaceRegistrationSchema.pre('save', async function (next) {
   }
 
   const race = await Race.findById(this.raceId).select('status maxParticipants').lean();
-  if (!race) return next(new Error('Race not found'));
-  if (race.status !== 'scheduled') return next(new Error('Can only register for a scheduled race'));
+  if (!race) return next(new Error('Không tìm thấy cuộc đua'));
+  if (race.status !== 'scheduled') return next(new Error('Chỉ có thể đăng ký khi cuộc đua đang ở trạng thái chờ'));
 
   next();
 });

@@ -42,11 +42,11 @@ export class AuthController {
 
     if (!['spectator', 'jockey', 'horse_owner'].includes(role)) {
       await removeUploadedFile(req.file?.path);
-      throw new HttpError(400, 'Chỉ hỗ trợ đăng ký tài khoản Khán giả, Jockey hoặc Chủ ngựa');
+      throw new HttpError(400, 'Chỉ hỗ trợ đăng ký tài khoản Khán giả, Nài ngựa hoặc Chủ ngựa');
     }
 
     if (role === 'jockey') {
-      if (!req.file) throw new HttpError(400, 'Hồ sơ PDF của Jockey là bắt buộc');
+      if (!req.file) throw new HttpError(400, 'Hồ sơ PDF của nài ngựa là bắt buộc');
       const forwardedProtocol = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
       const protocol = forwardedProtocol || req.protocol;
       const applicationPdfUrl = `${protocol}://${req.get('host')}/uploads/account-applications/${req.file.filename}`;

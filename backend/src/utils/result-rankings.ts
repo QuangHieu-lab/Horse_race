@@ -11,10 +11,10 @@ export function validateRankings(
 
   if (rankings.length === 0) return null;
   if (rankings.length > eligible.length) {
-    return 'Số lượng xếp hạng vượt quá số ngựa đủ điều kiện thi đấu (có thể do ngựa đã bị tước quyền)';
+    return 'Số lượng xếp hạng vượt quá số ngựa đủ điều kiện thi đấu (có thể do ngựa đã bị hủy kết quả hoặc cấm thi đấu)';
   }
 
-  // Khắc phục lỗi Đồng hạng (Dead Heat)
+  // Khắc phục lỗi đồng hạng.
   const ranks = rankings.map((r) => r.rank).sort((a, b) => a - b);
   if (ranks[0] !== 1) {
     return 'Thứ hạng phải bắt đầu từ 1';
@@ -24,7 +24,7 @@ export function validateRankings(
     const currentRank = ranks[i]!;
     const previousRank = ranks[i - 1]!;
     if (currentRank < previousRank || currentRank > i + 1) {
-      return `Thứ hạng không hợp lệ (lỗi tại rank ${currentRank}). Hãy kiểm tra lại logic đồng hạng.`;
+      return `Thứ hạng không hợp lệ (lỗi tại hạng ${currentRank}). Hãy kiểm tra lại logic đồng hạng.`;
     }
   }
 
