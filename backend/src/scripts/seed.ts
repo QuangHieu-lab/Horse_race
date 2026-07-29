@@ -4,7 +4,7 @@
  * B — Spectator: open prediction window, chưa có prediction
  * C — Scoring: race completed, result confirmed, chưa publish, 1 prediction pending
  * C3 — No-winner pool: race completed, result confirmed, mọi prediction đều sai
- * D — Referee: race completed, result DRAFT, ready for testing Time Penalty & Disqualify
+ * D — Referee: race completed, result DRAFT, ready for testing result void/time ban
  * E — Independent: New tournament, new race, horse registered but NO jockey invited yet. Free jockey available.
  * F — Pre-race checks: scheduled race with 5 valid participants, ready for referee start
  *
@@ -35,6 +35,8 @@ import {
 
 const DEMO_PASSWORD = 'Demo@123';
 const SEED_VND_PER_POINT = 0.01;
+const DEMO_HORSE_PDF_URL = 'https://www.nj.gov/agriculture/pdf/NJ4HHorseRegistrationForm.pdf';
+const DEMO_HORSE_PDF_NAME = 'NJ 4-H Horse Registration Form';
 
 const COLLECTIONS_TO_CLEAR = [
   'auditlogs',
@@ -385,8 +387,8 @@ async function seed(): Promise<void> {
       color: 'Chestnut',
       weight: 450,
       healthStatus: 'fit',
-      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
-      profilePdfName: 'NJ 4-H Horse Registration Form',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
     },
     {
       ownerId: owner._id,
@@ -398,8 +400,8 @@ async function seed(): Promise<void> {
       color: 'Bay',
       weight: 480,
       healthStatus: 'fit',
-      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
-      profilePdfName: 'NJ 4-H Horse Registration Form',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
     },
     {
       ownerId: owner._id,
@@ -411,6 +413,8 @@ async function seed(): Promise<void> {
       color: 'Grey',
       weight: 460,
       healthStatus: 'fit',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
     },
     {
       ownerId: owner._id,
@@ -422,6 +426,8 @@ async function seed(): Promise<void> {
       color: 'Black',
       weight: 490,
       healthStatus: 'fit',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
     },
     {
       ownerId: owner2._id,
@@ -433,8 +439,8 @@ async function seed(): Promise<void> {
       color: 'Dark Bay',
       weight: 475,
       healthStatus: 'fit',
-      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
-      profilePdfName: 'NJ 4-H Horse Registration Form',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
     },
     {
       ownerId: owner2._id,
@@ -446,8 +452,8 @@ async function seed(): Promise<void> {
       color: 'Grey',
       weight: 455,
       healthStatus: 'fit',
-      profilePdfUrl: 'http://localhost:3000/demo-files/horses/horse-reg-form.pdf',
-      profilePdfName: 'NJ 4-H Horse Registration Form',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
     },
     {
       ownerId: owner2._id,
@@ -459,6 +465,53 @@ async function seed(): Promise<void> {
       color: 'White',
       weight: 500,
       healthStatus: 'fit',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
+    },
+    {
+      ownerId: owner2._id,
+      name: 'Churchill Star',
+      registrationId: 'VN-HORSE-008',
+      breed: 'Thoroughbred',
+      sire: 'Derby Line',
+      dam: 'Twin Spires',
+      trainerName: 'Stable Demo E',
+      age: 4,
+      color: 'Bay',
+      weight: 472,
+      healthStatus: 'fit',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
+    },
+    {
+      ownerId: owner._id,
+      name: 'Ascot Crown',
+      registrationId: 'VN-HORSE-009',
+      breed: 'Thoroughbred',
+      sire: 'Royal Mile',
+      dam: 'Gold Cup',
+      trainerName: 'Stable Demo B',
+      age: 5,
+      color: 'Dark Bay',
+      weight: 486,
+      healthStatus: 'fit',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
+    },
+    {
+      ownerId: owner2._id,
+      name: 'Meydan Dancer',
+      registrationId: 'VN-HORSE-010',
+      breed: 'Arabian',
+      sire: 'Desert Wind',
+      dam: 'Dubai Night',
+      trainerName: 'Stable Demo F',
+      age: 3,
+      color: 'Chestnut',
+      weight: 452,
+      healthStatus: 'fit',
+      profilePdfUrl: DEMO_HORSE_PDF_URL,
+      profilePdfName: DEMO_HORSE_PDF_NAME,
     },
   ]);
   const horseA = horses[0]!;
@@ -468,6 +521,9 @@ async function seed(): Promise<void> {
   const horseE = horses[4]!;
   const horseF = horses[5]!;
   const horseG = horses[6]!;
+  const horseH = horses[7]!;
+  const horseI = horses[8]!;
+  const horseJ = horses[9]!;
 
   console.log('Creating Violation Rules…');
   const rules = await ViolationRule.create(
@@ -482,19 +538,50 @@ async function seed(): Promise<void> {
   const ruleBleeding = rules.find((rule) => rule.code === 'HRS-03')!;
 
   console.log('Creating tracks & tournaments…');
-  const track = await Track.create({
-    name: 'Trường đua Bình Dương',
-    location: 'Thủ Dầu Một, Bình Dương',
-    countryCode: 'VN',
-    surfaceDefault: 'turf',
-  });
+  const tracks = await Track.create([
+    {
+      name: 'Trường đua Bình Dương',
+      location: 'Thủ Dầu Một, Bình Dương',
+      countryCode: 'VN',
+      surfaceDefault: 'turf',
+    },
+    {
+      name: 'Churchill Downs',
+      location: 'Louisville, Kentucky, Hoa Kỳ',
+      countryCode: 'US',
+      surfaceDefault: 'dirt',
+    },
+    {
+      name: 'Ascot Racecourse',
+      location: 'Ascot, Berkshire, Anh',
+      countryCode: 'GB',
+      surfaceDefault: 'turf',
+    },
+    {
+      name: 'Meydan Racecourse',
+      location: 'Dubai, Các Tiểu vương quốc Ả Rập Thống nhất',
+      countryCode: 'AE',
+      surfaceDefault: 'dirt',
+    },
+    {
+      name: 'Saratoga Race Course',
+      location: 'Saratoga Springs, New York, Hoa Kỳ',
+      countryCode: 'US',
+      surfaceDefault: 'dirt',
+    },
+  ]);
+  const track = tracks[0]!;
+  const trackChurchill = tracks[1]!;
+  const trackAscot = tracks[2]!;
+  const trackMeydan = tracks[3]!;
+  const trackSaratoga = tracks[4]!;
 
   const tournamentSpring = await Tournament.create({
     name: 'Giải Đua Mùa Xuân 2026',
     description: 'Dữ liệu demo — Jockey + Spectator portals.',
     startDate: daysFromNow(-5),
     endDate: daysFromNow(30),
-    location: 'Trường đua Bình Dương',
+    location: track.location,
     status: 'ongoing',
     prizePool: 50_000_000,
     predictionConfig: {
@@ -527,7 +614,7 @@ async function seed(): Promise<void> {
     description: 'Giải đấu riêng biệt để test quy trình mời kỵ sĩ.',
     startDate: daysFromNow(10),
     endDate: daysFromNow(40),
-    location: 'Trường đua Bình Dương',
+    location: trackAscot.location,
     status: 'published',
     prizePool: 100_000_000,
     predictionConfig: {
@@ -581,7 +668,7 @@ async function seed(): Promise<void> {
 
   const meetingSummer = await RaceMeeting.create({
     tournamentId: tournamentSummer._id,
-    trackId: track._id,
+    trackId: trackAscot._id,
     meetingDate: daysFromNow(15),
     name: 'Khai mạc mùa hè',
     status: 'scheduled',
@@ -592,7 +679,7 @@ async function seed(): Promise<void> {
   const raceUpcoming = await Race.create({
     tournamentId: tournamentSpring._id,
     meetingId: meetingUpcoming._id,
-    trackId: track._id,
+    trackId: trackMeydan._id,
     name: 'Bán kết — Vòng 2',
     round: 2,
     raceClass: 'Open',
@@ -681,6 +768,25 @@ async function seed(): Promise<void> {
       processedAt: new Date(),
       waiverAcceptedAt: new Date(),
     },
+    {
+      raceId: raceOpen._id,
+      horseId: horseI._id,
+      ownerId: owner._id,
+      jockeyId: jockey3._id,
+      status: 'pending',
+      insuranceNote: 'Đơn chờ admin duyệt để test hàng pending trong màn Approvals.',
+      waiverAcceptedAt: new Date(),
+    },
+    {
+      raceId: raceOpen._id,
+      horseId: horseG._id,
+      ownerId: owner2._id,
+      status: 'rejected',
+      adminNote: 'Thiếu giấy xác nhận kiểm tra thú y trong hồ sơ demo.',
+      processedBy: admin._id,
+      processedAt: new Date(),
+      waiverAcceptedAt: new Date(),
+    },
   ]);
 
   await acceptInvitation(owner._id, jockey1._id, horseA._id, raceOpen._id, 'Mời bạn điều khiển Sóng Gió tại chung kết.');
@@ -751,7 +857,7 @@ async function seed(): Promise<void> {
     name: 'Vòng loại — Heat 1',
     round: 1,
     raceClass: 'Open',
-    scheduledAt: daysFromNow(1), // Giữ nguyên tương lai để tránh lỗi Validation
+    scheduledAt: daysFromNow(-1),
     distance: 1600,
     surface: 'turf',
     going: 'good',
@@ -930,7 +1036,7 @@ async function seed(): Promise<void> {
     name: 'No-Winner Pool — Heat 2',
     round: 7,
     raceClass: 'Open',
-    scheduledAt: daysFromNow(6),
+    scheduledAt: daysFromNow(-6),
     distance: 1400,
     surface: 'turf',
     going: 'good',
@@ -1023,11 +1129,11 @@ async function seed(): Promise<void> {
   const leaderboardRace1 = await Race.create({
     tournamentId: tournamentSpring._id,
     meetingId: meetingCompleted._id,
-    trackId: track._id,
+    trackId: trackChurchill._id,
     name: 'Leaderboard Demo — Sprint 1',
     round: 4,
     raceClass: 'Open',
-    scheduledAt: daysFromNow(3),
+    scheduledAt: daysFromNow(-4),
     distance: 1200,
     surface: 'turf',
     going: 'good',
@@ -1059,11 +1165,11 @@ async function seed(): Promise<void> {
   const leaderboardRace2 = await Race.create({
     tournamentId: tournamentSpring._id,
     meetingId: meetingCompleted._id,
-    trackId: track._id,
+    trackId: trackAscot._id,
     name: 'Leaderboard Demo — Sprint 2',
     round: 5,
     raceClass: 'Open',
-    scheduledAt: daysFromNow(4),
+    scheduledAt: daysFromNow(-3),
     distance: 1200,
     surface: 'turf',
     going: 'good',
@@ -1095,11 +1201,11 @@ async function seed(): Promise<void> {
   const leaderboardRace3 = await Race.create({
     tournamentId: tournamentSpring._id,
     meetingId: meetingCompleted._id,
-    trackId: track._id,
-    name: 'Leaderboard Demo — DQ Check',
+    trackId: trackSaratoga._id,
+    name: 'Leaderboard Demo — Kiểm tra hủy kết quả',
     round: 6,
     raceClass: 'Open',
-    scheduledAt: daysFromNow(5),
+    scheduledAt: daysFromNow(-2),
     distance: 1200,
     surface: 'turf',
     going: 'good',
@@ -1117,20 +1223,20 @@ async function seed(): Promise<void> {
         clothNumber: 3,
         confirmedAt: new Date(),
         isDisqualified: true,
-        disqualifiedReason: 'Xuất huyết phổi khi đua (EIPH) — ngựa bị đình chỉ thi đấu 14 ngày',
+        disqualifiedReason: 'Vấn đề sức khỏe cần đình chỉ — hủy kết quả trận này và cấm thi đấu 14 ngày đua',
         disqualifiedAt: new Date(),
         scratchedAt: new Date(),
       },
     ],
   });
   const seedHorseBanUntil = daysFromNow(14);
-  const leaderboardDQResult = await Result.create({
+  const leaderboardPenaltyResult = await Result.create({
     raceId: leaderboardRace3._id,
     tournamentId: tournamentSpring._id,
     rankings: [
       { rank: 1, horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, finishTime: 75.33, marginBehind: 0, prize: 0 },
       { rank: 2, horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, finishTime: 76.10, marginBehind: 0.77, prize: 0 },
-      { rank: 3, horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, finishTime: 74.90, marginBehind: 0, prize: 0 },
+      { rank: 3, horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, finishTime: 76.60, marginBehind: 1.27, prize: 0 },
     ],
     violations: [
       {
@@ -1140,7 +1246,7 @@ async function seed(): Promise<void> {
         ownerId: owner._id,
         ruleId: ruleBleeding._id,
         type: 'medical',
-        description: 'Seed DQ demo — ngựa xuất huyết phổi khi đua (EIPH), đình chỉ 14 ngày, loại khỏi leaderboard',
+        description: 'Ngựa gặp vấn đề sức khỏe cần đình chỉ, hủy kết quả trận này và cấm thi đấu 14 ngày đua.',
         penaltyApplied: 'time_ban',
         bannedUntil: seedHorseBanUntil,
         recordedAt: new Date(),
@@ -1158,11 +1264,11 @@ async function seed(): Promise<void> {
   const raceDraft = await Race.create({
     tournamentId: tournamentSpring._id,
     meetingId: meetingCompleted._id,
-    trackId: track._id,
+    trackId: trackChurchill._id,
     name: 'Chặng thử nghiệm phạt (Draft)',
     round: 3,
     raceClass: 'Open',
-    scheduledAt: daysFromNow(2), // 🚀 SỬA TẠI ĐÂY: Đổi sang tương lai (+2 ngày) để vượt qua validation
+    scheduledAt: daysFromNow(-1),
     distance: 1200,
     surface: 'turf',
     going: 'good',
@@ -1224,7 +1330,7 @@ async function seed(): Promise<void> {
   const raceIndependent = await Race.create({
     tournamentId: tournamentSummer._id,
     meetingId: meetingSummer._id,
-    trackId: track._id,
+    trackId: trackAscot._id,
     name: 'Vòng loại Mùa Hè - Heat 1',
     round: 1,
     raceClass: 'Open',
@@ -1255,7 +1361,7 @@ async function seed(): Promise<void> {
   const raceFiveReady = await Race.create({
     tournamentId: tournamentSummer._id,
     meetingId: meetingSummer._id,
-    trackId: track._id,
+    trackId: trackSaratoga._id,
     name: 'Pre-Race Gate — 5 Horse Field',
     round: 2,
     raceClass: 'Open',
@@ -1294,7 +1400,7 @@ async function seed(): Promise<void> {
     await raceFiveReadyDoc.save();
   }
 
-  const seededBanViolation = leaderboardDQResult.violations[0];
+  const seededBanViolation = leaderboardPenaltyResult.violations[0];
   if (!seedHorseBanUntil || !seededBanViolation) {
     throw new Error('Seed safety check failed: horse ban violation must have bannedUntil');
   }
@@ -1304,7 +1410,7 @@ async function seed(): Promise<void> {
         isBanned: true,
         bannedUntil: seedHorseBanUntil,
         currentViolationId: seededBanViolation._id ?? null,
-        reason: 'Seed DQ demo — EIPH, đình chỉ 14 ngày',
+        reason: 'Vấn đề sức khỏe cần đình chỉ, cấm thi đấu 14 ngày đua',
       },
     },
   });

@@ -133,7 +133,7 @@ RaceSchema.set('toJSON', { virtuals: true });
 RaceSchema.set('toObject', { virtuals: true });
 
 RaceSchema.pre('save', function (next) {
-  if (this.isNew && this.scheduledAt <= new Date()) {
+  if (this.isNew && this.scheduledAt <= new Date() && !['completed', 'cancelled'].includes(this.status)) {
     return next(new Error('Thời gian đua phải ở tương lai'));
   }
 

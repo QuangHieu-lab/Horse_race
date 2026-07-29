@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "db:seed": "tsx src/scripts/seed.ts",
+    "db:validate-seed": "tsx src/scripts/validate-seed-data.ts",
     "db:add-test-users": "tsx src/scripts/add-test-users.ts"
   },
   "dependencies": {
