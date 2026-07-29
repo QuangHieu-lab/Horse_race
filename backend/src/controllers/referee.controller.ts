@@ -44,16 +44,15 @@ export class RefereeController {
   toggleCheck = asyncHandler(async (req: Request, res: Response) => {
     const { horseId, field } = req.body as {
       horseId?: string;
-      field?: 'vetApprovedAt' | 'confirmedAt';
+      field?: 'confirmedAt';
     };
-    if (!horseId || !field || !['vetApprovedAt', 'confirmedAt'].includes(field)) {
-      throw new HttpError(400, 'horseId và field hợp lệ là bắt buộc');
+    if (!horseId || field !== 'confirmedAt') {
+      throw new HttpError(400, 'horseId và field=confirmedAt là bắt buộc');
     }
     await refereeService.toggleParticipantCheck(
       req.user!.id,
       req.params.id as string,
       horseId,
-      field,
     );
     res.json({ ok: true });
   });

@@ -525,7 +525,7 @@ const swaggerDefinition = {
         required: [
           'raceId', 'raceName', 'horseId', 'horseName', 'horseBreed', 'horseAge',
           'horseHealthStatus', 'jockeyId', 'jockeyName', 'ownerId', 'ownerName',
-          'vetApproved', 'confirmed',
+          'confirmed',
         ],
         properties: {
           raceId: { type: 'string' },
@@ -550,7 +550,6 @@ const swaggerDefinition = {
           ownerName: { type: 'string' },
           laneNumber: { type: 'number', nullable: true },
           clothNumber: { type: 'number', nullable: true },
-          vetApproved: { type: 'boolean' },
           confirmed: { type: 'boolean' },
         },
       },
@@ -558,10 +557,10 @@ const swaggerDefinition = {
         type: 'object',
         required: ['horseId', 'field'],
         description:
-          'Referee pre-race gate. Every active participant must have both vetApprovedAt and confirmedAt before /api/referee/races/{id}/start or /start-simulation can proceed.',
+          'Referee pre-race gate. Veterinary checks are handled outside the platform; every active participant only needs confirmedAt before start or simulation can proceed.',
         properties: {
           horseId: { type: 'string' },
-          field: { type: 'string', enum: ['vetApprovedAt', 'confirmedAt'] },
+          field: { type: 'string', enum: ['confirmedAt'] },
         },
       },
       UpsertRaceResultRequest: {
@@ -1379,13 +1378,13 @@ const swaggerDefinition = {
         tags: ['Referee'],
         summary: 'Simulate a race and create a draft result',
         description:
-          'Assigned referee only. Requires the race to be ready and every active participant to have passed the veterinary check and race-information confirmation. Generates randomized finish times, stores a draft result, and keeps the race live until the referee finishes it.',
+          'Assigned referee only. Requires the race to be ready and every active participant to have race-start confirmation. Veterinary checks are handled outside the platform. Generates randomized finish times, stores a draft result, and keeps the race live until the referee finishes it.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
         responses: {
           200: { description: 'Draft result generated' },
           403: { description: 'The referee is not assigned to this race' },
-          409: { description: 'Race is not ready, has fewer than two active participants, or has missing pre-race checks' },
+          409: { description: 'Race is not ready, has fewer than two active participants, or has missing race-start confirmations' },
         },
       },
     },
@@ -1394,13 +1393,13 @@ const swaggerDefinition = {
         tags: ['Referee'],
         summary: 'Start referee race control and assign lanes',
         description:
-          'Assigned referee only. Moves a scheduled race to ready after lane draw. Requires at least two active participants and requires every active participant to have both vetApprovedAt and confirmedAt.',
+          'Assigned referee only. Moves a scheduled race to ready after lane draw. Requires at least two active participants and requires every active participant to have confirmedAt. Veterinary checks are handled outside the platform.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
         responses: {
           200: { description: 'Race moved to ready' },
           403: { description: 'The referee is not assigned to this race' },
-          409: { description: 'Race is not scheduled, has fewer than two active participants, or has missing pre-race checks' },
+          409: { description: 'Race is not scheduled, has fewer than two active participants, or has missing race-start confirmations' },
         },
       },
     },
@@ -1439,9 +1438,9 @@ const swaggerDefinition = {
       },
       patch: {
         tags: ['Referee'],
-        summary: 'Toggle a pre-race check',
+        summary: 'Toggle a participant race-start confirmation',
         description:
-          'Toggles either veterinary approval or race-information confirmation for one active participant. Both checks are required before a race can be started.',
+          'Toggles race-start confirmation for one active participant. Veterinary approval is handled outside the platform.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {

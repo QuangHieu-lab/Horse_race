@@ -61,11 +61,11 @@ export class RaceController {
   });
 
   simulate = asyncHandler(async (req: Request, res: Response) => {
-    throw new HttpError(403, 'Chi trong tai phu trach moi duoc boc tham lan va bat dau cuoc dua');
+    throw new HttpError(403, 'Chỉ trọng tài phụ trách mới được bốc thăm làn và bắt đầu cuộc đua');
   });
 
   finishRace = asyncHandler(async (req: Request, res: Response) => {
-    throw new HttpError(403, 'Chi trong tai phu trach moi duoc hoan tat luong chay dua');
+    throw new HttpError(403, 'Chỉ trọng tài phụ trách mới được hoàn tất luồng chạy đua');
   });
 
   assignReferee = asyncHandler(async (req: Request, res: Response) => {

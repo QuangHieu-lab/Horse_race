@@ -15,20 +15,21 @@ export async function assertUserRole(
   role: 'jockey' | 'referee' | 'horse_owner',
 ): Promise<void> {
   const user = await User.findById(userId).select('role isActive penaltyStatus jockeyProfile.penaltyStatus').lean();
+  const roleLabel = role === 'jockey' ? 'nài ngựa' : role === 'referee' ? 'trọng tài' : 'chủ ngựa';
   if (!user?.isActive || user.role !== role) {
-    throw new HttpError(409, `Người dùng ${userId} phải là ${role} đang hoạt động`);
+    throw new HttpError(409, `Người dùng ${userId} phải là tài khoản ${roleLabel} đang hoạt động`);
   }
   if (role === 'jockey' && isPenaltyActive(user.jockeyProfile?.penaltyStatus)) {
-    throw new HttpError(403, 'Nai ngua dang bi tuoc quyen thi dau');
+    throw new HttpError(403, 'Nài ngựa đang bị cấm thi đấu');
   }
   if (role === 'horse_owner' && isPenaltyActive(user.penaltyStatus)) {
-    throw new HttpError(403, 'Chu ngua dang bi tuoc quyen thi dau');
+    throw new HttpError(403, 'Chủ ngựa đang bị cấm thi đấu');
   }
 }
 
 /**
- * Thêm horse + jockey vào Race.participants sau khi jockey ACCEPT lời mời.
- * Yêu cầu đơn đăng ký đã được admin DUYỆT trước đó.
+ * Thêm ngựa + nài ngựa vào danh sách thi đấu sau khi nài ngựa chấp nhận lời mời.
+ * Yêu cầu đơn đăng ký đã được quản trị viên duyệt trước đó.
  */
 export async function addParticipantFromInvitation(
   invitation: IJockeyInvitation,
@@ -53,7 +54,7 @@ export async function addParticipantFromInvitation(
   }
 
   if (isPenaltyActive(horse.penaltyStatus)) {
-    throw new HttpError(403, 'Ngua dang bi tuoc quyen thi dau');
+    throw new HttpError(403, 'Ngựa đang bị cấm thi đấu');
   }
 
   await assertUserRole(invitation.jockeyId, 'jockey');
@@ -61,7 +62,7 @@ export async function addParticipantFromInvitation(
 
   const race = await Race.findById(invitation.raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
-  if (race.status !== 'scheduled') throw new HttpError(409, 'Chi co the xep ngua vao cuoc dua chua duoc trong tai bat dau dieu hanh');
+  if (race.status !== 'scheduled') throw new HttpError(409, 'Chỉ có thể xếp ngựa vào cuộc đua chưa được trọng tài bắt đầu điều hành');
   if (race.participants.length >= race.maxParticipants) {
     throw new HttpError(409, 'Cuộc đua đã đủ số lượng tham gia');
   }
@@ -81,7 +82,6 @@ export async function addParticipantFromInvitation(
     jockeyId: invitation.jockeyId,
     ownerId: invitation.horseOwnerId,
     confirmedAt: null,
-    vetApprovedAt: null,
     scratchedAt: null,
   };
 
@@ -113,8 +113,8 @@ export interface AddParticipantInput {
 }
 
 /**
- * Thêm trực tiếp horse + jockey vào Race.participants từ dữ liệu request
- * (không qua luồng lời mời). Dùng cho thao tác xếp đường đua thủ công của BTC.
+ * Thêm trực tiếp ngựa + nài ngựa vào danh sách thi đấu từ dữ liệu request.
+ * Dùng cho thao tác xếp đường đua thủ công của ban tổ chức.
  */
 export async function addParticipant(
   raceId: string,
@@ -152,7 +152,7 @@ export async function addParticipant(
   }
 
   if (isPenaltyActive(horse.penaltyStatus)) {
-    throw new HttpError(403, 'Ngua dang bi tuoc quyen thi dau');
+    throw new HttpError(403, 'Ngựa đang bị cấm thi đấu');
   }
 
   await assertUserRole(jockeyId, 'jockey');
@@ -173,7 +173,6 @@ export async function addParticipant(
     ownerId,
     carriedWeight: input.carriedWeight,
     confirmedAt: null,
-    vetApprovedAt: null,
     scratchedAt: null,
   };
 
@@ -191,7 +190,7 @@ export async function addParticipant(
 }
 
 /**
- * Gọi từ hook JockeyInvitation khi chuyển sang accepted.
+ * Gọi từ hook JockeyInvitation khi lời mời chuyển sang trạng thái đã chấp nhận.
  * Kiểm tra ràng buộc + xếp ngựa/nài vào đường đua (đơn đã được duyệt trước đó).
  */
 export async function onInvitationAccepted(
@@ -226,7 +225,7 @@ export interface RaceEligibleEntry {
 /**
  * Liệt kê các đơn đăng ký đã được admin DUYỆT cho cuộc đua nhưng chưa được
  * xếp vào đường đua. Admin chọn từ danh sách này thay vì nhập ID thủ công.
- * Jockey lấy từ đơn đăng ký, nếu chưa có thì dò lời mời đã được chấp nhận.
+ * Nài ngựa lấy từ đơn đăng ký, nếu chưa có thì dò lời mời đã được chấp nhận.
  */
 export async function listEligibleEntries(raceId: string): Promise<RaceEligibleEntry[]> {
   if (!mongoose.isValidObjectId(raceId)) {

@@ -46,7 +46,6 @@ export interface RefereeCheckDto {
   ownerName: string;
   laneNumber: number | null;
   clothNumber: number | null;
-  vetApproved: boolean;
   confirmed: boolean;
 }
 
@@ -272,7 +271,6 @@ export async function listRefereeChecks(refereeId: string, raceId: string): Prom
       ownerName: owner.fullName,
       laneNumber: p.laneNumber ?? null,
       clothNumber: p.clothNumber ?? null,
-      vetApproved: !!p.vetApprovedAt,
       confirmed: !!p.confirmedAt,
     };
   });
@@ -282,7 +280,6 @@ export async function toggleParticipantCheck(
   refereeId: string,
   raceId: string,
   horseId: string,
-  field: 'vetApprovedAt' | 'confirmedAt',
 ): Promise<void> {
   const race = await Race.findById(raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
@@ -299,11 +296,7 @@ export async function toggleParticipantCheck(
     throw new HttpError(409, 'Không thể cập nhật kiểm tra cho participant đã rút khỏi hoặc bị loại');
   }
 
-  if (field === 'vetApprovedAt') {
-    participant.vetApprovedAt = participant.vetApprovedAt ? null : new Date();
-  } else {
-    participant.confirmedAt = participant.confirmedAt ? null : new Date();
-  }
+  participant.confirmedAt = participant.confirmedAt ? null : new Date();
 
   await race.save();
 }
@@ -327,7 +320,7 @@ export async function simulateRace(refereeId: string, raceId: string) {
   }
 
   if (race.status !== 'ready') {
-    throw new HttpError(409, 'Can boc tham lan va bat dau cuoc dua truoc khi chay mo phong');
+    throw new HttpError(409, 'Cần bốc thăm làn và bắt đầu cuộc đua trước khi chạy mô phỏng');
   }
 
   const checkErr = validatePreRaceChecks(race.participants);
@@ -441,7 +434,7 @@ export async function finishRefereeRace(refereeId: string, raceId: string): Prom
   }
   if (race.status === 'completed') return; // đã kết thúc thì bỏ qua
   if (race.status !== 'ongoing') {
-    throw new HttpError(409, 'Chỉ kết thúc được cuộc đua đang diễn ra (Live)');
+    throw new HttpError(409, 'Chỉ kết thúc được cuộc đua đang diễn ra');
   }
   race.status = 'completed';
   await race.save();
@@ -642,7 +635,7 @@ export async function applyRacePenalty(
     await createNotification({
       userId: participant.jockeyId,
       type: 'jockey_penalty',
-      title: 'Biên bản xử phạt jockey',
+      title: 'Biên bản xử phạt nài ngựa',
       message: `Bạn bị xử phạt vì: ${payload.notes ? `${rule.name} - ${payload.notes}` : rule.description}. ${banLine}.`,
       refModel: 'Result',
       refId: savedResult._id,

@@ -57,7 +57,7 @@ JockeyInvitationSchema.pre('save', async function (next) {
       status: 'pending',
     });
     if (existing) {
-      return next(new Error('A pending invitation already exists for this jockey and race'));
+      return next(new Error('Đã có lời mời đang chờ cho nài ngựa này trong cuộc đua này'));
     }
   }
 

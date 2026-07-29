@@ -10,7 +10,6 @@ export interface IParticipant {
   laneNumber?: number;
   clothNumber?: number;
   carriedWeight?: number;
-  vetApprovedAt?: Date | null;
   scratchedAt?: Date | null;
   confirmedAt?: Date | null;
   isDisqualified?: boolean;
@@ -78,7 +77,6 @@ const ParticipantSchema = new Schema<IParticipant>(
     isDisqualified: { type: Boolean, default: false },
     disqualifiedReason: { type: String },
     disqualifiedAt: { type: Date, default: null },  
-    vetApprovedAt: { type: Date, default: null },
     scratchedAt: { type: Date, default: null },
     confirmedAt: { type: Date, default: null },
   },

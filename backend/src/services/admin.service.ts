@@ -99,7 +99,7 @@ function toJockeyApplicationDto(
     phone: user.phone ?? null,
     status: profile?.approvalStatus ?? 'approved',
     applicationPdfUrl: profile?.applicationPdfUrl ?? '',
-    applicationPdfName: profile?.applicationPdfName ?? 'Hồ sơ Jockey.pdf',
+    applicationPdfName: profile?.applicationPdfName ?? 'Hồ sơ nài ngựa.pdf',
     appliedAt: profile?.appliedAt ? new Date(profile.appliedAt).toISOString() : null,
     reviewedAt: profile?.reviewedAt ? new Date(profile.reviewedAt).toISOString() : null,
     reviewedBy: profile?.reviewedBy?.toString() ?? null,
@@ -237,7 +237,7 @@ export async function listJockeyApplications(
   status?: JockeyApplicationStatus,
 ): Promise<JockeyApplicationDto[]> {
   if (status && !['pending', 'approved', 'rejected'].includes(status)) {
-    throw new HttpError(400, 'Trạng thái hồ sơ Jockey không hợp lệ');
+    throw new HttpError(400, 'Trạng thái hồ sơ nài ngựa không hợp lệ');
   }
 
   const query: Record<string, unknown> = {
@@ -257,7 +257,7 @@ export async function reviewJockeyApplication(
   adminNote?: string,
 ): Promise<JockeyApplicationDto> {
   if (!mongoose.isValidObjectId(userId)) {
-    throw new HttpError(400, 'ID hồ sơ Jockey không hợp lệ');
+    throw new HttpError(400, 'ID hồ sơ nài ngựa không hợp lệ');
   }
   if (!['approved', 'rejected'].includes(status)) {
     throw new HttpError(400, 'Trạng thái phải là approved hoặc rejected');
@@ -265,10 +265,10 @@ export async function reviewJockeyApplication(
 
   const user = await User.findById(userId);
   if (!user || user.role !== 'jockey' || !user.jockeyProfile?.applicationPdfUrl) {
-    throw new HttpError(404, 'Không tìm thấy hồ sơ đăng ký Jockey');
+    throw new HttpError(404, 'Không tìm thấy hồ sơ đăng ký nài ngựa');
   }
   if (user.jockeyProfile.approvalStatus !== 'pending') {
-    throw new HttpError(409, 'Hồ sơ Jockey này đã được xử lý');
+    throw new HttpError(409, 'Hồ sơ nài ngựa này đã được xử lý');
   }
 
   user.jockeyProfile.approvalStatus = status;
