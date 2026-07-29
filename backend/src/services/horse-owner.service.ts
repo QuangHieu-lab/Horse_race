@@ -41,21 +41,21 @@ export interface InviteJockeyInput {
 async function assertOwnerCanCompete(ownerId: string): Promise<void> {
   const owner = await User.findById(ownerId).select('penaltyStatus').lean();
   if (isPenaltyActive(owner?.penaltyStatus)) {
-    throw new HttpError(403, 'Chủ ngựa đang bị cấm thi đấu, không thể đăng ký ngựa hoặc mời nài ngựa');
+    throw new HttpError(403, 'Chủ ngựa đang bị cấm quyền thi đấu, không thể đăng ký ngựa hoặc mời nài ngựa');
   }
 }
 
 async function assertHorseCanCompete(horseId: string): Promise<void> {
   const horse = await Horse.findById(horseId).select('penaltyStatus').lean();
   if (isPenaltyActive(horse?.penaltyStatus)) {
-    throw new HttpError(403, 'Ngựa đang bị cấm thi đấu, không thể đăng ký tham gia cuộc đua');
+    throw new HttpError(403, 'Ngựa đang bị cấm quyền thi đấu, không thể đăng ký tham gia cuộc đua');
   }
 }
 
 async function assertJockeyCanCompete(jockeyId: string): Promise<void> {
   const jockey = await User.findById(jockeyId).select('jockeyProfile.penaltyStatus').lean();
   if (isPenaltyActive(jockey?.jockeyProfile?.penaltyStatus)) {
-    throw new HttpError(403, 'Nài ngựa đang bị cấm thi đấu, không thể được mời tham gia cuộc đua');
+    throw new HttpError(403, 'Nài ngựa đang bị cấm quyền thi đấu, không thể được mời tham gia cuộc đua');
   }
 }
 
