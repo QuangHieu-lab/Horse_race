@@ -497,14 +497,17 @@ export async function applyRacePenalty(
   const race = await Race.findById(raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
   if (race.refereeId?.toString() !== refereeId) throw new HttpError(403, 'Không có quyền truy cập');
-  // Cho phép lập biên bản khi đang đua (ongoing) HOẶC sau khi chạy đua nhưng
-  // kết quả nháp chưa được xác nhận/công bố (completed + draft).
-  if (race.status === 'scheduled' || race.status === 'cancelled') {
-    throw new HttpError(400, 'Chỉ áp dụng khi trận đua đang diễn ra hoặc đang chờ xác nhận kết quả');
+  if (race.status !== 'completed') {
+    throw new HttpError(409, 'Chỉ được lập biên bản sau khi cuộc đua đã kết thúc');
   }
-  const draftGuard = await Result.findOne({ raceId: race._id }).select('confirmedAt publishedAt').lean();
+  const draftGuard = await Result.findOne({ raceId: race._id })
+    .select('confirmedAt publishedAt rankings')
+    .lean();
+  if (!draftGuard || draftGuard.rankings.length === 0) {
+    throw new HttpError(409, 'Cuộc đua chưa có kết quả nháp để lập biên bản');
+  }
   if (draftGuard?.confirmedAt || draftGuard?.publishedAt) {
-    throw new HttpError(400, 'Kết quả đã được xác nhận/công bố — không thể lập biên bản mới');
+    throw new HttpError(409, 'Kết quả đã được xác nhận/công bố — không thể lập biên bản mới');
   }
 
   const rule = await ViolationRule.findById(payload.ruleId);
@@ -668,6 +671,9 @@ export async function revokeRacePenalty(
   if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
   if (race.refereeId?.toString() !== refereeId) {
     throw new HttpError(403, 'Bạn không phải trọng tài phụ trách trận đua này');
+  }
+  if (race.status !== 'completed') {
+    throw new HttpError(409, 'Chỉ được hoàn tác biên bản sau khi cuộc đua đã kết thúc');
   }
 
   const resultDoc = await Result.findOne({ raceId: race._id });

@@ -1357,7 +1357,7 @@ const swaggerDefinition = {
       post: {
         tags: ['Referee'],
         summary: 'Ghi nhận vi phạm và áp dụng hình phạt cho race',
-        description: 'Trọng tài chọn luật vi phạm và áp dụng lên ngựa, jockey, hoặc cả hai trong race phụ trách.',
+        description: 'Trọng tài chỉ được chọn luật và lập biên bản sau khi race phụ trách đã kết thúc, có kết quả nháp và kết quả chưa được xác nhận hoặc công bố.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
         requestBody: {
@@ -1369,7 +1369,8 @@ const swaggerDefinition = {
         responses: { 
           200: { description: 'Đã ghi nhận hình phạt thành công' },
           400: { description: 'Luật này không tồn tại hoặc đối tượng không hợp lệ' },
-          403: { description: 'Trận đua đã kết thúc, không thể phạt thêm' }
+          403: { description: 'Trọng tài không được phân công cho race này' },
+          409: { description: 'Race chưa kết thúc, chưa có kết quả nháp hoặc kết quả đã bị khóa' }
         },
       },
     },
