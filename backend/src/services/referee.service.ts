@@ -659,14 +659,21 @@ export async function applyRacePenalty(
   }
 }
 
-export async function revokeRacePenalty(
-  refereeId: string,
+async function revokeRacePenaltyInternal(
   raceId: string,
-  violationId: string
+  violationId: string,
+  refereeId?: string,
 ): Promise<void> {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID cuộc đua không hợp lệ');
+  }
+  if (!mongoose.isValidObjectId(violationId)) {
+    throw new HttpError(400, 'ID biên bản vi phạm không hợp lệ');
+  }
+
   const race = await Race.findById(raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy trận đua');
-  if (race.refereeId?.toString() !== refereeId) {
+  if (refereeId && race.refereeId?.toString() !== refereeId) {
     throw new HttpError(403, 'Bạn không phải trọng tài phụ trách trận đua này');
   }
 
@@ -683,12 +690,20 @@ export async function revokeRacePenalty(
 
   const affectsRaceResult = resultVoidingPenalty(violation.penaltyApplied);
   if (affectsRaceResult) {
+    const stillDisqualifiedByAnotherViolation = resultDoc.violations.some((item, index) =>
+      index !== violationIndex &&
+      resultVoidingPenalty(item.penaltyApplied) &&
+      (
+        (violation.horseId && item.horseId?.toString() === violation.horseId.toString()) ||
+        (violation.jockeyId && item.jockeyId?.toString() === violation.jockeyId.toString())
+      )
+    );
     const participant = race.participants.find(p =>
       (violation.horseId && p.horseId.toString() === violation.horseId.toString()) ||
       (violation.jockeyId && p.jockeyId.toString() === violation.jockeyId.toString())
     );
 
-    if (participant) {
+    if (participant && !stillDisqualifiedByAnotherViolation) {
       participant.isDisqualified = false;
       participant.disqualifiedReason = undefined;
       participant.disqualifiedAt = null;
@@ -707,13 +722,19 @@ export async function revokeRacePenalty(
     };
 
     if ((['horse', 'both'].includes(violation.target)) && violation.horseId) {
-      await Horse.findByIdAndUpdate(violation.horseId, {
+      await Horse.findOneAndUpdate({
+        _id: violation.horseId,
+        'penaltyStatus.currentViolationId': violation._id,
+      }, {
         $set: { penaltyStatus: resetStatus }
       });
     }
 
     if ((['jockey', 'both'].includes(violation.target)) && violation.jockeyId) {
-      await User.findByIdAndUpdate(violation.jockeyId, {
+      await User.findOneAndUpdate({
+        _id: violation.jockeyId,
+        'jockeyProfile.penaltyStatus.currentViolationId': violation._id,
+      }, {
         $set: { 'jockeyProfile.penaltyStatus': resetStatus }
       });
     }
@@ -722,6 +743,74 @@ export async function revokeRacePenalty(
 
   resultDoc.violations.splice(violationIndex, 1);
   await resultDoc.save();
+}
+
+export async function revokeRacePenalty(
+  refereeId: string,
+  raceId: string,
+  violationId: string,
+): Promise<void> {
+  await revokeRacePenaltyInternal(raceId, violationId, refereeId);
+}
+
+export async function liftRaceBanAsAdmin(
+  raceId: string,
+  violationId: string,
+): Promise<{ wasPublished: boolean }> {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID cuộc đua không hợp lệ');
+  }
+  if (!mongoose.isValidObjectId(violationId)) {
+    throw new HttpError(400, 'ID biên bản vi phạm không hợp lệ');
+  }
+
+  const resultDoc = await Result.findOne({ raceId });
+  if (!resultDoc) {
+    throw new HttpError(404, 'Không tìm thấy biên bản kết quả của cuộc đua');
+  }
+
+  const violation = resultDoc.violations.find((item) => item._id?.toString() === violationId);
+  if (!violation) {
+    throw new HttpError(404, 'Không tìm thấy biên bản vi phạm này');
+  }
+  if (!banPenalty(violation.penaltyApplied)) {
+    throw new HttpError(
+      409,
+      'Admin chỉ được gỡ án cấm có thời hạn hoặc cấm vĩnh viễn; cảnh cáo và bị loại không được gỡ',
+    );
+  }
+
+  const resetStatus = {
+    isBanned: false,
+    bannedUntil: null,
+    currentViolationId: null,
+    reason: null,
+  };
+
+  if ((['horse', 'both'].includes(violation.target)) && violation.horseId) {
+    await Horse.findOneAndUpdate({
+      _id: violation.horseId,
+      'penaltyStatus.currentViolationId': violation._id,
+    }, {
+      $set: { penaltyStatus: resetStatus },
+    });
+  }
+
+  if ((['jockey', 'both'].includes(violation.target)) && violation.jockeyId) {
+    await User.findOneAndUpdate({
+      _id: violation.jockeyId,
+      'jockeyProfile.penaltyStatus.currentViolationId': violation._id,
+    }, {
+      $set: { 'jockeyProfile.penaltyStatus': resetStatus },
+    });
+  }
+
+  violation.penaltyApplied = 'result_void';
+  violation.bannedUntil = null;
+  violation.description = `${violation.description} [Admin đã gỡ án cấm; trạng thái bị loại và kết quả tính điểm được giữ nguyên.]`;
+  await resultDoc.save();
+
+  return { wasPublished: Boolean(resultDoc.publishedAt) };
 }
 
 // ─── Luồng trọng tài điều khiển + xử phạt ────────────────────────────────────
@@ -745,6 +834,7 @@ export interface RaceViolationDto {
   type: string;
   description: string;
   penaltyApplied: string | null;
+  canLiftBan: boolean;
   target: 'horse' | 'jockey' | 'both';
   horseId: string | null;
   horseName: string | null;
@@ -801,9 +891,9 @@ export async function listActiveViolationRules(): Promise<ViolationRuleDto[]> {
 }
 
 /** Liệt kê các biên bản vi phạm của một cuộc đua (kèm tên ngựa/nài). */
-export async function listRaceViolations(
-  refereeId: string,
+async function listRaceViolationsInternal(
   raceId: string,
+  refereeId?: string,
 ): Promise<RaceViolationDto[]> {
   if (!mongoose.isValidObjectId(raceId)) throw new HttpError(400, 'ID cuộc đua không hợp lệ');
 
@@ -812,7 +902,7 @@ export async function listRaceViolations(
     .populate('participants.jockeyId', 'fullName')
     .lean();
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
-  if (race.refereeId?.toString() !== refereeId) {
+  if (refereeId && race.refereeId?.toString() !== refereeId) {
     throw new HttpError(403, 'Bạn không phải trọng tài cuộc đua này');
   }
 
@@ -839,6 +929,7 @@ export async function listRaceViolations(
       type: v.type,
       description: v.description,
       penaltyApplied: v.penaltyApplied ?? null,
+      canLiftBan: banPenalty(v.penaltyApplied),
       target: v.target,
       horseId,
       horseName: horseId ? horseNames.get(horseId) ?? null : null,
@@ -851,5 +942,18 @@ export async function listRaceViolations(
       recordedAt: v.recordedAt.toISOString(),
     };
   });
+}
+
+export async function listRaceViolations(
+  refereeId: string,
+  raceId: string,
+): Promise<RaceViolationDto[]> {
+  return listRaceViolationsInternal(raceId, refereeId);
+}
+
+export async function listRaceViolationsForAdmin(
+  raceId: string,
+): Promise<RaceViolationDto[]> {
+  return listRaceViolationsInternal(raceId);
 }
 

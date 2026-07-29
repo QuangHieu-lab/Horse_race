@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error.middleware.js';
 import * as adminRegistrationService from '../services/admin-registration.service.js';
 import * as adminService from '../services/admin.service.js';
+import * as refereeService from '../services/referee.service.js';
 import * as resultService from '../services/result.service.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -107,5 +108,25 @@ export class AdminController {
   listPublishQueue = asyncHandler(async (_req: Request, res: Response) => {
     const queue = await resultService.listPublishQueue();
     res.json({ queue });
+  });
+
+  listRaceViolations = asyncHandler(async (req: Request, res: Response) => {
+    const violations = await refereeService.listRaceViolationsForAdmin(
+      req.params.id as string,
+    );
+    res.json({ violations });
+  });
+
+  liftRaceBan = asyncHandler(async (req: Request, res: Response) => {
+    const { wasPublished } = await refereeService.liftRaceBanAsAdmin(
+      req.params.id as string,
+      req.params.violationId as string,
+    );
+    res.json({
+      success: true,
+      wasPublished,
+      message:
+        'Admin đã gỡ án cấm. Biên bản, trạng thái bị loại và kết quả chia điểm vẫn được giữ nguyên.',
+    });
   });
 }
