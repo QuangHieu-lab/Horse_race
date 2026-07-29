@@ -768,8 +768,7 @@ async function seed(): Promise<void> {
         ownerId: owner._id,
         laneNumber: 1,
         clothNumber: 1,
-        confirmedAt: new Date(),
-        vetApprovedAt: new Date()
+        confirmedAt: new Date()
       },
       {
         horseId: horseB._id,
@@ -777,8 +776,7 @@ async function seed(): Promise<void> {
         ownerId: owner._id,
         laneNumber: 2,
         clothNumber: 2,
-        confirmedAt: new Date(),
-        vetApprovedAt: new Date()
+        confirmedAt: new Date()
       },
       {
         horseId: horseC._id,
@@ -786,8 +784,7 @@ async function seed(): Promise<void> {
         ownerId: owner._id,
         laneNumber: 3,
         clothNumber: 3,
-        confirmedAt: new Date(),
-        vetApprovedAt: new Date()
+        confirmedAt: new Date()
       }
     ],
   });
@@ -944,9 +941,9 @@ async function seed(): Promise<void> {
     status: 'completed',
     refereeId: referee._id,
     participants: [
-      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
-      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
-      { horseId: horseE._id, jockeyId: jockey4._id, ownerId: owner2._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date() },
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date() },
+      { horseId: horseE._id, jockeyId: jockey4._id, ownerId: owner2._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date() },
     ],
   });
 
@@ -1038,9 +1035,9 @@ async function seed(): Promise<void> {
     status: 'completed',
     refereeId: referee._id,
     participants: [
-      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
-      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
-      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date() },
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date() },
+      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date() },
     ],
   });
   await Result.create({
@@ -1074,9 +1071,9 @@ async function seed(): Promise<void> {
     status: 'completed',
     refereeId: referee._id,
     participants: [
-      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
-      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
-      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseA._id, jockeyId: jockey1._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date() },
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date() },
+      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 3, clothNumber: 3, confirmedAt: new Date() },
     ],
   });
   await Result.create({
@@ -1110,8 +1107,8 @@ async function seed(): Promise<void> {
     status: 'completed',
     refereeId: referee._id,
     participants: [
-      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date(), vetApprovedAt: new Date() },
-      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date(), vetApprovedAt: new Date() },
+      { horseId: horseB._id, jockeyId: jockey2._id, ownerId: owner._id, laneNumber: 1, clothNumber: 1, confirmedAt: new Date() },
+      { horseId: horseC._id, jockeyId: jockey3._id, ownerId: owner._id, laneNumber: 2, clothNumber: 2, confirmedAt: new Date() },
       {
         horseId: horseA._id,
         jockeyId: jockey1._id,
@@ -1119,7 +1116,6 @@ async function seed(): Promise<void> {
         laneNumber: 3,
         clothNumber: 3,
         confirmedAt: new Date(),
-        vetApprovedAt: new Date(),
         isDisqualified: true,
         disqualifiedReason: 'Xuất huyết phổi khi đua (EIPH) — ngựa bị đình chỉ thi đấu 14 ngày',
         disqualifiedAt: new Date(),
@@ -1182,7 +1178,6 @@ async function seed(): Promise<void> {
         laneNumber: 1,
         clothNumber: 1,
         confirmedAt: new Date(),
-        vetApprovedAt: new Date(),
       },
       {
         horseId: horseC._id,
@@ -1191,7 +1186,6 @@ async function seed(): Promise<void> {
         laneNumber: 2,
         clothNumber: 2,
         confirmedAt: new Date(),
-        vetApprovedAt: new Date(),
       }
     ],
   });
@@ -1296,7 +1290,6 @@ async function seed(): Promise<void> {
   if (raceFiveReadyDoc) {
     raceFiveReadyDoc.participants.forEach((participant) => {
       participant.confirmedAt = new Date();
-      participant.vetApprovedAt = new Date();
     });
     await raceFiveReadyDoc.save();
   }

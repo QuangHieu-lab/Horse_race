@@ -81,7 +81,6 @@ export async function addParticipantFromInvitation(
     jockeyId: invitation.jockeyId,
     ownerId: invitation.horseOwnerId,
     confirmedAt: null,
-    vetApprovedAt: null,
     scratchedAt: null,
   };
 
@@ -173,7 +172,6 @@ export async function addParticipant(
     ownerId,
     carriedWeight: input.carriedWeight,
     confirmedAt: null,
-    vetApprovedAt: null,
     scratchedAt: null,
   };
 

@@ -50,14 +50,9 @@ export function validateParticipants(
 
 export function validatePreRaceChecks(participants: IParticipant[]): string | null {
   const active = activeParticipants(participants);
-  const missingVet = active.filter((p) => !p.vetApprovedAt);
-  if (missingVet.length > 0) {
-    return 'Tất cả ngựa đang thi đấu phải đạt kiểm tra thú y trước khi bắt đầu cuộc đua';
-  }
-
   const missingConfirmation = active.filter((p) => !p.confirmedAt);
   if (missingConfirmation.length > 0) {
-    return 'Tất cả ngựa đang thi đấu phải được xác nhận thông tin trước khi bắt đầu cuộc đua';
+    return 'Tất cả ngựa đang thi đấu phải được trọng tài xác nhận xuất phát trước khi bắt đầu cuộc đua';
   }
 
   return null;

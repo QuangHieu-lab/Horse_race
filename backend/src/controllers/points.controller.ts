@@ -5,8 +5,9 @@ import { HttpError } from '../utils/http-error.js';
 
 export class PointsController {
   getMine = asyncHandler(async (req: Request, res: Response) => {
-    if (req.user!.role === 'admin') {
-      throw new HttpError(403, 'Admin uses OrganizerLedger and does not have a point wallet');
+    const walletRoles = new Set(['spectator', 'horse_owner', 'jockey']);
+    if (!walletRoles.has(req.user!.role)) {
+      throw new HttpError(403, 'Role này không sử dụng ví điểm');
     }
     const points = await getOrCreateProfile(req.user!.id);
     res.json({ points });

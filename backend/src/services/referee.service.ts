@@ -46,7 +46,6 @@ export interface RefereeCheckDto {
   ownerName: string;
   laneNumber: number | null;
   clothNumber: number | null;
-  vetApproved: boolean;
   confirmed: boolean;
 }
 
@@ -272,7 +271,6 @@ export async function listRefereeChecks(refereeId: string, raceId: string): Prom
       ownerName: owner.fullName,
       laneNumber: p.laneNumber ?? null,
       clothNumber: p.clothNumber ?? null,
-      vetApproved: !!p.vetApprovedAt,
       confirmed: !!p.confirmedAt,
     };
   });
@@ -282,7 +280,6 @@ export async function toggleParticipantCheck(
   refereeId: string,
   raceId: string,
   horseId: string,
-  field: 'vetApprovedAt' | 'confirmedAt',
 ): Promise<void> {
   const race = await Race.findById(raceId);
   if (!race) throw new HttpError(404, 'Không tìm thấy cuộc đua');
@@ -299,11 +296,7 @@ export async function toggleParticipantCheck(
     throw new HttpError(409, 'Không thể cập nhật kiểm tra cho participant đã rút khỏi hoặc bị truất quyền thi đấu');
   }
 
-  if (field === 'vetApprovedAt') {
-    participant.vetApprovedAt = participant.vetApprovedAt ? null : new Date();
-  } else {
-    participant.confirmedAt = participant.confirmedAt ? null : new Date();
-  }
+  participant.confirmedAt = participant.confirmedAt ? null : new Date();
 
   await race.save();
 }

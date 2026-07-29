@@ -211,7 +211,6 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
     jockeyId: new mongoose.Types.ObjectId(payload.jockeyId),
     ownerId: new mongoose.Types.ObjectId(payload.ownerId),
     confirmedAt: null,
-    vetApprovedAt: null,
     scratchedAt: null,
   };
 
