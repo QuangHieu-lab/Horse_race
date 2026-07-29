@@ -1388,6 +1388,21 @@ const swaggerDefinition = {
         },
       },
     },
+    '/api/referee/races/{id}/replay': {
+      get: {
+        tags: ['Referee'],
+        summary: 'Replay a simulated race and review its officiating log',
+        description:
+          'Assigned referee only. Rebuilds the saved simulation timeline from the stored draft or official result without generating a new result.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
+        responses: {
+          200: { description: 'Saved replay availability and timeline' },
+          403: { description: 'The referee is not assigned to this race' },
+          404: { description: 'Race not found' },
+        },
+      },
+    },
     '/api/referee/races/{id}/start': {
       post: {
         tags: ['Referee'],

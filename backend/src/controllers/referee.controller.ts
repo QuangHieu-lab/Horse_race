@@ -138,6 +138,14 @@ export class RefereeController {
     });
   });
 
+  getRaceReplay = asyncHandler(async (req: Request, res: Response) => {
+    const data = await refereeService.getRefereeRaceReplay(
+      req.user!.id,
+      req.params.id as string,
+    );
+    res.json(data);
+  });
+
   finishRace = asyncHandler(async (req: Request, res: Response) => {
     await refereeService.finishRefereeRace(req.user!.id, req.params.id as string);
     res.json({ ok: true });

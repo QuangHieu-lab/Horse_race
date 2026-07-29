@@ -6,7 +6,7 @@ import { User } from '../models/User.model.js';
 import { HttpError } from '../utils/http-error.js';
 import { ViolationRule } from '../models/ViolationRule.model.js';
 import { activeParticipants, randomizeActiveParticipantLanes, validatePreRaceChecks } from '../utils/race-participants.js';
-import type { RaceSimTimeline } from './race-simulation.service.js';
+import { getRaceReplayTimeline, type RaceSimTimeline } from './race-simulation.service.js';
 import { createNotification, createNotifications, type NotificationInput } from './notification.service.js';
 
 export interface RefereeRaceDto {
@@ -419,6 +419,22 @@ export async function simulateRace(refereeId: string, raceId: string) {
   };
 
   return timeline;
+}
+
+export async function getRefereeRaceReplay(refereeId: string, raceId: string) {
+  if (!mongoose.isValidObjectId(raceId)) {
+    throw new HttpError(400, 'ID cuộc đua không hợp lệ');
+  }
+
+  const race = await Race.findById(raceId).select('refereeId');
+  if (!race) {
+    throw new HttpError(404, 'Không tìm thấy cuộc đua');
+  }
+  if (race.refereeId?.toString() !== refereeId) {
+    throw new HttpError(403, 'Bạn không phải trọng tài cuộc đua này');
+  }
+
+  return getRaceReplayTimeline(raceId);
 }
 
 /**
