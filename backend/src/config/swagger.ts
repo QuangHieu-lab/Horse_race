@@ -909,6 +909,39 @@ const swaggerDefinition = {
         },
       },
     },
+    '/api/admin/races/{id}/violations': {
+      get: {
+        tags: ['Admin'],
+        summary: 'List race violations for admin review',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' },
+        ],
+        responses: {
+          200: { description: 'Violation list' },
+          404: { description: 'Race not found' },
+        },
+      },
+    },
+    '/api/admin/races/{id}/penalties/{violationId}/lift-ban': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Lift a time or permanent ban',
+        description:
+          'Admin removes only the time-ban or permanent-ban portion, including after publication. The violation remains as result_void, the horse remains disqualified, and ranking, prediction scoring, points, and prizes are unchanged. Warning and result_void penalties cannot be lifted.',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' },
+          { name: 'violationId', in: 'path', required: true, schema: { type: 'string' }, description: 'Violation id' },
+        ],
+        responses: {
+          200: { description: 'Ban lifted; result effects preserved' },
+          400: { description: 'Invalid race or violation id' },
+          404: { description: 'Race, result, or violation not found' },
+          409: { description: 'The violation is warning or result_void and cannot be lifted' },
+        },
+      },
+    },
     '/api/admin/results/publish-queue': {
       get: {
         tags: ['Admin'],
@@ -1357,7 +1390,7 @@ const swaggerDefinition = {
       post: {
         tags: ['Referee'],
         summary: 'Ghi nhận vi phạm và áp dụng hình phạt cho race',
-        description: 'Trọng tài chọn luật vi phạm và áp dụng lên ngựa, jockey, hoặc cả hai trong race phụ trách.',
+        description: 'Trọng tài chỉ được chọn luật và lập biên bản sau khi race phụ trách đã kết thúc, có kết quả nháp và kết quả chưa được xác nhận hoặc công bố.',
         security: [{ bearerAuth: [] }],
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
         requestBody: {
@@ -1369,7 +1402,8 @@ const swaggerDefinition = {
         responses: { 
           200: { description: 'Đã ghi nhận hình phạt thành công' },
           400: { description: 'Luật này không tồn tại hoặc đối tượng không hợp lệ' },
-          403: { description: 'Trận đua đã kết thúc, không thể phạt thêm' }
+          403: { description: 'Trọng tài không được phân công cho race này' },
+          409: { description: 'Race chưa kết thúc, chưa có kết quả nháp hoặc kết quả đã bị khóa' }
         },
       },
     },
@@ -1385,6 +1419,21 @@ const swaggerDefinition = {
           200: { description: 'Draft result generated' },
           403: { description: 'The referee is not assigned to this race' },
           409: { description: 'Race is not ready, has fewer than two active participants, or has missing race-start confirmations' },
+        },
+      },
+    },
+    '/api/referee/races/{id}/replay': {
+      get: {
+        tags: ['Referee'],
+        summary: 'Replay a simulated race and review its officiating log',
+        description:
+          'Assigned referee only. Rebuilds the saved simulation timeline from the stored draft or official result without generating a new result.',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Race id' }],
+        responses: {
+          200: { description: 'Saved replay availability and timeline' },
+          403: { description: 'The referee is not assigned to this race' },
+          404: { description: 'Race not found' },
         },
       },
     },
