@@ -15,4 +15,6 @@ adminRouter.delete('/users/:id', adminController.deleteUser);
 adminRouter.get('/registrations', adminController.listRegistrations);
 adminRouter.patch('/registrations/:id', adminController.updateRegistration);
 adminRouter.patch('/races/:id/result/publish', adminController.publishResult);
+adminRouter.get('/races/:id/violations', adminController.listRaceViolations);
+adminRouter.patch('/races/:id/penalties/:violationId/lift-ban', adminController.liftRaceBan);
 adminRouter.get('/results/publish-queue', adminController.listPublishQueue);
