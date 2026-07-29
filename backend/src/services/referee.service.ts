@@ -8,6 +8,7 @@ import { ViolationRule } from '../models/ViolationRule.model.js';
 import { activeParticipants, randomizeActiveParticipantLanes, validatePreRaceChecks } from '../utils/race-participants.js';
 import { getRaceReplayTimeline, type RaceSimTimeline } from './race-simulation.service.js';
 import { createNotification, createNotifications, type NotificationInput } from './notification.service.js';
+import type { PenaltyApplied } from '../types/shared.types.js';
 
 export interface RefereeRaceDto {
   id: string;
@@ -104,6 +105,16 @@ function resultVoidingPenalty(penalty?: string | null): boolean {
 
 function banPenalty(penalty?: string | null): boolean {
   return penalty === 'time_ban' || penalty === 'permanent_ban';
+}
+
+function normalizePenaltyForResult(penalty?: string | null): PenaltyApplied | null {
+  if (penalty === 'disqualify' || penalty === 'disqualification') {
+    return 'result_void';
+  }
+  if (['warning', 'result_void', 'time_ban', 'permanent_ban'].includes(penalty ?? '')) {
+    return penalty as PenaltyApplied;
+  }
+  return null;
 }
 
 function raceDayKey(date: Date): string {
@@ -513,6 +524,14 @@ export async function applyRacePenalty(
   const rule = await ViolationRule.findById(payload.ruleId);
   if (!rule || !rule.isActive) throw new HttpError(404, 'Luật vi phạm không hợp lệ');
 
+  const penaltyApplied = normalizePenaltyForResult(rule.penaltyApplied);
+  if (!penaltyApplied) {
+    throw new HttpError(
+      409,
+      `Luật ${rule.code} đang dùng hình phạt dữ liệu cũ chưa được hỗ trợ. Quản trị viên cần chuyển đổi luật trước khi áp dụng.`,
+    );
+  }
+
   // Luật phải áp dụng đúng đối tượng (ngựa/nài) đang bị lập biên bản.
   const appliesTo = rule.appliesTo ?? 'both';
   if (appliesTo !== 'both' && appliesTo !== payload.target) {
@@ -526,8 +545,8 @@ export async function applyRacePenalty(
   );
   if (!participant) throw new HttpError(404, 'Không tìm thấy đối tượng trong trận');
 
-  const affectsRaceResult = resultVoidingPenalty(rule.penaltyApplied);
-  const isBannedPenalty = banPenalty(rule.penaltyApplied);
+  const affectsRaceResult = resultVoidingPenalty(penaltyApplied);
+  const isBannedPenalty = banPenalty(penaltyApplied);
   if (payload.affectedHorseId && !mongoose.isValidObjectId(payload.affectedHorseId)) {
     throw new HttpError(400, 'affectedHorseId không hợp lệ');
   }
@@ -568,7 +587,7 @@ export async function applyRacePenalty(
     affectedHorseId,
     type: rule.category,
     description: payload.notes ? `${rule.name} - Ghi chú: ${payload.notes}` : rule.description,
-    penaltyApplied: rule.penaltyApplied,
+    penaltyApplied,
     bannedUntil,
     recordedAt: new Date(),
   } as any);
@@ -879,7 +898,12 @@ export async function startRefereeRace(refereeId: string, raceId: string): Promi
 
 /** Danh sách luật vi phạm đang active để trọng tài chọn khi lập biên bản. */
 export async function listActiveViolationRules(): Promise<ViolationRuleDto[]> {
-  const rules = await ViolationRule.find({ isActive: true })
+  const rules = await ViolationRule.find({
+    isActive: true,
+    penaltyApplied: {
+      $in: ['warning', 'result_void', 'time_ban', 'permanent_ban', 'disqualify', 'disqualification'],
+    },
+  })
     .sort({ category: 1, code: 1 })
     .lean();
   return rules.map((r) => ({
