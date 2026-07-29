@@ -135,7 +135,7 @@ ResultSchema.set('toObject', { virtuals: true });
 
 ResultSchema.pre('save', async function (next) {
   const race = await Race.findById(this.raceId);
-  if (!race) return next(new Error('Race not found for result'));
+  if (!race) return next(new Error('Không tìm thấy cuộc đua cho biên bản kết quả'));
   
   for (const [i, v] of this.violations.entries()) {
   if (!v.horseId && !v.jockeyId) {
@@ -144,7 +144,7 @@ ResultSchema.pre('save', async function (next) {
 }
 
   if (this.rankings.length > 0 && !['ongoing', 'completed'].includes(race.status)) {
-    return next(new Error('Rankings can only be set when race is ongoing or completed'));
+    return next(new Error('Chỉ có thể nhập bảng xếp hạng khi cuộc đua đang diễn ra hoặc đã hoàn tất'));
   }  
 
   const rankingErr = validateRankings(this.rankings, race.participants, new Set());
@@ -152,7 +152,7 @@ ResultSchema.pre('save', async function (next) {
 
   if (this.isModified('confirmedAt') && this.confirmedAt) {
     if (race.status !== 'completed') {
-      return next(new Error('Result can only be confirmed after race is completed'));
+      return next(new Error('Chỉ có thể xác nhận kết quả sau khi cuộc đua đã hoàn tất'));
     }
     if (this.protests.some((p) => p.status === 'pending')) {
       return next(new Error('Không thể xác nhận kết quả khi còn khiếu nại đang chờ xử lý'));

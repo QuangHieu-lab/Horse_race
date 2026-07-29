@@ -86,11 +86,11 @@ export async function login(email: string, password: string): Promise<AuthRespon
   }
   if (!user.isActive) {
     if (user.role === 'jockey' && user.jockeyProfile?.approvalStatus === 'pending') {
-      throw new HttpError(403, 'Hồ sơ Jockey đang chờ quản trị viên xét duyệt');
+      throw new HttpError(403, 'Hồ sơ nài ngựa đang chờ quản trị viên xét duyệt');
     }
     if (user.role === 'jockey' && user.jockeyProfile?.approvalStatus === 'rejected') {
       const note = user.jockeyProfile.adminNote?.trim();
-      throw new HttpError(403, note ? `Hồ sơ Jockey đã bị từ chối: ${note}` : 'Hồ sơ Jockey đã bị từ chối');
+      throw new HttpError(403, note ? `Hồ sơ nài ngựa đã bị từ chối: ${note}` : 'Hồ sơ nài ngựa đã bị từ chối');
     }
     if (user.role === 'horse_owner' && user.ownerProfile?.approvalStatus === 'pending') {
       throw new HttpError(403, 'Hồ sơ Chủ ngựa đang chờ quản trị viên xét duyệt');
@@ -159,7 +159,7 @@ export async function registerJockeyApplication(
     throw new HttpError(400, 'Họ tên là bắt buộc');
   }
   if (!input.applicationPdfUrl || !input.applicationPdfName) {
-    throw new HttpError(400, 'Hồ sơ PDF của Jockey là bắt buộc');
+    throw new HttpError(400, 'Hồ sơ PDF của nài ngựa là bắt buộc');
   }
 
   const email = input.email.trim().toLowerCase();
@@ -172,7 +172,7 @@ export async function registerJockeyApplication(
 
     if (!canReapply) {
       if (existing.role === 'jockey' && existing.jockeyProfile?.approvalStatus === 'pending') {
-        throw new HttpError(409, 'Hồ sơ Jockey của email này đang chờ xét duyệt');
+        throw new HttpError(409, 'Hồ sơ nài ngựa của email này đang chờ xét duyệt');
       }
       throw new HttpError(409, 'Email đã được sử dụng');
     }
@@ -230,7 +230,7 @@ export async function registerJockeyApplication(
   }
 
   return {
-    message: 'Đã gửi hồ sơ Jockey. Bạn có thể đăng nhập sau khi quản trị viên phê duyệt.',
+    message: 'Đã gửi hồ sơ nài ngựa. Bạn có thể đăng nhập sau khi quản trị viên phê duyệt.',
     approvalRequired: true,
     applicationStatus: 'pending',
   };

@@ -165,23 +165,23 @@ export async function addParticipantToRace(raceId: string, payload: AddParticipa
   if (!horse) throw new HttpError(404, 'Không tìm thấy ngựa');
   if (horse.healthStatus !== 'fit') throw new HttpError(409, 'Ngựa không đủ điều kiện thi đấu');
   if (isPenaltyActive(horse.penaltyStatus)) {
-    throw new HttpError(403, 'Ngua dang bi tuoc quyen thi dau');
+    throw new HttpError(403, 'Ngựa đang bị cấm thi đấu');
   }
   if (!jockey?.isActive || jockey.role !== 'jockey') {
-    throw new HttpError(400, 'jockeyId phải là tài khoản jockey đang hoạt động');
+    throw new HttpError(400, 'jockeyId phải là tài khoản nài ngựa đang hoạt động');
   }
   if (isPenaltyActive(jockey.jockeyProfile?.penaltyStatus)) {
-    throw new HttpError(403, 'Nai ngua dang bi tuoc quyen thi dau');
+    throw new HttpError(403, 'Nài ngựa đang bị cấm thi đấu');
   }
   if (!owner?.isActive || owner.role !== 'horse_owner') {
-    throw new HttpError(400, 'ownerId phải là tài khoản horse_owner đang hoạt động');
+    throw new HttpError(400, 'ownerId phải là tài khoản chủ ngựa đang hoạt động');
   }
   if (isPenaltyActive(owner.penaltyStatus)) {
-    throw new HttpError(403, 'Chu ngua dang bi tuoc quyen thi dau');
+    throw new HttpError(403, 'Chủ ngựa đang bị cấm thi đấu');
   }
 
   if (race.status !== 'scheduled') {
-    throw new HttpError(409, 'Không thể thêm participant vào trận đua đã kết thúc hoặc hủy');
+    throw new HttpError(409, 'Không thể thêm người tham gia vào trận đua đã kết thúc hoặc đã hủy');
   }
 
   const registration = await RaceRegistration.findOne({
@@ -258,7 +258,7 @@ export async function updateRaceStatus(raceId: string, status: IRace['status']) 
 
   const requestedStatus = status as string;
   if (requestedStatus === 'ready' || requestedStatus === 'ongoing') {
-    throw new HttpError(403, 'Chi trong tai phu trach moi duoc boc tham lan va bat dau cuoc dua');
+    throw new HttpError(403, 'Chỉ trọng tài phụ trách mới được bốc thăm làn và bắt đầu cuộc đua');
   }
 
   if (status === 'completed' && race.status !== 'ongoing' && race.status !== 'completed') {
