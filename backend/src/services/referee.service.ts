@@ -296,7 +296,7 @@ export async function toggleParticipantCheck(
   const participant = race.participants.find((p) => p.horseId.toString() === horseId);
   if (!participant) throw new HttpError(404, 'Không tìm thấy ngựa trong cuộc đua');
   if (participant.scratchedAt || participant.isDisqualified) {
-    throw new HttpError(409, 'Không thể cập nhật kiểm tra cho participant đã rút khỏi hoặc bị truất quyền thi đấu');
+    throw new HttpError(409, 'Không thể cập nhật kiểm tra cho participant đã rút khỏi hoặc bị loại');
   }
 
   if (field === 'vetApprovedAt') {

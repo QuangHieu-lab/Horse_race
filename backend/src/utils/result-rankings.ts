@@ -11,7 +11,7 @@ export function validateRankings(
 
   if (rankings.length === 0) return null;
   if (rankings.length > eligible.length) {
-    return 'Số lượng xếp hạng vượt quá số ngựa đủ điều kiện thi đấu (có thể do ngựa đã bị tước quyền)';
+    return 'Số lượng xếp hạng vượt quá số ngựa đủ điều kiện thi đấu (có thể do ngựa đã bị xử phạt cấm quyền thi đấu)';
   }
 
   // Khắc phục lỗi Đồng hạng (Dead Heat)
