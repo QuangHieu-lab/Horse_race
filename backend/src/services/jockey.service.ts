@@ -254,6 +254,7 @@ async function buildJockeyRaceDto(
       ownerId: mongoose.Types.ObjectId;
       laneNumber?: number;
       confirmedAt?: Date | null;
+      isDisqualified?: boolean;
     }>;
   },
   jockeyObjectId: mongoose.Types.ObjectId,
@@ -274,8 +275,17 @@ async function buildJockeyRaceDto(
 
   let resultDto: JockeyRaceDto['result'] = null;
   if (result) {
-    const horseIds = result.rankings.map((r) => r.horseId);
-    const jockeyIds = result.rankings.map((r) => r.jockeyId);
+    const dqHorseIds = new Set(
+      race.participants.filter((p) => p.isDisqualified).map((p) => p.horseId.toString()),
+    );
+    const horseIds = [
+      ...result.rankings.map((r) => r.horseId),
+      ...result.violations.flatMap((v) => (v.horseId ? [v.horseId] : [])),
+    ];
+    const jockeyIds = [
+      ...result.rankings.map((r) => r.jockeyId),
+      ...result.violations.flatMap((v) => (v.jockeyId ? [v.jockeyId] : [])),
+    ];
     const [horses, jockeys] = await Promise.all([
       Horse.find({ _id: { $in: horseIds } }).select('name').lean(),
       User.find({ _id: { $in: jockeyIds } }).select('fullName').lean(),
@@ -298,8 +308,18 @@ async function buildJockeyRaceDto(
         },
         finishTime: r.finishTime,
         prize: r.prize,
+        isDisqualified: dqHorseIds.has(r.horseId.toString()),
       })),
-      violations: [],
+      violations: result.violations.map((v) => ({
+        target: v.target,
+        horseId: v.horseId?.toString() ?? null,
+        horseName: v.horseId ? horseMap.get(v.horseId.toString()) ?? null : null,
+        jockeyId: v.jockeyId?.toString() ?? null,
+        jockeyName: v.jockeyId ? jockeyMap.get(v.jockeyId.toString()) ?? null : null,
+        type: v.type,
+        description: v.description,
+        penaltyApplied: v.penaltyApplied ?? null,
+      })),
     };
   }
 
