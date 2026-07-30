@@ -3,6 +3,11 @@ import mongoose from 'mongoose';
 import { DeviceToken } from '../models/DeviceToken.model.js';
 
 const expo = new Expo();
+const REJECTED_TOKEN_ERRORS = new Set([
+  'DeviceNotRegistered',
+  'InvalidCredentials',
+  'MismatchSenderId',
+]);
 
 export interface PushPayload {
   title: string;
@@ -48,8 +53,9 @@ export async function sendPushToUser(
     tickets.forEach((ticket, index) => {
       if (ticket.status !== 'error') return;
       const token = chunk[index]?.to;
-      console.warn('Expo push ticket error:', ticket.details?.error, ticket.message, 'token:', token);
-      if (ticket.details?.error === 'DeviceNotRegistered' && typeof token === 'string') {
+      const errorCode = ticket.details?.error;
+      console.warn('Lỗi gửi thông báo Expo:', errorCode, ticket.message, 'token:', token);
+      if (typeof errorCode === 'string' && REJECTED_TOKEN_ERRORS.has(errorCode) && typeof token === 'string') {
         rejectedTokens.push(token);
       }
     });

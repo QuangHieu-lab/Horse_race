@@ -1,5 +1,5 @@
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
-import { Horse, Race, Result, ViolationRule } from '../models/index.js';
+import { Horse, Prediction, Race, RaceRegistration, Result, Tournament, ViolationRule } from '../models/index.js';
 
 const VALID_PENALTIES = ['warning', 'result_void', 'time_ban', 'permanent_ban'];
 
@@ -37,6 +37,18 @@ async function main() {
     );
   }
 
+  const ongoingTournaments = await Tournament.find({ status: 'ongoing' })
+    .select('name status')
+    .lean();
+  for (const tournament of ongoingTournaments) {
+    addIssue(issues, `Giải đấu ${tournament.name} vẫn đang ở trạng thái ongoing`);
+  }
+
+  const registrationCount = await RaceRegistration.countDocuments({});
+  if (registrationCount > 0) {
+    addIssue(issues, `Seed còn ${registrationCount} bản ghi đăng ký ngựa; yêu cầu hiện tại là để trống cho người dùng tự đăng ký`);
+  }
+
   const localPdfHorses = await Horse.find({
     profilePdfUrl: /localhost/i,
   }).select('name profilePdfUrl').lean();
@@ -63,6 +75,27 @@ async function main() {
       if (jockeyIds.has(jockeyId)) addIssue(issues, `Cuộc đua ${race.name} trùng nài ${jockeyId}`);
       horseIds.add(horseId);
       jockeyIds.add(jockeyId);
+    }
+    if (['scheduled', 'ready', 'ongoing'].includes(race.status) && race.participants.length > 0) {
+      addIssue(issues, `Cuộc đua ${race.name} chưa hoàn tất nhưng đã có ${race.participants.length} ngựa trong danh sách tham gia`);
+    }
+  }
+
+  const predictions = await Prediction.find({}).select('raceId predictedRanks').lean();
+  for (const prediction of predictions) {
+    const race = races.find((item) => item._id.toString() === prediction.raceId.toString());
+    if (!race) {
+      addIssue(issues, `Dự đoán ${prediction._id.toString()} tham chiếu cuộc đua không tồn tại`);
+      continue;
+    }
+    const participantHorseIds = new Set(race.participants.map((participant) => participant.horseId.toString()));
+    for (const predictedRank of prediction.predictedRanks) {
+      if (!participantHorseIds.has(predictedRank.horseId.toString())) {
+        addIssue(
+          issues,
+          `Dự đoán ${prediction._id.toString()} chọn ngựa không thuộc danh sách thi đấu của ${race.name}`,
+        );
+      }
     }
   }
 

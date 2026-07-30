@@ -1,12 +1,12 @@
 /**
  * Seed dữ liệu demo:
- * A — Kỵ sĩ: có lời mời đang chờ và cuộc đua sắp diễn ra
- * B — Khán giả: cửa sổ dự đoán đang mở, chưa có dự đoán
+ * A — Kỵ sĩ: cuộc đua sắp diễn ra, chưa có ngựa đăng ký
+ * B — Khán giả: cửa sổ dự đoán đang mở, chưa có ngựa/dự đoán
  * C — Chấm điểm: cuộc đua đã hoàn tất, kết quả đã xác nhận, chưa công bố
  * C3 — Quỹ không có người thắng: mọi dự đoán đều sai
  * D — Trọng tài: kết quả nháp để kiểm thử hủy kết quả/cấm thi đấu
- * E — Độc lập: ngựa đã đăng ký nhưng chưa mời kỵ sĩ
- * F — Kiểm tra trước đua: 5 ngựa hợp lệ, sẵn sàng bắt đầu
+ * E — Độc lập: cuộc đua trống để chủ ngựa tự đăng ký
+ * F — Kiểm tra trước đua: cuộc đua trống để trọng tài tự xếp ngựa
  *
  * Chạy: npm run db:seed — Mật khẩu: Demo@123
  */
@@ -20,7 +20,6 @@ import {
   RaceMeeting,
   Tournament,
   Race,
-  RaceRegistration,
   Result,
   JockeyInvitation,
   Prediction,
@@ -28,7 +27,6 @@ import {
   Product,
   Notification,
   PaymentTransaction,
-  RaceViewingPass,
   SpectatorProfile,
   ViolationRule,
 } from '../models/index.js';
@@ -42,6 +40,7 @@ const COLLECTIONS_TO_CLEAR = [
   'auditlogs',
   'organizerledgers',
   'notifications',
+  'devicetokens',
   'redemptions',
   'paymenttransactions',
   'products',
@@ -85,27 +84,6 @@ async function clearDemoData(): Promise<void> {
     await SpectatorProfile.deleteMany({ userId: { $in: demoUserIds } });
     await User.deleteMany({ _id: { $in: demoUserIds } });
   }
-}
-
-async function acceptInvitation(
-  ownerId: mongoose.Types.ObjectId,
-  jockeyId: mongoose.Types.ObjectId,
-  horseId: mongoose.Types.ObjectId,
-  raceId: mongoose.Types.ObjectId,
-  message: string,
-): Promise<{ _id: mongoose.Types.ObjectId }> {
-  const inv = await JockeyInvitation.create({
-    horseOwnerId: ownerId,
-    jockeyId,
-    horseId,
-    raceId,
-    status: 'pending',
-    message,
-  });
-  inv.status = 'accepted';
-  inv.respondedAt = new Date();
-  await inv.save();
-  return inv;
 }
 
 async function seed(): Promise<void> {
@@ -593,7 +571,7 @@ async function seed(): Promise<void> {
     startDate: daysFromNow(-5),
     endDate: daysFromNow(30),
     location: track.location,
-    status: 'ongoing',
+    status: 'published',
     prizePool: 50_000_000,
     predictionConfig: {
       isEnabled: true,
@@ -685,8 +663,8 @@ async function seed(): Promise<void> {
     status: 'scheduled',
   });
 
-  // --- Scenario A: Jockey pending invitation ---
-  console.log('Kịch bản A — Lời mời kỵ sĩ đang chờ...');
+  // --- Scenario A: Upcoming empty race ---
+  console.log('Kịch bản A — Cuộc đua sắp diễn ra, chưa có ngựa đăng ký...');
   const raceUpcoming = await Race.create({
     tournamentId: tournamentSpring._id,
     meetingId: meetingUpcoming._id,
@@ -707,27 +685,8 @@ async function seed(): Promise<void> {
     participants: [],
   });
 
-  await RaceRegistration.create({
-    raceId: raceUpcoming._id,
-    horseId: horseC._id,
-    ownerId: owner._id,
-    status: 'approved',
-    processedBy: admin._id,
-    processedAt: new Date(),
-    waiverAcceptedAt: new Date(),
-  });
-
-  const pendingInv = await JockeyInvitation.create({
-    horseOwnerId: owner._id,
-    jockeyId: jockey2._id,
-    horseId: horseC._id,
-    raceId: raceUpcoming._id,
-    status: 'pending',
-    message: 'Mời bạn điều khiển Gió Xuân tại bán kết vòng 2.',
-  });
-
-  // --- Scenario B: Spectator open prediction ---
-  console.log('Kịch bản B — Khán giả có cửa sổ dự đoán đang mở...');
+  // --- Scenario B: Spectator open prediction window, no horse registered yet ---
+  console.log('Kịch bản B — Cửa sổ dự đoán mở, chờ chủ ngựa đăng ký...');
   const raceOpenScheduled = daysFromNow(3);
   const raceOpen = await Race.create({
     tournamentId: tournamentSpring._id,
@@ -758,105 +717,6 @@ async function seed(): Promise<void> {
         'Vé xem trực tiếp cuộc Chung kết — Vòng 1. Giá 200 điểm. Mua trước giờ đua để xem stream HD.',
       allowVipRedemption: true,
     },
-  });
-
-  await RaceRegistration.create([
-    {
-      raceId: raceOpen._id,
-      horseId: horseA._id,
-      ownerId: owner._id,
-      status: 'approved',
-      processedBy: admin._id,
-      processedAt: new Date(),
-      waiverAcceptedAt: new Date(),
-    },
-    {
-      raceId: raceOpen._id,
-      horseId: horseB._id,
-      ownerId: owner._id,
-      status: 'approved',
-      processedBy: admin._id,
-      processedAt: new Date(),
-      waiverAcceptedAt: new Date(),
-    },
-    {
-      raceId: raceOpen._id,
-      horseId: horseI._id,
-      ownerId: owner._id,
-      jockeyId: jockey3._id,
-      status: 'pending',
-      insuranceNote: 'Đơn chờ admin duyệt để test hàng pending trong màn Approvals.',
-      waiverAcceptedAt: new Date(),
-    },
-    {
-      raceId: raceOpen._id,
-      horseId: horseG._id,
-      ownerId: owner2._id,
-      status: 'rejected',
-      adminNote: 'Thiếu giấy xác nhận kiểm tra thú y trong hồ sơ demo.',
-      processedBy: admin._id,
-      processedAt: new Date(),
-      waiverAcceptedAt: new Date(),
-    },
-  ]);
-
-  await acceptInvitation(owner._id, jockey1._id, horseA._id, raceOpen._id, 'Mời bạn điều khiển Sóng Gió tại chung kết.');
-  await acceptInvitation(owner._id, jockey2._id, horseB._id, raceOpen._id, 'Mời bạn điều khiển Bóng Mây tại chung kết.');
-
-  const openPrediction1 = await Prediction.create({
-    spectatorId: spectator2._id,
-    raceId: raceOpen._id,
-    tournamentId: tournamentSpring._id,
-    predictedRanks: [{ rank: 1, horseId: horseA._id }],
-    status: 'pending',
-    ticketCount: 2,
-    riskMultiplier: 2,
-    contribution: 100_000,
-    pointsEarned: 0,
-    bonusPoints: 0,
-    totalPoints: 0,
-  });
-  await spectator2Profile.spendPoints(
-    100_000,
-    'spent_pool_entry',
-    'Prediction',
-    openPrediction1._id,
-    `Seed demo: mở dự đoán 2 vé — ${raceOpen.name}`,
-  );
-
-  const openPrediction2 = await Prediction.create({
-    spectatorId: spectator3._id,
-    raceId: raceOpen._id,
-    tournamentId: tournamentSpring._id,
-    predictedRanks: [{ rank: 1, horseId: horseB._id }],
-    status: 'pending',
-    ticketCount: 1,
-    riskMultiplier: 1,
-    contribution: 50_000,
-    pointsEarned: 0,
-    bonusPoints: 0,
-    totalPoints: 0,
-  });
-  await spectator3Profile.spendPoints(
-    50_000,
-    'spent_pool_entry',
-    'Prediction',
-    openPrediction2._id,
-    `Seed demo: mở dự đoán 1 vé — ${raceOpen.name}`,
-  );
-
-  await PredictionPool.create({
-    raceId: raceOpen._id,
-    tournamentId: tournamentSpring._id,
-    status: 'open',
-    ticketPrice: 50_000,
-    minRiskMultiplier: 1,
-    maxRiskMultiplier: 10,
-    quickRiskMultipliers: [1],
-    totalTickets: 3,
-    totalBountyPool: 150_000,
-    winPool: 0,
-    contributorCount: 2,
   });
 
   // --- Scenario C: Scoring after publish ---
@@ -1336,8 +1196,8 @@ async function seed(): Promise<void> {
     confirmedAt: null,
   });
 
-  // --- Scenario E: Độc lập - Test quy trình mời Kỵ sĩ ---
-  console.log('Kịch bản E — Ngựa đã đăng ký, chưa có kỵ sĩ...');
+  // --- Scenario E: Độc lập - cuộc đua trống để chủ ngựa tự đăng ký từ UI ---
+  console.log('Kịch bản E — Cuộc đua trống để chủ ngựa tự đăng ký từ UI...');
   const raceIndependent = await Race.create({
     tournamentId: tournamentSummer._id,
     meetingId: meetingSummer._id,
@@ -1357,18 +1217,8 @@ async function seed(): Promise<void> {
     participants: [],
   });
 
-  await RaceRegistration.create({
-    raceId: raceIndependent._id,
-    horseId: horseD._id,
-    ownerId: owner._id,
-    status: 'approved',
-    processedBy: admin._id,
-    processedAt: new Date(),
-    waiverAcceptedAt: new Date(),
-  });
-
-  // --- Kịch bản F: Cuộc đua đang chờ với 5 ngựa hợp lệ và đã kiểm tra trước đua ---
-  console.log('Kịch bản F — Kiểm tra trước đua với 5 ngựa...');
+  // --- Kịch bản F: Cuộc đua trống để trọng tài/ban tổ chức tự kiểm thử xếp ngựa ---
+  console.log('Kịch bản F — Cuộc đua trống để tự kiểm thử xếp ngựa...');
   const raceFiveReady = await Race.create({
     tournamentId: tournamentSummer._id,
     meetingId: meetingSummer._id,
@@ -1388,28 +1238,6 @@ async function seed(): Promise<void> {
     refereeId: referee._id,
     participants: [],
   });
-
-  await RaceRegistration.create([
-    { raceId: raceFiveReady._id, horseId: horseA._id, ownerId: owner._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
-    { raceId: raceFiveReady._id, horseId: horseB._id, ownerId: owner._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
-    { raceId: raceFiveReady._id, horseId: horseC._id, ownerId: owner._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
-    { raceId: raceFiveReady._id, horseId: horseE._id, ownerId: owner2._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
-    { raceId: raceFiveReady._id, horseId: horseF._id, ownerId: owner2._id, status: 'approved', processedBy: admin._id, processedAt: new Date(), waiverAcceptedAt: new Date() },
-  ]);
-
-  await acceptInvitation(owner._id, jockey1._id, horseA._id, raceFiveReady._id, 'Mời điều khiển Sóng Gió ở field 5 ngựa.');
-  await acceptInvitation(owner._id, jockey2._id, horseB._id, raceFiveReady._id, 'Mời điều khiển Bóng Mây ở field 5 ngựa.');
-  await acceptInvitation(owner._id, jockey3._id, horseC._id, raceFiveReady._id, 'Mời điều khiển Gió Xuân ở field 5 ngựa.');
-  await acceptInvitation(owner2._id, jockey4._id, horseE._id, raceFiveReady._id, 'Mời điều khiển Mãnh Long ở field 5 ngựa.');
-  await acceptInvitation(owner2._id, jockey5._id, horseF._id, raceFiveReady._id, 'Mời điều khiển Hải Phong ở field 5 ngựa.');
-
-  const raceFiveReadyDoc = await Race.findById(raceFiveReady._id);
-  if (raceFiveReadyDoc) {
-    raceFiveReadyDoc.participants.forEach((participant) => {
-      participant.confirmedAt = new Date();
-    });
-    await raceFiveReadyDoc.save();
-  }
 
   const seededBanViolation = leaderboardPenaltyResult.violations[0];
   if (!seedHorseBanUntil || !seededBanViolation) {
@@ -1449,25 +1277,8 @@ async function seed(): Promise<void> {
     },
   ]);
 
-  const viewingPass = await RaceViewingPass.create({
-    spectatorId: spectator._id,
-    raceId: raceOpen._id,
-    source: 'purchase',
-    pointsPaid: 200,
-    purchasedAt: daysFromNow(-1),
-    status: 'active',
-  });
-
   console.log('Đang tạo thông báo demo...');
   await Notification.insertMany([
-    {
-      userId: jockey2._id,
-      type: 'invitation_received',
-      title: 'Lời mời điều khiển ngựa',
-      message: `Bạn được mời điều khiển ${horseC.name} tại ${raceUpcoming.name}.`,
-      refModel: 'JockeyInvitation',
-      refId: pendingInv._id,
-    },
     {
       userId: referee._id,
       type: 'result_confirmed',
@@ -1475,14 +1286,6 @@ async function seed(): Promise<void> {
       message: `Chờ admin công bố kết quả ${raceCompleted.name}.`,
       refModel: 'Result',
       refId: resultConfirmed._id,
-    },
-    {
-      userId: spectator._id,
-      type: 'viewing_ticket_purchased',
-      title: 'Vé xem đã sẵn sàng',
-      message: `Bạn đã có vé xem ${raceOpen.name}.`,
-      refModel: 'RaceViewingPass',
-      refId: viewingPass._id,
     },
     {
       userId: spectator3._id,
@@ -1495,16 +1298,16 @@ async function seed(): Promise<void> {
   ]);
 
   console.log('\n=== Seed hoàn tất ===\n');
-  console.log('A — Kỵ sĩ: lời mời đang chờ ở trận', raceUpcoming.name);
-  console.log('B — Khán giả: mở dự đoán ở trận', raceOpen.name);
+  console.log('A — Kỵ sĩ: trận sắp diễn ra nhưng chưa có ngựa đăng ký', raceUpcoming.name);
+  console.log('B — Khán giả: cửa sổ dự đoán mở, chờ có ngựa đăng ký ở trận', raceOpen.name);
   console.log('C — Chấm điểm: kết quả đã xác nhận, chờ công bố ở trận', raceCompleted.name);
   console.log('   -> spectator@demo.local đúng 1 vé, spectator2 sai 1 vé, spectator3 đúng 2 vé');
   console.log('   -> giải cố định hạng 1/2/3 = 30M/15M/5M điểm, chia 80% chủ ngựa / 20% kỵ sĩ khi công bố');
   console.log('C3 — Không có người thắng: kết quả đã xác nhận, chờ công bố ở trận', raceNoWinner.name);
   console.log('   -> spectator4 và spectator5 đều dự đoán sai; công bố để kiểm thử chia quỹ 40/60 khi không có người thắng');
   console.log('D — Trọng tài: đã tạo kết quả nháp ở trận', raceDraft.name);
-  console.log('E — Độc lập: ngựa đã đăng ký, chưa có kỵ sĩ ở trận', raceIndependent.name);
-  console.log('F — Trước đua: 5 ngựa đã kiểm tra ở trận', raceFiveReady.name);
+  console.log('E — Độc lập: trận trống để chủ ngựa tự đăng ký ở UI', raceIndependent.name);
+  console.log('F — Trước đua: trận trống để tự kiểm thử xếp ngựa', raceFiveReady.name);
   console.log('   -> Kỵ sĩ đang rảnh: jockey3@demo.local');
   console.log('   -> Tài khoản khán giả bổ sung: spectator2@demo.local, spectator3@demo.local, spectator4@demo.local, spectator5@demo.local');
   console.log('   -> Tài khoản chủ ngựa/kỵ sĩ bổ sung: owner2@demo.local, jockey4@demo.local, jockey5@demo.local');
