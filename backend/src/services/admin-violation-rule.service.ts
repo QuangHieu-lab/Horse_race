@@ -26,6 +26,14 @@ function normalizePayload(payload: Partial<IViolationRule>): Partial<IViolationR
   return next;
 }
 
+function normalizeRuleForResponse<T extends { penaltyApplied?: string; requiresBanDuration?: boolean | null }>(rule: T) {
+  return {
+    ...rule,
+    requiresBanDuration:
+      rule.requiresBanDuration ?? rule.penaltyApplied === 'time_ban',
+  };
+}
+
 export async function createRule(adminId: string, payload: Partial<IViolationRule>) {
   const existingRule = await ViolationRule.findOne({ code: payload.code?.toUpperCase() });
   if (existingRule) throw new HttpError(400, `Mã luật ${payload.code} đã tồn tại.`);
@@ -37,7 +45,12 @@ export async function listRules(filters: { category?: string; isActive?: string 
   if (filters.category) query.category = filters.category;
   if (filters.isActive !== undefined) query.isActive = filters.isActive === 'true';
 
-  return ViolationRule.find(query).populate('createdBy', 'fullName email').sort({ category: 1, code: 1 }).lean();
+  const rules = await ViolationRule.find(query)
+    .populate('createdBy', 'fullName email')
+    .sort({ category: 1, code: 1 })
+    .lean();
+
+  return rules.map(normalizeRuleForResponse);
 }
 
 export async function updateRule(id: string, payload: Partial<IViolationRule>) {
@@ -48,9 +61,17 @@ export async function updateRule(id: string, payload: Partial<IViolationRule>) {
 }
 
 export async function toggleRuleStatus(id: string) {
-  const rule = await ViolationRule.findById(id);
+  const currentRule = await ViolationRule.findById(id).select('isActive').lean();
+  if (!currentRule) throw new HttpError(404, 'Không tìm thấy luật vi phạm.');
+
+  // Dùng cập nhật nguyên tử để việc bật/tắt không kích hoạt validation toàn bộ
+  // tài liệu legacy (có thể còn penaltyApplied từ schema cũ).
+  const rule = await ViolationRule.findByIdAndUpdate(
+    id,
+    { $set: { isActive: !currentRule.isActive } },
+    { new: true },
+  ).lean();
   if (!rule) throw new HttpError(404, 'Không tìm thấy luật vi phạm.');
-  rule.isActive = !rule.isActive;
-  await rule.save();
-  return rule.toObject();
+
+  return normalizeRuleForResponse(rule);
 }
