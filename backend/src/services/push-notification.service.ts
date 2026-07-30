@@ -32,6 +32,8 @@ export async function sendPushToUser(
       title: payload.title,
       body: payload.body,
       data: payload.data ?? {},
+      priority: 'high',
+      channelId: 'default',
     });
   }
 
