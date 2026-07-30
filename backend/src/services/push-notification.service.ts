@@ -43,10 +43,16 @@ export async function sendPushToUser(
 
   for (const chunk of expo.chunkPushNotifications(messages)) {
     const tickets = await expo.sendPushNotificationsAsync(chunk);
-    const rejectedTokens = tickets
-      .map((ticket, index) => ({ ticket, token: chunk[index]?.to }))
-      .filter(({ ticket }) => ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered')
-      .flatMap(({ token }) => (Array.isArray(token) ? token : token ? [token] : []));
+    const rejectedTokens: string[] = [];
+
+    tickets.forEach((ticket, index) => {
+      if (ticket.status !== 'error') return;
+      const token = chunk[index]?.to;
+      console.warn('Expo push ticket error:', ticket.details?.error, ticket.message, 'token:', token);
+      if (ticket.details?.error === 'DeviceNotRegistered' && typeof token === 'string') {
+        rejectedTokens.push(token);
+      }
+    });
 
     if (rejectedTokens.length > 0) {
       await DeviceToken.deleteMany({ token: { $in: rejectedTokens } });
